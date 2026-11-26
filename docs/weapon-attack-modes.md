@@ -18,7 +18,7 @@ These are starting values to playtest. Energy (EP) pays for physical effort. Man
 | Spear · Probe | 11 EP | Maintain distance or conserve energy. | A quick thrust with a small step back on recovery. |
 | Spear · Driving thrust | 25 EP | Near full reach against a recovering rival. | A committed step behind the spear, with higher stance damage and slower recovery. |
 
-**Spear finisher — Last Cast.** On a lethal driving thrust near maximum reach, let the release pose flow into a short victory animation. The winner rocks back and throws the spear as the rival falls. Show the shaft leave the hand, cross the gap and stick in the sand beside the rival, quivering. Trigger it through the existing post-victory finisher system. The throw spends no extra energy, deals no second hit and needs no mid-bout weapon retrieval. Give it a minimum visible flight distance and use the ordinary finish when the fighters overlap.
+**Spear finisher — Last Cast.** The current game gives a lethal spear melee hit from at least 1.8 units away a one-in-eight chance of Last Cast. The winner rocks back and throws the spear, pinning the fallen rival. Once spear modes exist, use the driving thrust as the eligible move. The throw spends no extra energy and deals no second hit.
 
 ## Rest of the roster
 

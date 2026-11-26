@@ -28,3 +28,7 @@ Every commit that changes the game must be a meaningful improvement in a working
 - Work in the primary agent by default.
 - Use one read-only subagent only when I ask, or to review a risky change to combat logic (timing, hit detection, resources). Give it the diff and a specific question.
 - Don't run parallel agents that edit code.
+
+## Arena art direction
+
+The arena leans gory. Use stylized blood at the point of impact, stains on the sand and occasional bloody weapon-specific finishes. Keep injuries readable at the normal arena camera distance. Reserve severing for rare or signature executions. Keep the violence brief and leave anatomical close-ups and prolonged suffering out of the presentation. A heavy weapon should visibly shift the opponent’s weight in the direction of the blow.

@@ -54,7 +54,7 @@ const shields = {
   tower: { name: 'Tower shield', defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
 };
 // Testing only: ?force=perfect,wall,sand,oath,mender,pull,verdict makes those events trigger whenever they can,
-// and ?force=behead (impale, launch, shatter, pin) picks that finisher for every kill
+// and ?force=behead (impale, crumple, lastCast, shatter, pin) picks that finisher for every kill
 // (oath, mender and verdict: at any health below full; pull: at a shorter distance).
 const forced = new Set((new URLSearchParams(location.search).get('force') || '').split(',').filter(Boolean));
 const perfectColor = '#ffe9a8';
@@ -1537,7 +1537,9 @@ function drawGladiator(fighter, pose, parts) {
   }
 
   partStart = recordGeometry(parts, 'body', partStart);
-  weaponModel(fighter, j.weaponHand, pose.angle, pose.windup, pose.strike, weaponClock(), limb, world);
+  const thrown = finishingSpear(fighter, pose);
+  weaponModel(fighter, thrown?.hand || j.weaponHand, thrown?.angle ?? pose.angle, pose.windup, pose.strike,
+    weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon);
   partStart = recordGeometry(parts, 'held', partStart);
   const wieldingShield = shieldReady(fighter);
   const [sx, sy, sz] = wieldingShield ? j.shieldHand : torso([-.36, .34, -.42]);

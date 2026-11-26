@@ -3,13 +3,14 @@
 // Cosmetic finishers on the killing blow, chosen by weapon and hit zone. finishBout has already
 // decided the winner when one starts, and a finisher only moves the loser's ragdoll and changes
 // drawing, so it can never change who wins. Like effects.js, nothing here calls Math.random.
-// Testing: ?force=behead (or impale, launch, shatter, pin) uses that finisher on every kill.
+// Testing: ?force=behead (or impale, crumple, lastCast, shatter, pin) uses that finisher on every kill.
 let finisher = null;
 
 const finisherTypes = {
   behead: { name: 'BEHEADED', verb: 'beheads', color: '#ffb0a0' },
   impale: { name: 'RUN THROUGH', verb: 'runs through', color: '#ffd0ba' },
-  launch: { name: 'LAUNCHED', verb: 'launches', color: '#e0a060' },
+  lastCast: { name: 'LAST CAST', verb: 'pins', color: '#f2bd91' },
+  crumple: { name: 'CRUMPLED', verb: 'flattens', color: '#e0a060' },
   shatter: { name: 'SHATTERED', verb: 'shatters', color: '#cfefff' },
   pin: { name: 'PINNED', verb: 'pins', color: '#fae3ac' }
 };
@@ -17,6 +18,7 @@ const finisherTypes = {
 function chooseFinisher(attacker, defender, zone, action) {
   const pick = Object.keys(finisherTypes).find(type => forced.has(type));
   if (pick) return pick;
+  if (forced.has('launch')) return 'crumple'; // Older preview links.
   if (action?.execute) return 'behead';
   const key = action?.key;
   const iced = action?.spell?.ice || (key && specialOf(attacker, key) === specials.wintersBite)
@@ -24,9 +26,12 @@ function chooseFinisher(attacker, defender, zone, action) {
   if (iced) return 'shatter';
   if (!action || action.bash || action.spell || !key) return null;
   if (action.style === 'ranged') return 'pin';
-  if (zone === 'head' && meleeType(key) === 1) return 'behead';
+  // Presentation rolls stay independent of the fight's random sequence.
+  const rare = () => crypto.getRandomValues(new Uint8Array(1))[0] < 32;
+  if (key === 'spear' && Math.abs(attacker.x - defender.x) >= 1.8 && rare()) return 'lastCast';
+  if (zone === 'head' && meleeType(key) === 1 && rare()) return 'behead';
   if (key === 'rapier' && zone === 'body') return 'impale';
-  if (weaponFamily(key) === 'maul') return 'launch';
+  if (weaponFamily(key) === 'maul') return 'crumple';
   return null;
 }
 
@@ -56,11 +61,15 @@ function startFinisher(attacker, defender, zone, action) {
     ragdoll.pose.severed = true;
     ragdoll.pose.headSpin = 0;
     finisher.spin = -10;
-  } else if (type === 'launch') {
-    // Fly back as far as the arena allows, high enough to read as a launch.
-    const room = 4.1 + defender.direction * defender.x;
-    const speed = clamp(room / 1.25, .8, 3.4);
-    for (const node of all) node.speed = [-speed - node.point[1] * .55, 6 + node.point[1] * .9, node.speed[2]];
+  } else if (type === 'crumple') {
+    const room = clamp(3.8 + defender.direction * defender.x, 0, 1);
+    for (const node of all) {
+      const height = node.point[1];
+      node.speed = [-height * room * 1.45, -height * 1.8, node.speed[2] * .3];
+    }
+  } else if (type === 'lastCast') {
+    finisher.held = displayPose(attacker);
+    for (const node of all) node.speed = [-node.point[1] * .75, 0, 0];
   } else if (type === 'impale') {
     finisher.held = displayPose(attacker);
     finisher.tip = toLocal(defender, weaponTip(attacker, finisher.held, .78));
@@ -100,7 +109,19 @@ function stepFinisher(dt) {
   }
   stepRagdoll(ragdoll, dt / 2);
   stepRagdoll(ragdoll, dt / 2);
-  if (type === 'behead') {
+  if (type === 'crumple' && !finisher.landed && nodes.chest.point[1] <= nodes.chest.floor + .06) {
+    finisher.landed = true;
+    const point = worldPoint(defender, nodes.chest.point);
+    ArenaEffects.dust(point[0], point[2], '#b49b78', 12, 1.1);
+    ArenaEffects.bleed(point, attacker.direction, .38);
+    ArenaEffects.shake(.4);
+  } else if (type === 'lastCast' && t >= .7 && !finisher.landed) {
+    finisher.landed = true;
+    const point = worldPoint(defender, nodes.chest.point);
+    ArenaEffects.bleed(point, attacker.direction, .55);
+    ArenaEffects.dust(point[0], point[2], '#b49b78', 7, .8);
+    ArenaEffects.shake(.3);
+  } else if (type === 'behead') {
     const grounded = nodes.head.point[1] <= nodes.head.floor + .02;
     finisher.spin *= Math.exp(-dt * (grounded ? 6 : .4));
     ragdoll.pose.headSpin += finisher.spin * dt;
@@ -136,13 +157,33 @@ function stepFinisher(dt) {
 
 // The victor's pose during an impale: the finishing thrust held, then a front kick.
 function finisherPose(fighter) {
-  if (finisher?.type !== 'impale' || fighter !== finisher.attacker) return null;
+  if (!finisher?.held || fighter !== finisher.attacker) return null;
   const held = finisher.held;
   const pose = { ...held, joints: { ...held.joints } };
   const t = finisher.clock;
+  if (finisher.type === 'lastCast') {
+    const draw = smooth(t / .28);
+    const release = smooth((t - .28) / .14);
+    applyMotion(fighter, pose, { handX: -.58, handY: .52, leanX: -.12 }, draw);
+    applyMotion(fighter, pose, { handX: .80, handY: -.12, leanX: .22 }, release);
+    pose.angle = mix(held.angle, .18, draw) - .48 * release;
+    return pose;
+  }
   const kick = smooth((t - .55) / .25) * (1 - smooth((t - 1.05) / .35));
   if (kick > 0) applyMotion(fighter, pose, { frontX: .62, frontY: .42, leanX: -.14, hipX: -.05 }, kick);
   return pose;
+}
+
+// Return the same mesh grip in fighter-local coordinates throughout the throw.
+function finishingSpear(fighter, pose) {
+  if (finisher?.type !== 'lastCast' || fighter !== finisher.attacker) return null;
+  const flight = clamp((finisher.clock - .42) / .28, 0, 1);
+  const target = toLocal(fighter, worldPoint(finisher.defender, finisher.defender.ragdoll.nodes.chest.point));
+  const angle = mix(pose.angle, -.56, flight);
+  const endGrip = weaponAxis(target, angle)(-1.68);
+  const hand = pointBetween(pose.joints.weaponHand, endGrip, flight);
+  hand[1] += .12 * Math.sin(Math.PI * flight);
+  return { hand, angle };
 }
 
 // How far to tint the loser toward ice while they freeze, 0 to 1.
