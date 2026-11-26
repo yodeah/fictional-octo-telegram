@@ -181,8 +181,12 @@
       haft(g, c.wood, -118, 128, 3);
       wrap(g, c.grip, -16, 16, 3.8);
       shape(g, 'M-122,0 L-116,-3.4 L-108,-3.6 L-108,3.6 L-116,3.4 Z', steelAcross(g, 4, c.iron), 1.1);
-      // Tassel under the head.
-      for (let i = 0; i < 7; i++) stroke(g, `M122,${i < 4 ? 3 : -3} q-${6 + i},${(i % 4) * 3 * (i < 4 ? 1 : -1)} -${12 + i * 1.4},${(8 + i % 3 * 4) * (i < 4 ? 1 : -1)}`, tone(c.team, (i % 3) * .14 - .1), 1.5);
+      // Two thick tassels under the head.
+      for (const s of [-1, 1]) {
+        shape(g, `M122,${s * 3} C114,${s * 6} 106,${s * 9} 100,${s * 18} L105,${s * 15} L104,${s * 21} L110,${s * 14} L111,${s * 18} C115,${s * 10} 120,${s * 8} 127,${s * 4} Z`,
+          gradient(g, 100, s * 20, 124, s * 3, c.team, [-.2, .15, .05]), 1.1);
+        stroke(g, `M121,${s * 4.6} C115,${s * 7} 109,${s * 10} 104,${s * 16}`, 'rgba(255,215,185,.55)', .8);
+      }
       shape(g, 'M118,-4.4 L134,-3.4 L134,3.4 L118,4.4 Z', steelAcross(g, 4.4, c.brass), 1.1);
       metal(g, 'M132,-3.4 C140,-12 150,-11 158,-9 L179,0 L158,9 C150,11 140,12 132,3.4 Z', 11, c.steel, 29);
       stroke(g, 'M134,0 L176,0', tone(c.iron, -.15), 1.4);
