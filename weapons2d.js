@@ -756,7 +756,11 @@
   });
 
   special('pendulum', 'twinFlail', { steel: [188, 164, 230], iron: [98, 76, 140], brass: [214, 196, 244], grip: [60, 44, 84], wood: [76, 58, 100], teamCss: '#d8b4ff' }, g => {
-    stroke(g, 'M26,0 a8,5 0 1 1 8,0 a8,5 0 1 0 8,0', '#eadcff', 1.5);
+    // A swinging-weight sigil on a violet wrap.
+    shape(g, 'M24,-5 H46 V5 H24 Z', tone([120, 88, 176], 0), 1);
+    stroke(g, 'M30,-3 L38,2', '#f2e8ff', 1);
+    disc(g, 39.6, 2, 2.2, '#f2e8ff', .5);
+    stroke(g, 'M28,3 Q35,6 43,2', '#d8c0ff', .8);
     disc(g, 57, 0, 3.6, '#c79cff', 1);
   }, { glow: { x: 58, color: 'blue' } });
 
