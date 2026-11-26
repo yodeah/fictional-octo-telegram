@@ -250,7 +250,6 @@ function applySpellbook(fighter) {
   }));
 }
 const particles = [];
-const labels = [];
 const stains = [];
 const faces = [];
 const armor = [135, 125, 108];
@@ -1733,19 +1732,7 @@ function draw() {
   }
   ArenaEffects.drawSparks(ctx, project, scale);
   ctx.restore();
-  for (const label of labels) {
-    const [x, y] = project([label.x, label.y + label.age * .53, label.z + .3]);
-    ctx.globalAlpha = clamp((label.life - label.age) * 3, 0, 1);
-    ctx.font = '800 ' + (label.small ? 16 : 25) + 'px system-ui';
-    ctx.textAlign = 'center';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#302017';
-    ctx.strokeText(label.text, x, y);
-    ctx.fillStyle = label.color;
-    ctx.fillText(label.text, x, y);
-  }
-  ctx.globalAlpha = 1;
+  ArenaEffects.drawLabels(ctx, project, width, height);
 }
 
 function logEvent(message) {
@@ -1995,7 +1982,7 @@ function startBout(generated = null) {
   elapsed = 0;
   fall = 0;
   hitPause = 0;
-  particles.length = labels.length = stains.length = 0;
+  particles.length = stains.length = 0;
   ArenaEffects.reset();
   fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
@@ -2041,8 +2028,10 @@ function runBout() {
   updateControls();
 }
 
-function floatLabel(fighter, text, color, small = false, height = 2.64) {
-  labels.push({ x: fighter.x, z: fighter.z, y: height, age: 0, life: 1.08, text, color, small });
+const healColor = '#b9f08f';
+
+function floatLabel(fighter, text, color, options) {
+  ArenaEffects.label([fighter.x, 2.52, fighter.z + .3], text, color, options);
 }
 
 function burst(fighter, { offset = 0, y = 1.35, point, direction, colors, count, blood = false, gravity = 5 }) {
@@ -2070,11 +2059,17 @@ function payForSpell(action) {
 function applySupportSpell(fighter, spell, power) {
   let message;
   let label;
+  let tag;
+  let color = spell.color;
+  let share;
   if (spell.heal) {
     const amount = Math.min(Math.round(spell.heal * power), fighter.maxHP - fighter.hp);
     fighter.hp += amount;
     updateHealth();
-    label = '+' + amount + ' HP';
+    label = '+' + amount;
+    tag = 'HEALTH';
+    color = healColor;
+    share = amount / fighter.maxHP;
     message = 'restores ' + amount + ' HP';
   } else if (spell.absorb) {
     fighter.ward = Math.round(spell.absorb * power);
@@ -2090,6 +2085,7 @@ function applySupportSpell(fighter, spell, power) {
     updateMana();
     updateHealth();
     label = '+' + Math.round(amount) + ' MP';
+    tag = '−' + spell.hpCost + ' HP';
     message = 'trades ' + spell.hpCost + ' HP for ' + Math.round(amount) + ' MP';
   } else {
     const amount = Math.min(spell.energyRestore, 100 - fighter.energy);
@@ -2099,7 +2095,7 @@ function applySupportSpell(fighter, spell, power) {
     label = '+' + Math.round(amount) + ' ENERGY';
     message = 'recovers ' + Math.round(amount) + ' energy and gains haste';
   }
-  floatLabel(fighter, label, spell.color, !spell.heal);
+  floatLabel(fighter, label, color, { tag, power: share });
   logEvent(fighter.name + ' casts ' + spell.name + ' and ' + message + '.');
   burst(fighter, { colors: [spell.color, '#fff3d3'], count: 24, gravity: 2 });
 }
@@ -2116,7 +2112,7 @@ function applySpellHit(attacker, defender, spell, damage) {
     const healing = Math.min(Math.round(damage * spell.lifesteal), attacker.maxHP - attacker.hp);
     if (healing > 0) {
       attacker.hp += healing;
-      floatLabel(attacker, '+' + healing + ' HP', spell.color, true);
+      floatLabel(attacker, '+' + healing, healColor, { tag: 'DRAINED', power: healing / attacker.maxHP });
       logEvent(attacker.name + ' drains ' + healing + ' HP.');
     }
   }
@@ -2151,7 +2147,7 @@ function breakStance(fighter, duration) {
   updateStance(fighter);
   ArenaEffects.shake(.55);
   kickDust(fighter, 1.35, 12);
-  floatLabel(fighter, 'STAGGERED', '#f4c483', true, 2.34);
+  floatLabel(fighter, 'STAGGERED', '#ffbe5c');
   logEvent(fighter.name + ' staggers and drops their guard.');
 }
 
@@ -2176,7 +2172,7 @@ function impact(action, contact) {
 
   const name = bash ? 'shield bash' : spell?.name || weapons[action.key].name.toLowerCase();
   if ((style === 'melee' && !contact) || action.missedShot) {
-    floatLabel(defender, 'MISS', '#e1cfb3', true);
+    floatLabel(defender, 'MISS', '#d8cbb8');
     logEvent(attacker.name + (action.crowded > .35 ? ' misses a crowded crossbow shot.' : ' misses with the ' + name + '.'));
     return;
   }
@@ -2188,7 +2184,7 @@ function impact(action, contact) {
     defender.reaction = { zone: 'arm', time: elapsed };
     hitPause = .035;
     ArenaEffects.shake(action.heavy ? .45 : .22);
-    floatLabel(defender, 'BLOCKED', '#ffe2a0', true);
+    floatLabel(defender, 'BLOCKED', '#ffe2a0');
     ArenaEffects.strike(point || [defender.x - attacker.direction * .56, 1.55, defender.z + .55], -attacker.direction,
       spell?.color || '#ffb63f', action.heavy ? 26 : 16, action.heavy ? 1.4 : 1);
     if (action.heavy) kickDust(defender, 1.1, 8);
@@ -2198,7 +2194,7 @@ function impact(action, contact) {
     return;
   }
   if (action.resistedSpell) {
-    floatLabel(defender, 'RESISTED', spell.color, true);
+    floatLabel(defender, 'RESISTED', spell.color);
     burst(defender, { colors: [spell.color, '#fff3d3'], count: 8 });
     logEvent(defender.name + ' resists ' + attacker.name + '’s ' + name + '.');
     return;
@@ -2232,8 +2228,12 @@ function impact(action, contact) {
   ArenaEffects.strike(flashPoint, attacker.direction, spell?.color || (clang ? '#ffb63f' : '#ffe0c2'),
     clang ? 12 : 4, action.heavy || zone === 'head' ? 1.35 : .9);
   if (action.heavy || actualDamage > defender.maxHP * .14) kickDust(defender, 1, 7);
-  const hitText = zone !== 'body' && contact ? ' · ' + zone.toUpperCase() : matchup >= 1.2 ? ' · EDGE' : '';
-  floatLabel(defender, actualDamage ? '−' + actualDamage + hitText : 'ABSORBED', color, !actualDamage || !!hitText);
+  const tag = [zone !== 'body' && contact ? zone.toUpperCase() : '', matchup >= 1.2 ? 'ARMOR WEAKNESS' : '',
+    absorbed ? absorbed + ' WARDED' : ''].filter(Boolean).join(' · ');
+  if (actualDamage) {
+    floatLabel(defender, '−' + actualDamage, spell?.color || (zone === 'head' ? '#ffd23f' : '#fff6ea'),
+      { tag, power: actualDamage / defender.maxHP });
+  } else floatLabel(defender, 'ABSORBED', color);
   defender.reaction = { zone, time: elapsed };
   hitPause = zone === 'head' ? .066 : .045;
   defender.hp -= actualDamage;
@@ -2276,10 +2276,6 @@ function updateEffects(dt) {
       stains.push({ x: particle.x, z: particle.z, size: .025 + Math.random() * .055 });
     }
     if (particle.life <= 0 || particle.y <= 0) particles.splice(i, 1);
-  }
-  for (let i = labels.length - 1; i >= 0; i--) {
-    labels[i].age += dt;
-    if (labels[i].age >= labels[i].life) labels.splice(i, 1);
   }
 }
 
