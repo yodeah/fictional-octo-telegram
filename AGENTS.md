@@ -15,6 +15,14 @@ Every commit that changes the game must be a meaningful improvement in a working
 - After committing, give me the commit hash, the command that starts the game (`open index.html` from the project folder), and what to try.
 - If you couldn't run the game, say so and don't call the commit tested.
 
+## Ideas backlog
+
+`ideas.md` lists improvement ideas with an impact (1–5), an estimated token cost and a score (impact per 10k tokens), sorted best first.
+
+- When you notice a good idea while working, add it to `ideas.md` with its impact, estimated tokens and score, and keep the table sorted by score.
+- When asked what to do next, start from the top of `ideas.md`.
+- Remove an idea in the commit that implements it.
+
 ## Subagents
 
 - Work in the primary agent by default.
