@@ -312,4 +312,28 @@
       disc(g, -32, 0, 4.4, tone(c.iron, 0), 1.1);
     }
   };
+
+  art.club = {
+    box: [-36, -24, 114, 24],
+    draw(g, c) {
+      const body = 'M-30,-3.6 C0,-3.4 28,-5 48,-9 C68,-13 82,-18 98,-17 C110,-16 111,16 98,17 C82,18 68,13 48,9 C28,5 0,3.4 -30,3.6 Z';
+      shape(g, body, across(g, 17, [152, 105, 59].map((v, i) => Math.round(v * c.wood[i] / WOOD_REF[i])), [.2, .3, -.05, -.45]), 1.4);
+      wear(g, body, [-30, -17, 108, 17], 130, 'rgba(255,220,170,.35)', 'rgba(30,12,2,.45)', 89, 8);
+      for (const [x, y] of [[66, 3], [90, -7]]) {
+        g.beginPath();
+        g.ellipse(x, y, 4.4, 2.6, .2, 0, Math.PI * 2);
+        g.fillStyle = 'rgba(55,28,8,.7)';
+        g.fill();
+      }
+      for (const [x, r] of [[62, 12.4], [77, 16], [93, 17.4]]) {
+        band(g, c.brass, x, r, 3.6);
+        for (const y of [-r * .6, 0, r * .6]) rivet(g, x, y, 1.1, c.brass);
+      }
+      for (const [x, y] of [[70, -14], [85, -17], [70, 14], [85, 17]]) {
+        metal(g, `M${x - 3},${y} L${x},${y + Math.sign(y) * 6} L${x + 3},${y} Z`, 24, c.iron, 97);
+      }
+      wrap(g, c.grip, -26, 10, 4.2);
+      disc(g, -31, 0, 4.2, tone(c.brass, 0), 1.1);
+    }
+  };
 })();
