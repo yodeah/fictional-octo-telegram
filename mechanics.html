@@ -18,7 +18,7 @@
       <div><p class="eyebrow">FIELD MANUAL</p><h1>Mechanics</h1></div>
     </section>
     <nav class="toc" aria-label="Sections">
-      <a href="#bout">The bout</a><a href="#stats">Stats and resources</a><a href="#choice">Decisions</a><a href="#hits">Hits and damage</a><a href="#stance">Stance</a><a href="#gear">Gear</a><a href="#spells">Spells</a><a href="#ideas">Improvements</a>
+      <a href="#bout">The bout</a><a href="#stats">Stats and resources</a><a href="#choice">Decisions</a><a href="#hits">Hits and damage</a><a href="#stance">Stance</a><a href="#tactics">Tactics and wounds</a><a href="#gear">Gear</a><a href="#spells">Spells</a><a href="#ideas">Improvements</a>
     </nav>
 
     <section class="record" id="bout">
@@ -34,6 +34,26 @@
         <li><b>Arena:</b> the Sand Pit, Fernwood Clearing and Moonlit Ruins rotate every one to three bouts. They are cosmetic, including the crowd and wildlife you can click between bouts.</li>
         <li><b>Record:</b> win totals last until the page is closed or reloaded.</li>
       </ul>
+    </section>
+
+    <section class="record" id="tactics">
+      <h2>Tactics and wounds</h2>
+      <p>In the game you pick a stance and a target before each bout. Your opponent always fights balanced with no target.</p>
+      <table>
+        <tr><th>Stance</th><th>Effect</th></tr>
+        <tr><td>Balanced</td><td>No change.</td></tr>
+        <tr><td>Aggressive</td><td>Damage +8%, attack speed +4%, half the pause between attacks, stance damage +35%. Weapon energy cost +40%, recovers 1 less energy per second, block chance −16 points, perfect block −15, dodge −8, takes 16% more damage.</td></tr>
+        <tr><td>Defensive</td><td>Block chance +8 points, perfect block +15, dodge +2, weapon energy cost −20%, recovers 1 more energy per second. Damage −10%, pauses 40% longer.</td></tr>
+      </table>
+      <p>A target takes three of every four melee swings at its height. Bolts, spells and bashes ignore it. Which parts a weapon really reaches depends on its shape: axes and mauls rarely reach the legs. Special damage and burning ignore stance.</p>
+      <table>
+        <tr><th>Target</th><th>Every swing</th><th>When it lands there</th></tr>
+        <tr><td>Head</td><td>Damage −13%, easier to dodge</td><td>Head hits already do +24% and shake the stance more</td></tr>
+        <tr><td>Body</td><td>Damage −4%, harder to dodge</td><td>—</td></tr>
+        <tr><td>Arms</td><td>Damage −3%</td><td>Drains 10 energy</td></tr>
+        <tr><td>Legs</td><td>Reaches closer in</td><td>Slows the foe by 20% for 2.5 seconds</td></tr>
+      </table>
+      <p>A bout that ends with you under 20% health (a lost spar or a spared defeat included) leaves one wound on the part that took the most damage. Bolts and spells count as body. Cracked skull: −10% melee and ranged skill. Broken ribs: −10% health. Torn arm: −10% strength. Gashed leg: −10% speed. A wound lasts four days, a rest day counts double, and a surgeon removes it for gold.</p>
     </section>
 
     <section class="record" id="stats">

@@ -7,6 +7,8 @@ A gory gladiator autobattler with permanent death, for phone and laptop. Static 
 - Dice-rolled stats and a race (human, elf or demon, each with a drawback).
 - Each day: fight, train, rest or work. The debt falls due every fifth day.
 - Sparring is safe from death; blood bouts and champions are not, apart from one mercy per champion.
+- Before each bout pick a stance (aggressive, balanced, defensive) and where to aim.
+- Ending a bout under a fifth of your health leaves a wound on the part that took the most damage: −10% to one thing for four days, unless you pay the surgeon.
 - Champions give a trophy weapon and a spell page. Mana appears with your first spell.
 - The game saves itself. A saved fight replays identically after a reload. A save code backs it up.
 - A new gladiator may start at the furthest champion reached (a Legacy).
@@ -19,7 +21,7 @@ What comes next is in [docs/implementation-plan.md](docs/implementation-plan.md)
 node --test tests/*.test.mjs
 ```
 
-About 90 seconds. They check the rules, that a seed repeats a fight, weapon balance, and that a sensible bot can finish while a random one cannot. `node tests/report.mjs` and `node tests/weapons.mjs` print the numbers.
+About 3 minutes. They check the rules, that a seed repeats a fight, weapon balance, and that a sensible bot can finish while a random one cannot. `node tests/report.mjs` and `node tests/weapons.mjs` print the numbers.
 
 ## Combat engine
 

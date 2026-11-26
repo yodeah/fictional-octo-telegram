@@ -42,7 +42,9 @@ const Game = (() => {
     debt: ['The debt', 'Every fifth day the lanista collects. Miss once and you are flogged. Miss twice and you are sold.'],
     train: ['Training', 'A drill costs gold and a day. Each repeat of the same drill teaches a little less.'],
     market: ['Armor matters', 'Melee cuts through leather, bolts through robes, spells through plate. Axes and maces break shields.'],
-    wounds: ['Wounds', 'You carry your wounds into the next fight. A day heals some; resting heals all.'],
+    wounds: ['Lost health', 'You carry lost health into the next fight. A day heals some; resting heals all.'],
+    injury: ['Injuries', 'A wound costs you something until it heals. Resting heals it twice as fast, or pay the surgeon.'],
+    tactics: ['Tactics', 'Pick a stance and a target before the bell. The trainer judges the fight with your choice.'],
     spells: ['Spells', 'Your first spell wakes your mana. You can ready up to three; your gladiator decides when to cast.']
   };
   const tip = key => save.seen[key] ? '' : '<aside class="tip"><b>' + tips[key][0] + '</b><p>' + tips[key][1] + '</p>' + button('tip', 'Got it', 'data-key="' + key + '"') + '</aside>';
@@ -92,6 +94,37 @@ const Game = (() => {
     const share = wins / trials;
     return share >= .93 ? ['safe', 'You should win this.'] : share >= .72 ? ['good', 'The odds are yours, but not certain.']
       : share >= .45 ? ['even', 'A coin toss. Think again.'] : ['bad', 'You will likely lose.'];
+  }
+
+  // The stance and target pickers on the bout screen.
+  function tacticsPanel() {
+    const run = save.run;
+    const pickers = (action, keys, table, chosen) => '<div class="choices">' + keys.map(key => button(action, table[key].name,
+      'data-key="' + key + '" aria-pressed="' + (chosen === key) + '"')).join('') + '</div>';
+    const tactic = run.tactic || 'balanced';
+    const aim = run.aimAt || 'any';
+    const melee = [run.equipped.weapon, run.equipped.reserve].some(key => key !== 'none' && weaponClass(Rules.trophies[key] || key) === 'melee');
+    return '<h2>Stance</h2>' + pickers('tactic', Rules.tacticKeys, tactics, tactic) + '<p class="small">' + tactics[tactic].text + '</p>'
+      + '<h2>Aim at</h2>' + pickers('aim', Rules.aimKeys, aimZones, aim) + '<p class="small">' + aimZones[aim].text
+      + (melee ? '' : ' Targets only guide melee blows, and you carry no melee weapon.') + '</p>';
+  }
+
+  function woundList(run, treatable) {
+    const cost = Rules.surgeonCost(run);
+    return Rules.woundsOf(run).map(({ part, days }) => '<div class="card wound"><h3>' + Rules.wounds[part].name + '</h3><p>' + Rules.wounds[part].text
+      + ' · heals in ' + days + (days === 1 ? ' day' : ' days') + '</p>'
+      + (treatable ? button('treat', 'Pay the surgeon: ' + cost + ' gold', 'data-key="' + part + '"' + (run.gold < cost ? ' disabled' : '')) : '') + '</div>').join('');
+  }
+
+  // Asks the trainer again after a short pause, so the screen draws first.
+  function judge() {
+    const mine = preview;
+    mine.read = null;
+    setTimeout(() => {
+      if (preview !== mine || view !== 'confirm' || mine.read) return;
+      mine.read = trainersRead(Rules.heroConfig(save.run), mine.foe);
+      render(true);
+    }, 60);
   }
 
   const screens = {
@@ -147,12 +180,13 @@ const Game = (() => {
     confirm: () => {
       const run = save.run;
       const { kind, foe, read } = preview;
-      const risk = kind === 'spar' ? 'First blood. Losing costs the purse and leaves you hurt.'
+      const risk = kind === 'spar' ? 'First blood. Losing costs the purse and leaves you hurt and wounded.'
         : run.mercy ? 'To the death. If you fall, the crowd may spare you this once, for half your gold.' : 'To the death. There is no mercy left. If you fall, ' + escape(run.name) + ' is gone.';
       return scene('arena') + '<h2>' + { spar: 'Sparring', blood: 'Blood bout', champion: 'Champion' }[kind] + ' · purse about ' + Rules.purse(run, kind) + ' gold</h2>'
-        + card({ ...Rules.heroConfig(run) }, '<p class="small">You, at ' + Math.round(run.health * 100) + '% health</p>')
+        + card({ ...Rules.heroConfig(run) }, '<p class="small">You, at ' + Math.round(run.health * 100) + '% health</p>') + woundList(run)
         + card(foe, '<p class="weak">' + weakness(foe) + '</p>' + (kind === 'champion' ? '<p class="small">' + Rules.champions[run.act].hint + '</p>' : ''))
-        + '<p class="read ' + (read?.[0] || '') + '">Trainer: ' + (read ? read[1] : 'Let me watch you both…') + '</p><p class="small ' + (kind === 'spar' ? '' : 'warn') + '">' + risk + '</p>'
+        + tip('tactics') + tacticsPanel()
+        + '<p class="read ' + (read?.[0] || '') + '">Trainer: ' + (read ? read[1] : 'Let me watch you both…') + '</p><p class="small ' + (kind === 'spar' ? '' : 'warn') + '">' + risk + (kind === 'spar' ? '' : ' Win with under a fifth of your health and you carry a wound.') + '</p>'
         + button('fight', 'Walk onto the sand', 'class="primary"') + button('back', 'Not today');
     },
 
@@ -189,6 +223,7 @@ const Game = (() => {
       + ' · ' + foe.maxHP + ' health</p><p class="small">About ' + Rules.purse(run, kind) + ' gold</p>' + button('size', 'Size up', 'data-key="' + kind + '"') + '</div>';
     const champion = Rules.champions[run.act];
     return scene('arena') + tip('arena') + (run.health < 1 ? tip('wounds') : '') + (run.day > 2 ? tip('debt') : '')
+      + (Rules.woundsOf(run).length ? tip('injury') + woundList(run, true) : '')
       + offer('spar', 'SPARRING · +1 renown', run.offers.spar) + offer('blood', 'BLOOD BOUT · +2 renown · to the death', run.offers.blood)
       + (Rules.championReady(run) ? offer('champion', champion.title + ' · to the death', Rules.championConfig(run.act))
         : '<p class="small locked">' + champion.name + ' will answer your challenge at ' + Rules.renownNeeded[run.act] + ' renown.</p>')
@@ -297,6 +332,15 @@ const Game = (() => {
     return { name: '', race: 'human', stats: Rules.rollStats(), rerolls: 3, startAct: 0 };
   }
 
+  function retune(choose, key) {
+    choose(save.run, key);
+    store();
+    // A fresh object, so a trainer's answer still on its way for the old choice is dropped.
+    preview = { ...preview };
+    judge();
+    render(true);
+  }
+
   const actions = {
     title: () => go('title'),
     saves: () => go('saves'),
@@ -333,14 +377,13 @@ const Game = (() => {
     size: kind => {
       const run = save.run;
       const foe = kind === 'champion' ? Rules.championConfig(run.act) : run.offers[kind];
-      const mine = preview = { kind, foe, read: null };
+      preview = { kind, foe, read: null };
       go('confirm');
-      setTimeout(() => {
-        if (preview !== mine || view !== 'confirm') return;
-        mine.read = trainersRead(Rules.heroConfig(run), foe);
-        render(true);
-      }, 60);
+      judge();
     },
+    tactic: key => retune(Rules.setTactic, key),
+    aim: key => retune(Rules.setAim, key),
+    treat: part => { Rules.treat(save.run, part); store(); render(true); },
     back: () => go('hub'),
     fight: () => {
       if (!Rules.startFight(save.run, preview.kind)) return;

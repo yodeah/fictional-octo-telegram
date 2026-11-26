@@ -31,7 +31,8 @@ const ArenaDuel = (() => {
     random = generator(seed);
     carry = 0;
     state = 'ready';
-    const copies = configs.map(config => ({ lifesteal: 0, spellList: [], ...config, gear: { ...config.gear }, wins: 0 }));
+    // Every optional field needs a default here: the engine reuses its fighters, and old saved fights lack the new ones.
+    const copies = configs.map(config => ({ lifesteal: 0, spellList: [], tactic: 'balanced', aimAt: 'any', pace: 1, ...config, gear: { ...config.gear }, wins: 0 }));
     seeded(() => startBout(copies));
     fighters.forEach((fighter, index) => {
       fighter.hp = Math.max(1, Math.round(fighter.maxHP * (configs[index].health ?? 1)));
@@ -72,11 +73,17 @@ const ArenaDuel = (() => {
     }
   }
 
-  const result = () => state === 'finished' ? {
-    won: fighters[0].hp > 0,
-    health: Math.max(0, fighters[0].hp / fighters[0].maxHP),
-    time: elapsed
-  } : null;
+  // `worst` is the part of the first fighter that took the most damage; wounds follow it.
+  const result = () => {
+    if (state !== 'finished') return null;
+    const zones = fighters[0].zoneDamage;
+    return {
+      won: fighters[0].hp > 0,
+      health: Math.max(0, fighters[0].hp / fighters[0].maxHP),
+      time: elapsed,
+      worst: Object.keys(zones).reduce((worst, zone) => zones[zone] > zones[worst] ? zone : worst, 'body')
+    };
+  };
 
   // Plays the rest of the bout at once.
   function resolve() {

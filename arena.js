@@ -154,6 +154,24 @@ const specialOf = (fighter, key = fighter.weapon) => ownedSpecial(fighter)?.weap
 const weaponName = (fighter, key) => specialOf(fighter, key)?.name || weapons[key].name;
 // Weapon pickers list specials by their own key; this resolves a picker value to the weapon it uses.
 const pickedWeapon = value => specials[value]?.weapon || value;
+// Chosen before a bout. 'balanced' and 'any' change nothing, so fights saved without them replay as before.
+const tactics = {
+  balanced: { name: 'Balanced', damage: 1, taken: 1, tempo: 1, cost: 1, regen: 0, block: 0, perfect: 0, evade: 0, pause: 1, breaking: 1,
+    text: 'No gain and no price.' },
+  aggressive: { name: 'Aggressive', damage: 1.08, taken: 1.16, tempo: 1.04, cost: 1.4, regen: -1, block: -.16, perfect: -.15, evade: -.08, pause: .5, breaking: 1.35,
+    text: 'Strikes again sooner, hits harder and breaks guards. Tires fast, guards badly and takes more damage.' },
+  defensive: { name: 'Defensive', damage: .9, taken: 1, tempo: 1, cost: .8, regen: 1, block: .08, perfect: .15, evade: .02, pause: 1.4, breaking: 1,
+    text: 'Blocks better and saves energy. Waits longer between blows and hits softer.' }
+};
+// swing scales every aimed blow, landed there or not; dodge is added to the foe's chance to avoid it.
+const aimZones = {
+  any: { name: 'None', text: 'Strike whatever opens.' },
+  head: { name: 'Head', aim: .93, swing: .87, dodge: .06, text: 'Head blows hurt most, but a high swing is careful, softer and easier to dodge.' },
+  body: { name: 'Body', aim: .08, swing: .96, dodge: -.06, text: 'The surest mark: harder to dodge, a little softer.' },
+  arm: { name: 'Arms', aim: -.45, swing: .97, dodge: 0, drain: 10, text: 'Arm blows deal less but drain the foe’s energy.' },
+  leg: { name: 'Legs', aim: -1.5, swing: 1, dodge: 0, hobble: 2.5, text: 'Leg blows deal less but slow the foe. Axes and mauls rarely reach that low.' }
+};
+const tacticOf = fighter => tactics[fighter.tactic] || tactics.balanced;
 const manaRegen = 3.6;
 const energyRegen = 5;
 const switchCost = 7;
@@ -340,7 +358,8 @@ const weaponKeys = fighter => [fighter.gear.weapon, fighter.gear.reserve].filter
 const carriesSpare = fighter => fighter.gear.reserve !== 'none';
 const shieldReady = fighter => fighter.shieldHitsLeft > 0 && !weapons[fighter.weapon].twoHanded;
 const mobility = fighter => (shieldReady(fighter) ? shields[fighter.gear.shield].mobility : 1) * armors[fighter.gear.armor].mobility
-  * (carriesSpare(fighter) ? .96 : 1) * (fighter.hastedUntil > elapsed ? 1.12 : 1);
+  * (carriesSpare(fighter) ? .96 : 1) * (fighter.hastedUntil > elapsed ? 1.12 : 1)
+  * (fighter.hobbledUntil > elapsed ? .8 : 1) * (fighter.pace ?? 1);
 const defense = fighter => fighter.defense + (shieldReady(fighter) ? shields[fighter.gear.shield].defense : 0) + armors[fighter.gear.armor].defense;
 const attackType = (style, key) => style === 'magic' ? 3 : style === 'ranged' ? 4 : meleeType(key);
 
@@ -2387,11 +2406,11 @@ function pickAction(attacker, defender) {
       const energy = attacker.energy - (key === attacker.weapon ? 0 : switchCost);
       const opening = defender.stunnedUntil > elapsed || defender.frozenUntil > elapsed || defender.action?.connected
         || attacker.counterUntil > elapsed || defender.stance >= stanceLimit(defender) * .55;
-      const canCleave = distance <= weapon.range + .2 && opening && energy >= powerProfile(weapon, attacker.strength, axeModes.cleave).cost;
+      const canCleave = distance <= weapon.range + .2 && opening && energy >= Math.ceil(powerProfile(weapon, attacker.strength, axeModes.cleave).cost * tacticOf(attacker).cost);
       mode = canCleave ? axeModes.cleave : axeModes.chop;
     }
     const handling = powerProfile(weapon, attacker.strength, mode);
-    const stamina = clamp(attacker.energy / handling.cost, 0, 1);
+    const stamina = clamp(attacker.energy / Math.ceil(handling.cost * tacticOf(attacker).cost), 0, 1);
     const level = style === 'ranged' ? attacker.ranged : (attacker.attack + attacker.strength) / 2;
     const reach = style === 'ranged'
       ? (.95 + Math.min(distance, 4.7) * .075) * mix(1, .27, crowding)
@@ -2501,26 +2520,33 @@ function startAction(attacker, defender, bash = false) {
   const item = weapons[key];
   const spell = spells[spellKey];
   const ranged = style === 'ranged';
-  const handling = style === 'melee' && !bash ? powerProfile(item, attacker.strength, mode)
+  const tactic = tacticOf(attacker);
+  const guarding = tacticOf(defender);
+  const profile = style === 'melee' && !bash ? powerProfile(item, attacker.strength, mode)
     : { heavy: false, cost: bash ? 14 : item.energy, power: 1, recovery: .51 };
+  const handling = bash || spell ? profile : { ...profile, cost: Math.ceil(profile.cost * tactic.cost) };
   const fatigue = spell ? 1 : clamp(attacker.energy / handling.cost, 0, 1);
   const equipAccuracy = accuracyBonus(attacker, defender, style, key);
   const guard = shields[defender.gear.shield];
   const ownShield = shields[attacker.gear.shield];
   const blockChance = (bash ? .12 : spell ? spell.block || 0 : item.block)
-    + clamp((defense(defender) - 56) / (spell ? 350 : 150), -.10, .20);
+    + clamp((defense(defender) - 56) / (spell ? 350 : 150), -.10, .20) + guarding.block;
   const guardCost = guard.energy + (handling.heavy ? 7 : 0);
   const block = shieldReady(defender) && !ownedSpecial(defender)?.noGuard?.(defender, defender.special) && (!spell || spell.damage) && defender.energy >= guardCost
     && (Math.random() < Math.max(.03, blockChance) || (forced.has('perfect') && style === 'melee' && !bash));
   // A well-timed block: easier against telegraphed heavy swings and for high Defense.
   const perfect = block && style === 'melee' && !bash
-    && (forced.has('perfect') || Math.random() < clamp(.45 + (handling.heavy ? .15 : 0) + (defense(defender) - 56) / 250, .25, .70));
+    && (forced.has('perfect') || Math.random() < clamp(.45 + (handling.heavy ? .15 : 0) + (defense(defender) - 56) / 250, .25, .70) + guarding.perfect);
+  // A chosen target takes most swings. Bashes go where they always did.
+  const aimed = !bash && !spell && style === 'melee' ? aimZones[attacker.aimAt] : undefined;
+  const mark = aimed?.aim;
   const evade = !spell && !bash && !block && defender.frozenUntil <= elapsed && defender.energy >= 11
-    && Math.random() < clamp(.18 - equipAccuracy / 520 - (attacker.attack - 55) / 600, .03, .32) * mobility(defender);
+    && Math.random() < (clamp(.18 - equipAccuracy / 520 - (attacker.attack - 55) / 600, .03, .32) + guarding.evade + (aimed?.dodge || 0)) * mobility(defender);
   const aimRoll = Math.random();
-  const aim = defender.stunnedUntil > elapsed ? -.64 : aimRoll < .19 ? -.96 : aimRoll > .69 ? .93 : .08;
+  const aim = mark !== undefined && aimRoll < .75 ? mark
+    : defender.stunnedUntil > elapsed ? -.64 : aimRoll < .19 ? -.96 : aimRoll > .69 ? .93 : .08;
   const reach = bash ? 1.18 : item.range - .23 - Math.abs(aim) * .26;
-  const tempo = (bash ? 2.34 * ownShield.bashTempo : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16 * (mode?.tempo ?? 1))
+  const tempo = (bash ? 2.34 * ownShield.bashTempo : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16 * (mode?.tempo ?? 1) * tactic.tempo)
     * mobility(attacker) * mix(.76, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1);
   const attackSkill = ranged ? attacker.ranged : (attacker.strength * 2 + attacker.attack) / 3;
   const damage = bash ? (5.5 + attacker.strength / 28) * fatigue * ownShield.bashPower
@@ -2532,14 +2558,14 @@ function startAction(attacker, defender, bash = false) {
     attacker, defender, phase: 0, created: now, previousPose, bash, key, mode, label: mode?.name,
     block, guardCost, evade, spell, spellKey, aim, style, switched, perfect,
     riposte: bash && attacker.riposte && attacker.counterUntil > now, bashPower: bash ? ownShield.bashPower : 1,
-    damage: damage * (bash ? 1 : armorPower(attacker, style)),
+    damage: damage * (bash ? 1 : armorPower(attacker, style) * tactic.damage * (aimed?.swing ?? 1)),
     crowded: ranged ? closeRange(gap) : 0,
     shotRoll: Math.random(),
     shotAccuracy: .75 + attacker.ranged / 390 + equipAccuracy / 430,
     resistedSpell: spell?.damage && Math.random() > clamp(.95 + equipAccuracy / 410, .72, .99),
     attackType: bash ? 2 : attackType(style, key),
     heavy: handling.heavy, cost: handling.cost, tempo, hitAt, reach,
-    stanceDamage: bash ? 47 * ownShield.bashPower : spell ? 12 : ranged ? 16 : mode?.stance ?? (handling.heavy ? 49 : 24 + item.damage * .36),
+    stanceDamage: bash ? 47 * ownShield.bashPower : spell ? 12 : (ranged ? 16 : mode?.stance ?? (handling.heavy ? 49 : 24 + item.damage * .36)) * tactic.breaking,
     duration: hitAt + (bash ? .43 : handling.recovery) + (switched ? .13 : 0)
   };
   if (mode?.heavy) spendEnergy(attacker, handling.cost);
@@ -2615,6 +2641,8 @@ function startBout(generated = null) {
     fighter.cooldowns = {};
     fighter.reaction = fighter.ragdoll = null;
     fighter.shattered = false;
+    fighter.hobbledUntil = 0;
+    fighter.zoneDamage = { head: 0, body: 0, arm: 0, leg: 0 };
     updateStats(fighter);
     updateEnergy(fighter);
     updateStance(fighter);
@@ -2637,6 +2665,7 @@ function runBout() {
   logEvent(fighters[0].name + ' and ' + fighters[1].name + ' enter the arena.');
   for (const fighter of fighters) {
     const special = ownedSpecial(fighter);
+    if (fighter.tactic && fighter.tactic !== 'balanced') logEvent(fighter.name + ' fights ' + tacticOf(fighter).name.toLowerCase() + 'ly.');
     if (special) logEvent(fighter.name + ' carries ' + special.name + ': ' + special.effect.charAt(0).toLowerCase() + special.effect.slice(1) + '.');
   }
   updateControls();
@@ -2849,12 +2878,13 @@ function impact(action, contact) {
   }
 
   const zone = contact?.zone || 'body';
+  const struck = contact && !bash && !spell && zone === attacker.aimAt ? aimZones[zone] : null;
   const multiplier = { head: 1.24, body: 1, arm: .88, leg: .85 }[zone];
   const matchup = armors[defender.gear.armor][style];
   const absorption = style === 'magic' ? 1 : 1 - Math.max(0, defense(defender) - 45) / 275;
   const typeDefense = armors[defender.gear.armor].defenseBonus[action.attackType];
   const rolledDamage = Math.max(1, Math.round(damage * suddenDeath() * multiplier * matchup * absorption * (1 - typeDefense / 600)
-    * (defender.stunnedUntil > elapsed ? 1.14 : 1)));
+    * (defender.stunnedUntil > elapsed ? 1.14 : 1) * tacticOf(defender).taken));
   const absorbed = Math.min(defender.ward, rolledDamage);
   defender.ward -= absorbed;
   const actualDamage = survivable(defender, attacker, Math.min(rolledDamage - absorbed, defender.hp));
@@ -2883,6 +2913,7 @@ function impact(action, contact) {
   defender.reaction = { zone, time: elapsed };
   hitPause = zone === 'head' ? .066 : .045;
   defender.hp -= actualDamage;
+  defender.zoneDamage[zone] += actualDamage;
   hurt(defender, actualDamage, attacker, style);
   const weight = actualDamage / defender.maxHP * 2.4 + (zone === 'head' ? .15 : 0) + (action.heavy ? .1 : 0);
   ArenaEffects.shake(defender.hp <= 0 ? 1 : actualDamage ? Math.min(.85, .22 + weight) : .15);
@@ -2896,6 +2927,10 @@ function impact(action, contact) {
   // A special can end the bout itself (an execution), and then there is nothing left to resolve.
   if (state !== 'running') return;
   if (defender.hp > 0) {
+    if (struck && actualDamage) {
+      if (struck.drain) spendEnergy(defender, struck.drain);
+      if (struck.hobble) defender.hobbledUntil = elapsed + struck.hobble;
+    }
     applyStanceDamage(action, (zone === 'head' ? 1.25 : 1) * (actualDamage ? 1 : .36), bash);
     if (action.riposte) {
       // The riposte drives the defender back; moveFighter checks for the arena edge.
@@ -3172,7 +3207,7 @@ function advanceAction(action, dt) {
   }
   if (attacker.action === action && action.phase >= action.duration) {
     attacker.action = null;
-    const pause = (.08 + Math.random() * .29) * (attacker.energy < 18 ? 1.7 : 1);
+    const pause = (.08 + Math.random() * .29) * (attacker.energy < 18 ? 1.7 : 1) * tacticOf(attacker).pause;
     attacker.readyAt = elapsed + pause;
   }
 }
@@ -3203,7 +3238,7 @@ function update(dt, realTime) {
   elapsed += dt;
   for (const fighter of fighters) {
     fighter.mp = Math.min(100, fighter.mp + dt * manaRegen);
-    const recovery = energyRegen - (carriesSpare(fighter) ? .35 : 0);
+    const recovery = energyRegen - (carriesSpare(fighter) ? .35 : 0) + tacticOf(fighter).regen;
     fighter.energy = Math.min(100, fighter.energy + dt * recovery);
     updateEnergy(fighter);
     if (fighter.wardUntil <= elapsed) fighter.ward = 0;

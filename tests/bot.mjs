@@ -67,6 +67,10 @@ export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
       continue;
     }
     shop();
+    // The surgeon is only worth the money right before a champion.
+    if (smart && Rules.championReady(run)) for (const { part } of Rules.woundsOf(run).slice()) {
+      if (run.gold >= Rules.surgeonCost(run) + Rules.debtDue(run) + Rules.trainingCost(run)) Rules.treat(run, part);
+    }
     if (!smart) {
       const options = ['spar', 'blood', 'train', 'rest', 'work'];
       if (Rules.championReady(run)) options.push('champion', 'champion');

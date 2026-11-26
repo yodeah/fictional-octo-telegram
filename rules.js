@@ -15,6 +15,17 @@ const Rules = (() => {
     guard: { name: 'Shield work', text: 'Defense: less damage, better blocks.', gain: 3 },
     toughness: { name: 'Run the beach', text: 'More health.', gain: 16 }
   };
+  // Wounds are named for the part that took the most punishment. Each cuts one thing until it heals or is treated.
+  const wounds = {
+    head: { name: 'Cracked skull', text: '−10% weapon skill, melee and ranged' },
+    body: { name: 'Broken ribs', text: '−10% health' },
+    arm: { name: 'Torn arm', text: '−10% strength' },
+    leg: { name: 'Gashed leg', text: '−10% speed' }
+  };
+  const woundDays = 4;
+  const woundBelow = .2;
+  const tacticKeys = ['balanced', 'aggressive', 'defensive'];
+  const aimKeys = ['any', 'head', 'body', 'arm', 'leg'];
   const catalog = {
     club: { slot: 'weapon', price: 20, act: 0 },
     sword: { slot: 'weapon', price: 60, act: 0 },
@@ -103,15 +114,19 @@ const Rules = (() => {
     const weaponKey = key => trophies[key] || key;
     const { weapon, reserve, shield, armor } = run.equipped;
     const special = [weapon, reserve].find(key => trophies[key]) || 'none';
+    const hurt = part => woundsOf(run).some(wound => wound.part === part) ? .9 : 1;
     return {
       name: run.name,
       level: 1 + run.wins,
-      strength: Math.round(24 + stat(run, 'str') * 1.7 + trained(run, 'power')),
-      attack: Math.round(24 + stat(run, 'agi') * 1.7 + trained(run, 'skill')),
-      ranged: Math.round(24 + stat(run, 'agi') * 1.9 + trained(run, 'skill')),
+      strength: Math.round((24 + stat(run, 'str') * 1.7 + trained(run, 'power')) * hurt('arm')),
+      attack: Math.round((24 + stat(run, 'agi') * 1.7 + trained(run, 'skill')) * hurt('head')),
+      ranged: Math.round((24 + stat(run, 'agi') * 1.9 + trained(run, 'skill')) * hurt('head')),
       magic: Math.round(30 + stat(run, 'mind') * 2.2),
       defense: Math.round(8 + stat(run, 'agi') * .35 + stat(run, 'end') * .2 + trained(run, 'guard')),
-      maxHP: Math.round((72 + stat(run, 'end') * 2.7) * 1.5 + trained(run, 'toughness') + run.wins),
+      maxHP: Math.round(((72 + stat(run, 'end') * 2.7) * 1.5 + trained(run, 'toughness') + run.wins) * hurt('body')),
+      tactic: run.tactic || 'balanced',
+      aimAt: run.aimAt || 'any',
+      pace: hurt('leg') < 1 ? .9 : 1,
       color: [157, 62, 42],
       trim: [242, 143, 96],
       lifesteal: races[run.race].lifesteal,
@@ -167,6 +182,7 @@ const Rules = (() => {
       train: { power: startAct * 2, skill: startAct * 2, guard: startAct * 2, toughness: startAct * 2 },
       gold: 40 + startAct * 120, day: 1, act: startAct, renown: 0, health: 1, mercy: true, debtMisses: 0,
       inventory: ['club'], equipped: { weapon: 'club', reserve: 'none', shield: 'none', armor: 'rags' },
+      tactic: 'balanced', aimAt: 'any', wounds: [],
       spells: [], learned: [], spellChoices: null, spellsOwed: startAct, wins: 0, fights: 0, pending: null, over: null
     };
     if (startAct > 0) {
@@ -218,7 +234,41 @@ const Rules = (() => {
     return true;
   }
 
+  // Saves from before wounds existed have none.
+  const woundsOf = run => run.wounds || [];
+  const surgeonCost = run => 15 + 15 * run.act;
+
+  function wound(run, part, events) {
+    run.wounds = woundsOf(run).filter(item => item.part !== part).concat({ part, days: woundDays });
+    events.push('You leave the sand with a wound: ' + wounds[part].name.toLowerCase() + ' (' + wounds[part].text + ') for ' + woundDays + ' days.');
+  }
+
+  function treat(run, part) {
+    if (run.over || run.pending || run.gold < surgeonCost(run) || !woundsOf(run).some(item => item.part === part)) return false;
+    run.gold -= surgeonCost(run);
+    run.wounds = run.wounds.filter(item => item.part !== part);
+    return true;
+  }
+
+  function setTactic(run, key) {
+    if (tacticKeys.includes(key)) run.tactic = key;
+  }
+
+  function setAim(run, key) {
+    if (aimKeys.includes(key)) run.aimAt = key;
+  }
+
+  // A day of rest counts double toward healing a wound.
+  function healWounds(run, events, rested) {
+    run.wounds = woundsOf(run).map(item => ({ ...item, days: item.days - (rested ? 2 : 1) })).filter(item => {
+      if (item.days > 0) return true;
+      events.push('Your ' + wounds[item.part].name.toLowerCase() + ' has healed.');
+      return false;
+    });
+  }
+
   function endDay(run, events, rested = false) {
+    healWounds(run, events, rested);
     run.health = rested ? 1 : clamp(run.health + .22, 0, 1);
     if (run.day % debtEvery === 0 && !run.over) {
       const due = debtDue(run);
@@ -309,7 +359,10 @@ const Rules = (() => {
       events.push(foe.name + ' kills you. The sand drinks and the crowd moves on.');
       return events;
     }
-    return endDay(run, events);
+    endDay(run, events);
+    // Added after the day passes, so a new wound keeps its full length.
+    if (result.health < woundBelow && !run.over) wound(run, wounds[result.worst] ? result.worst : 'body', events);
+    return events;
   }
 
   function learnSpell(run, key) {
@@ -329,7 +382,7 @@ const Rules = (() => {
   }
 
   return {
-    races, statNames, drills, catalog, trophies, champions, renownNeeded,
+    races, statNames, wounds, woundDays, woundBelow, tacticKeys, aimKeys, woundsOf, surgeonCost, treat, setTactic, setAim, drills, catalog, trophies, champions, renownNeeded,
     rollStats, stat, newRun, heroConfig, championConfig, price, sellPrice, shopStock, slotOf, trainingCost, purse, wage,
     debtDue, daysToDebt, championReady, buy, sell, equip, equipped, train, rest, work, startFight, finishFight, learnSpell, toggleSpell
   };
