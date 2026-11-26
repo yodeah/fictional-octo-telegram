@@ -526,4 +526,26 @@
       shape(g, 'M86,16 c6,-1 7,7 0,9 c-5,-2 -5,-7 0,-9 Z', '#d9d3c4', .8);
     }
   };
+
+  art.sunStaff = {
+    box: [-100, -28, 156, 28],
+    glow: { x: 129, color: 'sun' },
+    draw(g, c) {
+      haft(g, c.wood, -94, 114, 3.4);
+      wrap(g, c.grip, -30, 18, 4.4);
+      for (const x of [-60, -39, -12, 40, 85, 106]) band(g, c.brass, x, 4.8);
+      shape(g, 'M-99,0 L-94,-4 L-86,-4 L-86,4 L-94,4 Z', steelAcross(g, 4, c.brass), 1.1);
+      for (let i = 0; i < 12; i++) {
+        const long = i % 2 === 0;
+        g.save();
+        g.translate(129, 0);
+        g.rotate(i * Math.PI / 6);
+        shape(g, `M10,${long ? -4.4 : -3} L${long ? 25 : 19},0 L10,${long ? 4.4 : 3} Z`, gradient(g, 10, -4, 24, 4, c.brass, [.7, .15, -.25]), 1);
+        g.restore();
+      }
+      disc(g, 129, 0, 14, gradient(g, 119, -10, 139, 10, c.brass, [.6, 0, -.4]), 1.4);
+      disc(g, 129, 0, 9.4, gradient(g, 122, -7, 136, 7, [255, 190, 70], [.75, .2, -.15]), 1);
+      disc(g, 126.4, -2.8, 2.6, 'rgba(255,255,235,.95)', 0);
+    }
+  };
 })();
