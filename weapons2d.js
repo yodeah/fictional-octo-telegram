@@ -131,4 +131,25 @@
       disc(g, -58, 0, 2.6, c.teamCss, .7);
     }
   };
+
+  art.claymore = {
+    box: [-68, -38, 180, 38],
+    draw(g, c) {
+      metal(g, 'M19,-7.6 L46,-8.4 L121,-6.6 L151,-4.8 L175,0 L151,4.8 L121,6.6 L46,8.4 L19,7.6 Z', 8.4, c.steel, 19);
+      shape(g, 'M34,0 L56,-1.9 L148,0 L56,1.9 Z', across(g, 1.9, c.iron, [-.35, .3]), .5);
+      wrap(g, c.grip, -52, 14, 4.2);
+      // Quillons sweep toward the blade and end in four-ring knots.
+      for (const s of [-1, 1]) {
+        shape(g, `M13,${s * 4} L29,${s * 27} L24,${s * 30} L11,${s * 9} Z`, steelAcross(g, 30, c.iron), 1.2);
+        for (const [dx, dy] of [[3.4, 0], [-3.4, 0], [0, 3.4], [0, -3.4]]) {
+          disc(g, 27 + dx, s * 30 + dy, 3, tone(c.iron, .12), .9);
+          disc(g, 27 + dx, s * 30 + dy, 1.1, tone(c.iron, -.5), 0);
+        }
+      }
+      shape(g, 'M12,-7 L24,-5 L30,0 L24,5 L12,7 Z', steelAcross(g, 7, c.iron), 1.1);
+      disc(g, 18, 0, 2.2, c.teamCss, .6);
+      disc(g, -57, 0, 6.4, gradient(g, -62, -5, -52, 5, c.iron, [.55, 0, -.4]), 1.2);
+      disc(g, -57, 0, 2.4, c.teamCss, .7);
+    }
+  };
 })();
