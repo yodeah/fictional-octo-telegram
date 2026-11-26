@@ -698,4 +698,12 @@
     stroke(g, cracks, '#ffd28a', 1.1);
     shape(g, 'M87,-7 L93,0 L87,7 L81,0 Z', '#ffa040', 1);
   });
+
+  special('jailersChain', 'flail', { iron: [96, 98, 108], steel: [140, 142, 152], brass: [140, 94, 62], grip: [50, 46, 46], wood: [72, 64, 58] }, g => {
+    // A cuff and key hanging from the haft.
+    stroke(g, 'M34,5 q-4,10 2,15', OUTLINE, 2.4);
+    for (const [color, w] of [[OUTLINE, 4.4], ['#8e929a', 2.4]]) stroke(g, 'M29,24 a7,7 0 1 0 14,0 a7,7 0 1 0 -14,0', color, w);
+    stroke(g, 'M14,5 L14,18 M14,15 L19,15 M14,18 L18,18', '#c9a45a', 1.8);
+    disc(g, 14, 5, 2.6, '#c9a45a', .8);
+  }, { box: [-34, -12, 70, 34] });
 })();
