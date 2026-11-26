@@ -288,4 +288,28 @@
       disc(g, -32, 0, 4.4, gradient(g, -36, -4, -28, 4, c.brass, [.6, -.4]), 1.1);
     }
   };
+
+  art.morningstar = {
+    box: [-36, -32, 124, 32],
+    draw(g, c) {
+      haft(g, c.wood, -30, 76, 3.5);
+      wrap(g, c.grip, -23, 10, 4.3);
+      for (const x of [20, 56, 70]) band(g, c.iron, x, 4.8);
+      const spike = (angle, reach) => {
+        g.save();
+        g.translate(91, 0);
+        g.rotate(angle);
+        metal(g, `M13,-4.6 L${reach},0 L13,4.6 Z`, 5, c.steel, 79);
+        g.restore();
+      };
+      for (let i = -3; i <= 4; i++) spike(i * Math.PI / 4, i === 0 ? 31 : 28);
+      disc(g, 91, 0, 17, gradient(g, 80, -14, 102, 14, c.iron, [.6, .1, -.2, -.5]), 1.4);
+      wear(g, 'M74,0 a17,17 0 1 0 34,0 a17,17 0 1 0 -34,0 Z', [74, -17, 108, 17], 50, 'rgba(255,255,255,.35)', 'rgba(20,20,30,.4)', 83, 3);
+      for (const [x, y] of [[85, -7], [97, 4], [83, 7]]) {
+        disc(g, x, y, 3.6, gradient(g, x - 3, y - 3, x + 3, y + 3, c.steel, [.7, -.4]), .9);
+      }
+      shape(g, 'M72,-7 L80,-8 L80,8 L72,7 Z', steelAcross(g, 8, c.brass), 1.1);
+      disc(g, -32, 0, 4.4, tone(c.iron, 0), 1.1);
+    }
+  };
 })();
