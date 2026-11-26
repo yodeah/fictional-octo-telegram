@@ -119,6 +119,20 @@
       <p>To test without waiting, open <code>index.html?force=oath,mender,pull</code> (any subset): Last Oath and Dawn Mender take hold at the first damage, and Jailer’s Chain pulls from 2.4 units.</p>
     </section>
 
+    <section class="record" id="finishers">
+      <h2>Finishers</h2>
+      <p>The killing blow can end in a finisher. It starts after the winner is decided and only changes how the loser falls and what is drawn, so it never changes who wins. The first match in this list is used:</p>
+      <table>
+        <tr><th>Finisher</th><th>When</th><th>What you see</th></tr>
+        <tr><td>Shattered</td><td>A frost spell kill, a Winter’s Bite kill, or any kill on a frozen (not rooted) target</td><td>The body turns to ice where it stands, then breaks into shards.</td></tr>
+        <tr><td>Pinned</td><td>A crossbow bolt kill</td><td>The body is knocked back and pinned to the ground with the bolt standing out of it.</td></tr>
+        <tr><td>Beheaded</td><td>A slashing weapon’s head hit (swords, greatswords, axes, halberd), gore on</td><td>The head flies off and tumbles; the neck sprays blood.</td></tr>
+        <tr><td>Run through</td><td>A rapier hit to the body</td><td>The body hangs on the blade, then the victor kicks it off.</td></tr>
+        <tr><td>Launched</td><td>Any war maul family kill</td><td>The body flies up and back, as far as the arena allows.</td></tr>
+      </table>
+      <p><b>Gore</b> (next to Hitboxes, saved in the browser) turns off blood sprays, stains and pools and replaces beheadings with a normal fall. It only changes the picture, so it works during a fight. To test a finisher, open <code>index.html?force=behead</code> (or <code>impale</code>, <code>launch</code>, <code>shatter</code>, <code>pin</code>) to use it on every kill.</p>
+    </section>
+
     <section class="record" id="gear">
       <h2>Gear</h2>
       <p>Each fighter carries a main weapon, an optional backup, a shield, armor and a spellbook. Variants shift their family’s numbers.</p>
@@ -171,7 +185,7 @@
       <ul>
         <li><b>Sound (S–M):</b> the game is silent. Add clangs, thuds, spell cues and crowd reactions.</li>
         <li><b>Impact (S):</b> add screen shake, longer freezes on big hits, weapon trails and larger damage numbers.</li>
-        <li><b>Finishers (M):</b> slow motion and a camera push on the killing blow.</li>
+        <li><b>Finishers (M):</b> slow motion and a camera push on the killing blow, on top of the finisher animations.</li>
         <li><b>Crowd (M):</b> a hype meter that rises with counters, staggers and comebacks.</li>
         <li><b>Arena first (M):</b> move gear and stats into a drawer so the fight fills the screen, with health bars close to it.</li>
       </ul>

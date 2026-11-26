@@ -25,6 +25,7 @@ const ArenaEffects = (() => {
   };
   let trauma = 0;
   let clock = 0;
+  let goreOn = true;
 
   const pointOnLine = (from, to, amount) => [from[0] + (to[0] - from[0]) * amount, from[1] + (to[1] - from[1]) * amount];
 
@@ -99,6 +100,7 @@ const ArenaEffects = (() => {
     },
     // Severity runs from 0 to 1 and sets how much sprays from the wound.
     bleed(point, direction, severity) {
+      if (!goreOn) return;
       const count = Math.round(24 + severity * 46);
       for (let i = 0; i < count; i++) {
         // One drop in four spatters back toward the attacker.
@@ -111,6 +113,7 @@ const ArenaEffects = (() => {
     },
     // A pool that spreads under a fallen fighter.
     pool(x, z) {
+      if (!goreOn) return;
       stains.push({ x, z, size: .1, limit: .92, color: '#6e1512' });
       for (let i = 0; i < 14; i++) {
         stains.push({ x: x + (random() - .5) * 1.3, z: z + (random() - .5) * .5, size: .02 + random() * .06, color: '#74201b' });
@@ -321,6 +324,11 @@ const ArenaEffects = (() => {
         }
       }
       ctx.restore();
+    },
+    // Gore off stops new blood and clears what is on the ground.
+    setGore(on) {
+      goreOn = on;
+      if (!on) drops.length = stains.length = 0;
     },
     reset() {
       trauma = 0;

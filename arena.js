@@ -46,7 +46,8 @@ const shields = {
   round: { name: 'Round shield', defense: 20, mobility: 1, energy: 15, bashTempo: 1, bashPower: 1, width: .34, height: .43, shape: 1 },
   tower: { name: 'Tower shield', defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
 };
-// Testing only: ?force=perfect,wall,sand,oath,mender,pull makes those events trigger whenever they can
+// Testing only: ?force=perfect,wall,sand,oath,mender,pull makes those events trigger whenever they can,
+// and ?force=behead (impale, launch, shatter, pin) picks that finisher for every kill
 // (oath and mender: at any health below full; pull: at a shorter distance).
 const forced = new Set((new URLSearchParams(location.search).get('force') || '').split(',').filter(Boolean));
 const perfectColor = '#ffe9a8';
@@ -1388,9 +1389,16 @@ function drawGladiator(fighter, pose) {
     weaponModel(fighter, mount, torsoAngle + (long ? 2.0 : -2.34), 0, 0, 0, holder, point => world(stow(point)), spare);
   }
 
-  const neck = pointBetween(j.chest, j.head, .48);
-  limb(j.chest, neck, [.12, .15], [.12, .15], robed ? clothLining : leather, 8);
-  const headTurn = Math.atan2(j.head[1] - j.chest[1], j.head[0] - j.chest[0]) - Math.PI / 2;
+  if (pose.severed) {
+    // Beheaded: a short stump stays on the body and the head tumbles on its own.
+    const stumpTop = shifted(j.chest, 0, .2);
+    limb(j.chest, stumpTop, [.12, .15], [.11, .13], robed ? clothLining : leather, 8);
+    limb(stumpTop, shifted(stumpTop, 0, .015), [.11, .13], [.09, .11], [120, 22, 20], 8);
+  } else {
+    const neck = pointBetween(j.chest, j.head, .48);
+    limb(j.chest, neck, [.12, .15], [.12, .15], robed ? clothLining : leather, 8);
+  }
+  const headTurn = pose.severed ? pose.headSpin : Math.atan2(j.head[1] - j.chest[1], j.head[0] - j.chest[0]) - Math.PI / 2;
   const headPoint = ([x, y, z]) => world([
     j.head[0] + x * Math.cos(headTurn) - y * Math.sin(headTurn),
     j.head[1] + x * Math.sin(headTurn) + y * Math.cos(headTurn), j.head[2] + z
@@ -2009,8 +2017,9 @@ function draw() {
   const sceneDone = performance.now();
   if (ArenaBench.drawEffects) ArenaEffects.drawStains(ctx, project, scale);
   const stainsDone = performance.now();
-  const poses = fighters.map(fighter => fighter.ragdoll?.pose || displayPose(fighter));
+  const poses = fighters.map(fighter => fighter.ragdoll?.pose || finisherPose(fighter) || displayPose(fighter));
   if (ArenaBench.drawFighters) fighters.forEach((fighter, index) => {
+    if (fighter.shattered) return;
     const pose = poses[index];
     const hips = pose.joints.hips;
     const down = fighter.ragdoll ? clamp(1 - hips[1] / 1.1, 0, 1) : 0;
@@ -2025,7 +2034,13 @@ function draw() {
       }
     }
     // The benchmark's polygon multiplier rebuilds each fighter in place: same picture, more polygons.
+    const firstFace = faces.length;
     for (let copy = 0; copy < ArenaBench.polygons; copy++) drawGladiator(fighter, pose);
+    // A frost-shatter finisher turns the body to ice before it breaks.
+    const frost = finisherFrost(fighter);
+    if (frost) for (let i = firstFace; i < faces.length; i++) {
+      faces[i].rgb = faces[i].rgb.map((channel, axis) => Math.round(mix(channel, [196, 232, 250][axis] * (.55 + channel / 560), frost)));
+    }
   });
   faces.sort((a, b) => a.depth - b.depth);
   paintFaces();
@@ -2048,6 +2063,7 @@ function draw() {
 function drawEffects() {
   drawMagic();
   drawBolts();
+  drawFinisher();
   for (const particle of particles) {
     const [x, y] = project([particle.x, particle.y, particle.z]);
     // Magic particles streak along their flight.
@@ -2339,6 +2355,7 @@ function startBout(generated = null) {
   hitPause = 0;
   particles.length = 0;
   scheduled.length = 0;
+  finisher = null;
   ArenaEffects.reset();
   fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
@@ -2366,6 +2383,7 @@ function startBout(generated = null) {
     fighter.special = {};
     fighter.cooldowns = {};
     fighter.reaction = fighter.ragdoll = null;
+    fighter.shattered = false;
     updateStats(fighter);
     updateEnergy(fighter);
     updateStance(fighter);
@@ -2640,17 +2658,20 @@ function impact(action, contact) {
     }
     return;
   }
-  finishBout(attacker, defender, zone, blood);
+  finishBout(attacker, defender, zone, blood, action);
 }
 
-function finishBout(attacker, defender, zone, blood) {
+function finishBout(attacker, defender, zone, blood, action = null) {
   defender.ragdoll = makeRagdoll(defender, zone);
-  defender.ragdoll.bleeding = blood;
+  defender.ragdoll.bleeding = blood && gore;
+  // The winner is settled here; the finisher only changes what the fall looks like. It starts before
+  // the actions are cleared so it can read the finishing pose.
+  const finisherDelay = startFinisher(attacker, defender, zone, action);
   attacker.wins++;
   state = 'finished';
   for (const fighter of fighters) fighter.action = null;
   elements.cast.hidden = true;
-  rematchDelay = 2.5;
+  rematchDelay = 2.5 + finisherDelay;
   elements.winner.textContent = attacker.name;
   elements.result.hidden = false;
   elements.record.textContent = fighters.map(fighter => fighter.name + ' ' + fighter.wins).join(' · ');
@@ -2908,11 +2929,14 @@ function update(dt, realTime) {
   updateEffects(dt);
   if (state === 'finished') {
     fall += dt;
-    if (fall < 2.1) for (const fighter of fighters) {
-      if (fighter.ragdoll) {
-        stepRagdoll(fighter.ragdoll, dt / 2);
-        stepRagdoll(fighter.ragdoll, dt / 2);
+    if (fall < 3.2) for (const fighter of fighters) {
+      if (!fighter.ragdoll) continue;
+      if (finisher?.defender === fighter) {
+        stepFinisher(dt);
+        continue;
       }
+      stepRagdoll(fighter.ragdoll, dt / 2);
+      stepRagdoll(fighter.ragdoll, dt / 2);
     }
     if (elements.repeat.checked) rematchDelay -= realTime;
     if (rematchDelay <= 0) beginRematch();
@@ -3006,6 +3030,19 @@ detailsToggle.addEventListener('click', () => {
   document.getElementById('scoreboard').dataset.details = open ? 'shown' : 'hidden';
   detailsToggle.setAttribute('aria-expanded', String(open));
   detailsToggle.textContent = open ? 'Hide gear, stats & spells' : 'Show gear, stats & spells';
+});
+
+// Gore only changes the picture, so like Hitboxes it stays available during a fight.
+const goreToggle = document.getElementById('gore');
+const showGore = () => {
+  goreToggle.setAttribute('aria-pressed', String(gore));
+  goreToggle.textContent = gore ? 'Gore on' : 'Gore off';
+};
+ArenaEffects.setGore(gore);
+showGore();
+goreToggle.addEventListener('click', () => {
+  setGore(!gore);
+  showGore();
 });
 
 elements.hitboxes.addEventListener('click', () => {
