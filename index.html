@@ -25,7 +25,7 @@
       <p class="bout-number">BOUT <strong id="bout">01</strong></p>
     </section>
     <section class="match" aria-label="Gladiator duel">
-      <div class="scoreboard">
+      <div class="scoreboard" id="scoreboard" data-details="hidden">
         <div class="fighter red">
           <div class="fighter-info">
             <h2>Varro <small id="red-level"></small></h2><span id="red-hp"></span>
@@ -55,6 +55,7 @@
           <p class="gear-note" id="blue-queued" role="status" hidden>Gear changes apply next bout.</p>
           <div class="spell-kit"><div class="loadout book-picker" id="blue-book"></div><div class="spells" id="blue-spells" aria-label="Cassian spells"></div></div>
         </div>
+        <button class="details-toggle" id="details" type="button" aria-expanded="false">Show gear, stats &amp; spells</button>
       </div>
       <div class="stage">
         <canvas id="arena" aria-label="Side view of Varro and Cassian fighting with weapons and shields"></canvas>

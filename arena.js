@@ -2700,6 +2700,15 @@ elements.speed.addEventListener('click', () => {
   elements.speed.setAttribute('aria-label', 'Simulation speed, ' + speeds[speedIndex] + ' times');
 });
 
+// Showing gear and stats only changes the page layout, so it stays available during a fight.
+const detailsToggle = document.getElementById('details');
+detailsToggle.addEventListener('click', () => {
+  const open = detailsToggle.getAttribute('aria-expanded') !== 'true';
+  document.getElementById('scoreboard').dataset.details = open ? 'shown' : 'hidden';
+  detailsToggle.setAttribute('aria-expanded', String(open));
+  detailsToggle.textContent = open ? 'Hide gear, stats & spells' : 'Show gear, stats & spells';
+});
+
 elements.hitboxes.addEventListener('click', () => {
   showHitboxes = !showHitboxes;
   elements.hitboxes.setAttribute('aria-pressed', String(showHitboxes));

@@ -48,6 +48,10 @@ h1{font:normal clamp(42px,6vw,70px)/.98 Georgia,serif;letter-spacing:-.045em}
 .active-gear{color:var(--muted)}
 .blue .gear-note,.blue .active-gear{text-align:right}
 .blue .fighter-info{flex-direction:row-reverse;text-align:right}
+/* Gear, stats and spellbooks stay out of the way while watching; the toggle brings them back. */
+.scoreboard[data-details="hidden"] :is(.stats,.loadout,.active-gear,.gear-note,.spell-kit){display:none}
+.details-toggle{grid-column:1/-1;justify-self:center;margin-top:10px;min-height:34px;padding:4px 14px;border:1px solid #544333;background:#2a231b;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer}
+.details-toggle:hover,.details-toggle[aria-expanded="true"]{border-color:var(--gold);color:var(--gold)}
 .versus{align-self:center;text-align:center;font:italic 17px Georgia,serif;color:var(--muted)}
 meter{display:block;width:100%;height:7px;background:#44382d;border:none;appearance:none}
 meter::-webkit-meter-bar{height:7px;background:#44382d;border:none;border-radius:0}

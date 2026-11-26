@@ -16,7 +16,7 @@ This replaces the earlier idea of a "corner coach" with timed calls.
 
 Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
 
-Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. Pin any selection for future bouts or leave the slot on **Auto** to keep what the last matchup chose. Fighters keep their levels, stats, and gear until you select **Generate matchup**. Hover over a selector or focus it with the keyboard to read details. Gear is locked while a bout is in progress.
+Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. These pickers, the fighter stats and the spell list are hidden so the fight stays in view; select **Show gear, stats & spells** under the fighters to open them, at any time. Pin any selection for future bouts or leave the slot on **Auto** to keep what the last matchup chose. Fighters keep their levels, stats, and gear until you select **Generate matchup**. Hover over a selector or focus it with the keyboard to read details. Gear is locked while a bout is in progress.
 
 Armor has separate attack and defense bonuses for stab, slash, crush, magic, and ranged. The greatsword and war maul trade slower, more expensive swings for higher accuracy and damage. They use both hands, so the shield moves to the back and stops providing defense or blocks until a one-handed weapon is drawn.
 
@@ -59,7 +59,7 @@ Fighters coil before they swing and carry the weapon through after it lands, the
 
 ## Renderers and benchmark
 
-The benchmark overlay is hidden by default so it never covers the fight. Select **Stats** next to the speed control to show or hide it, or open `index.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
+The benchmark overlay is hidden by default so it never covers the fight. Select **FPS** next to the speed control to show or hide it, or open `index.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
 
 The overlay toggles the fighter painter between **Canvas** (the default) and **WebGL**, and **Polys 1×/3×** builds each fighter three times over to test three times as many polygons with the same picture. The choices are saved in the browser; `?renderer=webgl` and `?polygons=3` set them from the address bar.
 

@@ -188,8 +188,8 @@ const ArenaBench = (() => {
   const opener = document.createElement('button');
   opener.type = 'button';
   opener.className = 'bench-open';
-  opener.title = 'Show or hide frame rate and renderer statistics';
-  opener.textContent = 'Stats';
+  opener.title = 'Show or hide the frame rate benchmark';
+  opener.textContent = 'FPS';
   opener.setAttribute('aria-expanded', String(settings.open));
   opener.addEventListener('click', () => toggle(panel.hidden));
   resetButton.title = 'Clear the statistics. The first second after a reset is ignored.';
