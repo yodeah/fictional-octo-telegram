@@ -690,4 +690,12 @@
     stroke(g, 'M24,0 L122,0', '#ff8a96', .9);
     for (const x of [48, 78, 104]) shape(g, `M${x},1.6 q2.6,4.6 0,6.4 q-2.6,-1.8 0,-6.4 Z`, '#b01828', .6);
   });
+
+  special('earthshaker', 'maul', { steel: [150, 128, 104], iron: [92, 76, 62], brass: [206, 128, 64], grip: [110, 70, 42] }, g => {
+    // Glowing cracks run through the head.
+    const cracks = 'M80,-24 L88,-14 L83,-6 M92,24 L85,14 L91,7 M96,-30 L90,-22 M78,30 L84,23';
+    stroke(g, cracks, 'rgba(255,120,30,.7)', 3.8);
+    stroke(g, cracks, '#ffd28a', 1.1);
+    shape(g, 'M87,-7 L93,0 L87,7 L81,0 Z', '#ffa040', 1);
+  });
 })();
