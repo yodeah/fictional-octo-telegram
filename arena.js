@@ -370,8 +370,8 @@ function polygon(points, color) {
 function surface(points, color, light, transform) {
   const projected = points.map(point => project(transform(point)));
   const depth = projected.reduce((sum, point) => sum + point[2], 0) / projected.length;
-  const fill = 'rgb(' + color.map(channel => clamp(Math.round(channel * light), 0, 255)).join(',') + ')';
-  faces.push({ projected, depth, fill });
+  const rgb = color.map(channel => clamp(Math.round(channel * light), 0, 255));
+  faces.push({ projected, depth, rgb });
 }
 
 const ringAngles = new Map();
@@ -1893,6 +1893,17 @@ function resize() {
   draw();
 }
 
+let glRenderer;
+function paintFaces() {
+  if (ArenaBench.renderer === 'webgl' && glRenderer === undefined) glRenderer = ArenaGL.create();
+  const useGL = ArenaBench.renderer === 'webgl' && glRenderer && !glRenderer.lost
+    && glRenderer.paint(faces, width, height, canvas.width, canvas.height);
+  if (useGL) ctx.drawImage(glRenderer.canvas, 0, 0, width, height);
+  else for (const face of faces) polygon(face.projected, 'rgb(' + face.rgb.join(',') + ')');
+  ArenaBench.report(useGL ? 'webgl' : 'canvas', faces.length, useGL ? glRenderer.paint.complex : 0,
+    canvas.width + '×' + canvas.height + ' px');
+}
+
 function draw() {
   // The still backdrop underneath fills the edges that a shake uncovers.
   ctx.drawImage(backdrop, 0, 0, width, height);
@@ -1919,10 +1930,11 @@ function draw() {
         ctx.globalAlpha = 1;
       }
     }
-    drawGladiator(fighter, pose);
+    // The benchmark's polygon multiplier rebuilds each fighter in place: same picture, more polygons.
+    for (let copy = 0; copy < ArenaBench.polygons; copy++) drawGladiator(fighter, pose);
   });
   faces.sort((a, b) => a.depth - b.depth);
-  faces.forEach(face => polygon(face.projected, face.fill));
+  paintFaces();
   faces.length = 0;
   ArenaEffects.drawDust(ctx, project, scale);
   ArenaEffects.drawTrails(ctx, project);
@@ -2678,6 +2690,12 @@ resize();
 new ResizeObserver(resize).observe(canvas);
 let lastFrame = performance.now();
 function frame(now) {
+  // Rendering is capped at 120 FPS. A skipped frame leaves lastFrame alone, so the next frame's
+  // dt covers the gap and the simulation advances by the same total time.
+  if (!ArenaBench.gate(now)) {
+    requestAnimationFrame(frame);
+    return;
+  }
   const dt = clamp((now - lastFrame) / 1000, 0, .05);
   lastFrame = now;
   const speed = speeds[speedIndex];
@@ -2697,7 +2715,9 @@ function frame(now) {
       sampleDust();
     }
   }
+  const drawStart = performance.now();
   draw();
+  ArenaBench.record(now, performance.now() - drawStart, state === 'paused');
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
