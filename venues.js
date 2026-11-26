@@ -284,7 +284,8 @@ const ArenaVenues = (() => {
     return [[birdsX / 1000, birdsY / 420], [.70, .49]];
   }
 
-  function create(ctx, button, targets, heading, invalidate) {
+  // flat() says whether the 2D art is on; venues2d.js then paints the venues it has.
+  function create(ctx, button, targets, heading, invalidate, flat = () => false) {
     const rotationRandom = randomSource(Date.now());
     let index = 0;
     let remaining = 1;
@@ -331,6 +332,14 @@ const ArenaVenues = (() => {
         if (index === 0) reactions[0] = clock + 2.4;
       },
       backdrop(width, height, original, detail) {
+        if (flat() && ArenaVenues2D.has(index)) {
+          ctx.save();
+          // The Sand Pit lays itself out in screen pixels; the others in the 1000 × 420 scene.
+          if (index) ctx.scale(width / sceneWidth, height / sceneHeight);
+          ArenaVenues2D.backdrop(ctx, index, index ? sceneWidth : width, index ? sceneHeight : height);
+          ctx.restore();
+          return 0;
+        }
         if (index === 0) return original();
         facetCount = 0;
         ctx.save();
@@ -344,11 +353,15 @@ const ArenaVenues = (() => {
         facetCount = 0;
         clock = time;
         const active = reactions.map(value => Math.max(0, value - clock));
-        ctx.save();
-        ctx.scale(width / sceneWidth, height / sceneHeight);
-        const points = index === 0 ? crowd(ctx, clock, active[0], detail) : index === 1
-          ? wildlife(ctx, clock, active, detail) : moonlife(ctx, clock, active, detail);
-        ctx.restore();
+        let points;
+        if (flat() && ArenaVenues2D.has(index)) points = ArenaVenues2D.draw(ctx, index, width, height, clock, active);
+        else {
+          ctx.save();
+          ctx.scale(width / sceneWidth, height / sceneHeight);
+          points = index === 0 ? crowd(ctx, clock, active[0], detail) : index === 1
+            ? wildlife(ctx, clock, active, detail) : moonlife(ctx, clock, active, detail);
+          ctx.restore();
+        }
         if (clock >= nextMarkerAt) {
           points.forEach(([x, y], i) => {
             targets[i].style.left = x * 100 + '%';

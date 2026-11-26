@@ -3416,7 +3416,7 @@ artButton.addEventListener('click', () => {
   artStyle.flat = !artStyle.flat;
   try { localStorage.setItem('arena-art', artStyle.flat ? '2d' : '3d'); } catch { /* private mode */ }
   showArtStyle();
-  draw();
+  resize();
   ArenaBench.reset();
 });
 showArtStyle();
@@ -3446,7 +3446,7 @@ elements.hitboxes.addEventListener('click', () => {
 
 scenery = ArenaVenues.create(ctx, document.getElementById('venue'),
   ['scenery-primary', 'scenery-secondary'].map(id => document.getElementById(id)),
-  document.getElementById('arena-title'), resize);
+  document.getElementById('arena-title'), resize, () => artStyle.flat);
 startBout();
 resize();
 new ResizeObserver(resize).observe(canvas);
