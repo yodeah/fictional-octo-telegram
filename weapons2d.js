@@ -479,4 +479,28 @@
       shape(g, 'M24,-3 L46,-2.6 L46,3 L24,3.4 Z', across(g, 3, c.grip, [.15, -.3]), .8);
     }
   };
+
+  art.repeater = {
+    box: [-46, -36, 90, 36],
+    string: { tip: 50, span: 29, nock: 18, pull: 18, bolt: 76 },
+    draw(g, c) {
+      const stock = 'M-42,-3 L-28,-6 L70,-5 L81,-1 L79,4 L10,5 C2,6 -2,14 -14,14 L-20,8 L-42,10 Z';
+      shape(g, stock, across(g, 12, c.wood, [.25, .05, -.15, -.45]), 1.4);
+      wear(g, stock, [-42, -6, 81, 13], 70, 'rgba(255,214,160,.28)', 'rgba(25,10,2,.4)', 139, 8);
+      // Box magazine on top with a lever.
+      shape(g, 'M10,-20 L48,-19 L50,-6 L8,-6 Z', across(g, 14, c.wood, [.35, .1, -.2, -.35]), 1.3);
+      for (const x of [14, 28, 42]) shape(g, `M${x},-19.6 h3.4 v13.4 h-3.4 Z`, steelAcross(g, 18, c.iron), .8);
+      for (let i = 0; i < 4; i++) stroke(g, `M${18 + i * 6},-24 L${19 + i * 6},-20`, '#e6dcc2', 1.8);
+      stroke(g, 'M40,-18 C34,-32 6,-32 -12,-20', OUTLINE, 4.4);
+      stroke(g, 'M40,-18 C34,-32 6,-32 -12,-20', tone(c.brass, .05), 2.4);
+      disc(g, -13, -19, 3.4, tone(c.wood, -.1), 1);
+      shape(g, 'M12,5 L22,5 L24,17 L14,18 Z', across(g, 18, c.grip, [.1, -.1, -.35]), 1.1);
+      for (const s of [-1, 1]) {
+        metal(g, `M62,${s * 3} C70,${s * 12} 64,${s * 23} 52,${s * 29} L48,${s * 33} L48,${s * 27} C58,${s * 21} 60,${s * 12} 55,${s * 3} Z`, 33, c.brass, 149);
+        rivet(g, 50, s * 29.4, 1.4, c.iron);
+      }
+      shape(g, 'M52,-7 L66,-6 L66,6 L52,7 Z', steelAcross(g, 7, c.iron), 1.1);
+      band(g, c.brass, 74, 6, 5);
+    }
+  };
 })();
