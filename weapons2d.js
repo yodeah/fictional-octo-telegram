@@ -667,4 +667,13 @@
     disc(g, 80, 0, 5, gradient(g, 76, -4, 84, 4, [255, 214, 110], [.7, 0]), 1);
     disc(g, 80, 0, 2, '#fffbe8', 0);
   }, { box: [-36, -30, 120, 30], glow: { x: 80, color: 'sun' } });
+
+  special('dragonBow', 'crossbow', { steel: [206, 82, 46], iron: [84, 36, 28], wood: [80, 46, 34], grip: [40, 22, 20], brass: [240, 204, 128] }, g => {
+    // Horned limb tips, a dragon head at the front and scales on the stock.
+    for (const s of [-1, 1]) shape(g, `M50,${s * 33} C58,${s * 36} 66,${s * 40} 70,${s * 39} C62,${s * 36} 57,${s * 30} 54,${s * 28} Z`, tone([240, 214, 150], 0), 1);
+    for (let x = -30; x < 44; x += 6) stroke(g, `M${x},-4 q3,4 6,0`, '#f0b070', .9);
+    shape(g, 'M68,-8 C78,-12 86,-9 90,-4 L80,-3 L88,2 C84,6 76,8 68,7 Z', gradient(g, 68, -10, 88, 6, [190, 60, 36], [.35, 0, -.35]), 1.2);
+    shape(g, 'M71,-9 L66,-18 L76,-11 Z', '#f0cc80', .9);
+    disc(g, 78, -6, 1.6, '#ffe27a', .6);
+  }, { box: [-46, -42, 96, 42] });
 })();
