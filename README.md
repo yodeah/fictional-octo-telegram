@@ -51,7 +51,7 @@ The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and
 
 ## Combat effects
 
-Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake on the finishing blow. The shake is off when the system asks for reduced motion. All effects live in `effects.js` and are cosmetic: they never change fight state or use the simulation's random rolls.
+Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake on the finishing blow. The shake is off when the system asks for reduced motion. Melee swings leave a short trail behind the weapon head, warmer for heavy weapons. All effects live in `effects.js` and are cosmetic: they never change fight state or use the simulation's random rolls.
 
 ## Armor geometry
 

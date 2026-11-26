@@ -1224,6 +1224,20 @@ function weaponSegments(fighter, pose) {
   }
 }
 
+function sampleTrails() {
+  for (const fighter of fighters) {
+    const action = fighter.action;
+    if (action?.style !== 'melee' || action.bash || action.phase < .48 || action.phase > action.hitAt + .14) continue;
+    const pose = fighterPose(fighter);
+    const hand = pose.joints.weaponHand;
+    const reach = point => Math.hypot(point[0] - hand[0], point[1] - hand[1]);
+    const tip = weaponSegments(fighter, pose).flatMap(([from, to]) => [from, to])
+      .reduce((far, point) => reach(point) > reach(far) ? point : far);
+    ArenaEffects.trail(action, worldPoint(fighter, pointBetween(hand, tip, .56)), worldPoint(fighter, tip),
+      action.heavy ? '#ffd493' : '#fff4da');
+  }
+}
+
 function bodyZones(fighter, { joints: j }, shielding) {
   const zones = [
     ['head', j.head, shifted(j.head, -.02, .13), .25],
@@ -1669,6 +1683,7 @@ function draw() {
   faces.sort((a, b) => a.depth - b.depth);
   faces.forEach(face => polygon(face.projected, face.fill));
   faces.length = 0;
+  ArenaEffects.drawTrails(ctx, project);
   if (showHitboxes) fighters.forEach((fighter, index) => drawHitboxes(fighter, poses[index]));
   drawMagic();
   drawBolts();
@@ -2412,7 +2427,13 @@ function frame(now) {
   }
   if (dt > 0) {
     const steps = Math.max(speed, Math.ceil(dt * speed * 60));
-    for (let step = 0; step < steps; step++) update(dt * speed / steps, dt / steps);
+    for (let step = 0; step < steps; step++) {
+      const frozen = state === 'paused' || hitPause > 0;
+      update(dt * speed / steps, dt / steps);
+      if (frozen) continue;
+      ArenaEffects.tick(dt * speed / steps);
+      sampleTrails();
+    }
   }
   draw();
   requestAnimationFrame(frame);
