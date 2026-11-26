@@ -437,4 +437,18 @@
       }
     }
   };
+
+  art.twinFlail = {
+    box: [-34, -14, 70, 14],
+    draw(g, c) {
+      haft(g, c.wood, -25, 56, 3.6);
+      wrap(g, c.grip, -20, 12, 4.4);
+      for (const x of [24, 42]) band(g, c.brass, x, 4.8);
+      shape(g, 'M52,-6 L62,-11 L66,-8 L60,0 L66,8 L62,11 L52,6 Z', steelAcross(g, 11, c.iron), 1.3);
+      disc(g, 57, 0, 2.6, c.teamCss, .7);
+      disc(g, -28, 0, 4.6, tone(c.brass, 0), 1.1);
+    },
+    link: linkArt(),
+    ball: ballArt(12.5)
+  };
 })();
