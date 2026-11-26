@@ -107,8 +107,16 @@
         <tr><td>ϟ Stormbrand</td><td>Sword</td><td>Once per bout, on the third landed hit, lightning strikes the target for 14 + Magic ÷ 12 magic damage (times the armor's magic matchup) and drains 20 energy. Ignores blocks and wards.</td></tr>
         <tr><td>⌇ Snarecaster</td><td>Crossbow</td><td>Bolts are snare bolts until one lands (not blocked or missed). That bolt roots the target in place for 3 seconds: no movement or dodges, attacks still allowed. Once per bout.</td></tr>
         <tr><td>✠ Last Oath</td><td>Greatsword</td><td>When the holder falls below 10% health, the oath holds for the rest of the bout: the fighter uses only Last Oath, deals +60% damage, heals 40% of damage dealt, and cannot block.</td></tr>
+        <tr><td>☀ Dawn Mender</td><td>Mace</td><td>Once, below 35% health and not attacking, the fighter stands still and channels for 1.5 seconds, then heals 30% of maximum health. Any damage during the channel interrupts it and the heal is lost.</td></tr>
+        <tr><td>♨ Dragon Bow</td><td>Crossbow</td><td>Its first shot fires two bolts 0.14 seconds apart, each rolled and blocked separately. Each bolt that lands sets the target burning for 3 seconds.</td></tr>
+        <tr><td>❄ Winter’s Bite</td><td>Axe</td><td>Every third landed hit freezes the target for 1.2 seconds: no movement and no new attacks.</td></tr>
+        <tr><td>⚕ Leech Fang</td><td>Rapier</td><td>Heals 30% of the damage it deals. Each miss (not a block) costs its wielder 3 HP, never below 1.</td></tr>
+        <tr><td>⛰ Earthshaker</td><td>War maul</td><td>Once per bout, after the first 2 seconds, a slam that breaks the target’s stance (1.4 second stagger) whether it hits or is blocked. A missed slam tries again on the next swing.</td></tr>
+        <tr><td>⛓ Jailer’s Chain</td><td>Flail</td><td>Once per bout, while holding it with the target more than 3.1 units away, the chain pulls the target to about 1.85 units and cancels the attack they were winding up. Costs 10 energy.</td></tr>
+        <tr><td>♆ Phoenix Spear</td><td>Spear</td><td>Once per bout, a killing blow leaves the fighter at 1 HP instead, and the attacker burns for 4 seconds. Works whichever weapon is held.</td></tr>
       </table>
-      <p>To test Last Oath without waiting for low health, open <code>index.html?force=oath</code>: the oath takes hold at the first damage.</p>
+      <p><b>Burning</b> deals 2 damage every half second and can finish a bout. Burning again only extends it. Dawn Mender, Last Oath and Phoenix Spear work from either weapon slot; the others need their weapon in hand.</p>
+      <p>To test without waiting, open <code>index.html?force=oath,mender,pull</code> (any subset): Last Oath and Dawn Mender take hold at the first damage, and Jailer’s Chain pulls from 2.4 units.</p>
     </section>
 
     <section class="record" id="gear">

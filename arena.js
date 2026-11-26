@@ -46,7 +46,8 @@ const shields = {
   round: { name: 'Round shield', defense: 20, mobility: 1, energy: 15, bashTempo: 1, bashPower: 1, width: .34, height: .43, shape: 1 },
   tower: { name: 'Tower shield', defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
 };
-// Testing only: ?force=perfect,wall,sand,oath makes those events trigger whenever they can (oath: Last Oath at any health below full).
+// Testing only: ?force=perfect,wall,sand,oath,mender,pull makes those events trigger whenever they can
+// (oath and mender: at any health below full; pull: at a shorter distance).
 const forced = new Set((new URLSearchParams(location.search).get('force') || '').split(',').filter(Boolean));
 const perfectColor = '#ffe9a8';
 const sandColors = ['#e2c98f', '#c9a96b', '#f1deb0'];
@@ -1829,6 +1830,11 @@ function drawMagic() {
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+    ownedSpecial(fighter)?.draw?.(fighter, fighter.special);
+    if (fighter.burnUntil > elapsed) {
+      const [x, y] = project([fighter.x, .9, fighter.z + .3]);
+      magicGlow(x, y, scale * (.8 + Math.sin(visualClock * 17) * .06), '#ff7a30');
+    }
     const aura = ownedSpecial(fighter)?.aura?.(fighter, fighter.special);
     if (aura) {
       const [x, y] = project([fighter.x, 1.2, fighter.z + .35]);
@@ -1934,13 +1940,24 @@ function drawBolt(action) {
   const point = pointBetween(from, target, travel);
   const [x, y] = project(point);
   const tail = project(shifted(point, -attacker.direction * .33, -.015));
-  ctx.strokeStyle = action.snare ? specials.snarecaster.color : travel > 0 ? '#fae3ac' : '#cdb592';
+  ctx.strokeStyle = action.snare ? specials.snarecaster.color : action.doubleShot || action.echo ? fireColors[0] : travel > 0 ? '#fae3ac' : '#cdb592';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(...tail.slice(0, 2));
   ctx.lineTo(x, y);
   ctx.stroke();
   ellipse(x, y, 2.6, 1.5, '#ebe3c7');
+  if (action.doubleShot && travel > .12) {
+    // The second, burning bolt trails the first.
+    const echo = project(shifted(pointBetween(from, target, travel - .12), 0, .09));
+    const echoTail = project(shifted(pointBetween(from, target, travel - .12), -attacker.direction * .33, .075));
+    ctx.strokeStyle = fireColors[0];
+    ctx.beginPath();
+    ctx.moveTo(echoTail[0], echoTail[1]);
+    ctx.lineTo(echo[0], echo[1]);
+    ctx.stroke();
+    ellipse(echo[0], echo[1], 3, 1.8, fireColors[1]);
+  }
 }
 
 function resize() {
@@ -2291,13 +2308,24 @@ function startAction(attacker, defender, bash = false) {
 }
 
 function showCurrentAction() {
+  // A special's own banner (such as a heal being channeled) wins over attacks.
+  for (const fighter of fighters) {
+    const special = ownedSpecial(fighter);
+    const text = special?.banner?.(fighter, fighter.special);
+    if (!text) continue;
+    elements.cast.hidden = false;
+    const label = fighter.name + ' · ' + text;
+    if (elements.cast.textContent !== label) elements.cast.textContent = label;
+    elements.cast.style.setProperty('--spell-color', special.color);
+    return;
+  }
   const current = fighters.map(fighter => fighter.action)
-    .filter(action => action && !action.connected && (action.spell || action.style === 'ranged' || action.bash))
+    .filter(action => action && !action.connected && (action.spell || action.style === 'ranged' || action.bash || action.label))
     .sort((a, b) => b.created - a.created)[0];
   elements.cast.hidden = !current;
   if (!current) return;
   const name = current.riposte ? 'Riposte bash' : current.bash ? 'Shield bash' : current.spell?.name
-    ?? (current.snare ? 'Snare bolt' : current.crowded > .35 ? 'Crowded shot' : weaponName(current.attacker, current.key));
+    ?? (current.label || (current.snare ? 'Snare bolt' : null)) ?? (current.crowded > .35 ? 'Crowded shot' : weaponName(current.attacker, current.key));
   const label = current.attacker.name + ' · ' + name;
   if (elements.cast.textContent !== label) {
     elements.cast.textContent = label;
@@ -2334,7 +2362,7 @@ function startBout(generated = null) {
     fighter.frozenUntil = fighter.hastedUntil = 0;
     fighter.shove = fighter.blindUntil = fighter.sandPuff = 0;
     fighter.riposte = fighter.sandUsed = fighter.sandReady = false;
-    fighter.rootedUntil = 0;
+    fighter.rootedUntil = fighter.burnUntil = fighter.pull = fighter.channelUntil = 0;
     fighter.special = {};
     fighter.cooldowns = {};
     fighter.reaction = fighter.ragdoll = null;
@@ -2516,11 +2544,13 @@ function impact(action, contact) {
     if (style === 'ranged') action.missedShot = true;
     floatLabel(defender, 'MISS', '#d8cbb8', { tag: 'BLINDED' });
     logEvent(attacker.name + ', blinded by sand, misses with ' + usedName + '.');
+    special?.onMissed?.(attacker, defender, action, attacker.special);
     return;
   }
   if ((style === 'melee' && !contact) || action.missedShot) {
     floatLabel(defender, 'MISS', '#d8cbb8');
     logEvent(attacker.name + (action.crowded > .35 ? ' misses a crowded crossbow shot.' : ' misses with ' + usedName + '.'));
+    special?.onMissed?.(attacker, defender, action, attacker.special);
     return;
   }
   const stopped = style === 'melee' ? contact.zone === 'shield' : isGuarding(action);
@@ -2545,6 +2575,7 @@ function impact(action, contact) {
     logEvent(defender.name + (perfect ? ' times a perfect block against ' : ' blocks ') + attacker.name + '’s ' + name + '.');
     applyStanceDamage(action, perfect ? .3 : .54);
     if (defender.energy < 2.5 && defender.stunnedUntil <= elapsed) breakStance(defender, 1.08);
+    special?.onBlocked?.(attacker, defender, action, attacker.special);
     return;
   }
   if (action.resistedSpell) {
@@ -2563,7 +2594,7 @@ function impact(action, contact) {
     * (defender.stunnedUntil > elapsed ? 1.14 : 1)));
   const absorbed = Math.min(defender.ward, rolledDamage);
   defender.ward -= absorbed;
-  const actualDamage = Math.min(rolledDamage - absorbed, defender.hp);
+  const actualDamage = survivable(defender, attacker, Math.min(rolledDamage - absorbed, defender.hp));
   if (absorbed) logEvent(defender.name + '’s ' + defender.wardName + ' absorbs ' + absorbed + ' damage.');
   const blood = actualDamage > 0 && !spell && !bash;
   const color = absorbed && !actualDamage ? defender.wardColor : spell?.color || '#ffd0ba';
@@ -2589,6 +2620,7 @@ function impact(action, contact) {
   defender.reaction = { zone, time: elapsed };
   hitPause = zone === 'head' ? .066 : .045;
   defender.hp -= actualDamage;
+  hurt(defender, actualDamage);
   const weight = actualDamage / defender.maxHP * 2.4 + (zone === 'head' ? .15 : 0) + (action.heavy ? .1 : 0);
   ArenaEffects.shake(defender.hp <= 0 ? 1 : actualDamage ? Math.min(.85, .22 + weight) : .15);
   if (actualDamage) {
@@ -2644,8 +2676,9 @@ function runScheduled() {
 // Damage from a special, outside the normal hit roll. It ignores blocks and wards but can end the bout.
 function specialHit(attacker, defender, amount, { special, tag, message }) {
   if (state !== 'running' || defender.hp <= 0) return;
-  const damage = Math.min(defender.hp, Math.max(1, Math.round(amount)));
+  const damage = survivable(defender, attacker, Math.min(defender.hp, Math.max(1, Math.round(amount))));
   defender.hp -= damage;
+  hurt(defender, damage);
   defender.reaction = { zone: 'body', time: elapsed };
   hitPause = .06;
   floatLabel(defender, '−' + damage, special.color, { tag, power: damage / defender.maxHP });
@@ -2655,6 +2688,46 @@ function specialHit(attacker, defender, amount, { special, tag, message }) {
   updateHealth();
   if (defender.hp <= 0) finishBout(attacker, defender, 'body', false);
   else applyStanceDamage({ defender, stanceDamage: 30 }, 1);
+}
+
+// A special may cheat death (onLethal returns true): the blow then leaves the fighter at 1 HP.
+function survivable(defender, attacker, damage) {
+  if (damage < defender.hp || !ownedSpecial(defender)?.onLethal?.(defender, attacker, defender.special)) return damage;
+  return defender.hp - 1;
+}
+
+function hurt(fighter, damage) {
+  if (damage > 0) ownedSpecial(fighter)?.onHurt?.(fighter, damage, fighter.special);
+}
+
+const fireColors = ['#ff8a3d', '#ffc15a', '#ff5a2a'];
+
+// Burning deals 2 damage every half second until it runs out. A new ignite only extends it.
+function ignite(target, source, seconds) {
+  if (target.burnUntil <= elapsed) {
+    target.burnTick = .5;
+    floatLabel(target, 'BURNING', fireColors[0], { tag: seconds + 'S' });
+    logEvent(target.name + ' catches fire.');
+  }
+  target.burnUntil = Math.max(target.burnUntil, elapsed + seconds);
+  target.burnSource = source;
+}
+
+function burnStep(fighter, dt) {
+  if (fighter.burnUntil <= elapsed || fighter.hp <= 0) return;
+  if (Math.random() < dt * 14) burst(fighter, { y: .5 + Math.random() * 1.2, colors: fireColors, count: 2, gravity: -1.5 });
+  if ((fighter.burnTick -= dt) > 0) return;
+  fighter.burnTick = .5;
+  const source = fighter.burnSource;
+  const damage = survivable(fighter, source, Math.min(2, fighter.hp));
+  fighter.hp -= damage;
+  hurt(fighter, damage);
+  floatLabel(fighter, '−' + damage, fireColors[0], { tag: 'BURN' });
+  updateHealth();
+  if (fighter.hp <= 0) {
+    logEvent(fighter.name + ' burns down.');
+    finishBout(source, fighter, 'body', false);
+  }
 }
 
 function updateSpecialHud(fighter) {
@@ -2702,7 +2775,7 @@ function moveFighter(fighter, dt) {
   const incoming = rival.action;
   const speed = mobility(fighter);
   let intent = 0;
-  if (fighter.stunnedUntil > elapsed || fighter.frozenUntil > elapsed) {
+  if (fighter.stunnedUntil > elapsed || fighter.frozenUntil > elapsed || fighter.channelUntil > elapsed) {
     intent = 0;
   } else if (action?.style === 'melee' && !action.connected) {
     intent = clamp((gap - action.reach + .07) * (action.bash ? 9 : 5.5), -.34, action.bash ? 4.5 : 4.0) * speed;
@@ -2725,6 +2798,13 @@ function moveFighter(fighter, dt) {
   const maximum = fighter.direction > 0 ? rival.x - .86 : 3.36;
   fighter.x = fighter.frozenUntil > elapsed ? fighter.freezeX : clamp(fighter.x + fighter.velocity * dt, minimum, maximum);
   if (fighter.shove > 0) shoveFighter(fighter, dt);
+  if (fighter.pull > 0) {
+    // A chain pull drags the fighter toward the rival.
+    const step = Math.min(fighter.pull, dt * 8);
+    fighter.pull -= step;
+    fighter.velocity = 0;
+    fighter.x = clamp(fighter.x + fighter.direction * step, minimum, maximum);
+  }
   const targetZ = fighter.frozenUntil > elapsed ? fighter.freezeZ : Math.sin(elapsed * .85 + fighter.direction) * .16;
   fighter.z = mix(fighter.z, targetZ, 1 - Math.exp(-dt * 6));
   const motion = (fighter.x - previous) * fighter.direction;
@@ -2777,6 +2857,11 @@ function throwSand(fighter, rival) {
   logEvent(fighter.name + ' throws sand in ' + rival.name + '’s eyes.');
 }
 
+function resolved(action) {
+  if (state !== 'running' || action.bash || action.spell) return;
+  specialOf(action.attacker, action.key)?.onResolved?.(action.attacker, action.defender, action, action.attacker.special);
+}
+
 function advanceAction(action, dt) {
   const { attacker, defender, style } = action;
   const previous = action.phase;
@@ -2795,6 +2880,7 @@ function advanceAction(action, dt) {
     if (contact || action.phase >= .99) {
       action.connected = true;
       impact(action, contact);
+      resolved(action);
     }
   } else if (!action.connected && style !== 'melee' && previous < action.hitAt && action.phase >= action.hitAt) {
     action.connected = true;
@@ -2804,6 +2890,7 @@ function advanceAction(action, dt) {
       action.damage *= 1 - action.crowded * .53;
     }
     impact(action);
+    resolved(action);
   }
   if (attacker.action === action && action.phase >= action.duration) {
     attacker.action = null;
@@ -2847,6 +2934,8 @@ function update(dt, realTime) {
     if (elapsed - fighter.lastStanceHit > 1.35) fighter.stance = Math.max(0, fighter.stance - dt * 13);
     updateStance(fighter);
     ownedSpecial(fighter)?.onUpdate?.(fighter, fighter.special);
+    burnStep(fighter, dt);
+    if (state !== 'running') return;
     updateSpecialHud(fighter);
     const rival = otherFighter(fighter);
     if (fighter.sandReady) {
