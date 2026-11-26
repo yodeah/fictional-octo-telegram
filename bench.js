@@ -16,13 +16,14 @@ const ArenaBench = (() => {
   const settings = {
     renderer: query.get('renderer') || saved.renderer || 'canvas',
     polygons: Number(query.get('polygons') || saved.polygons || 1),
-    open: query.has('bench') || !!saved.open
+    // Hidden on every load so the fight is unobstructed; ?bench opens it straight away.
+    open: query.has('bench')
   };
   // Diagnostic toggles are deliberately not saved: a fighter-less arena must not survive a reload.
   const probe = { lowRes: query.get('res') === '1', fighters: true, scene: true, effects: true };
   let onResolution = () => {};
   const store = () => {
-    try { localStorage.setItem('arena-bench', JSON.stringify(settings)); } catch { /* private mode */ }
+    try { localStorage.setItem('arena-bench', JSON.stringify({ renderer: settings.renderer, polygons: settings.polygons })); } catch { /* private mode */ }
   };
 
   // Refresh-rate estimate from every animation frame callback, rendered or skipped.
@@ -187,8 +188,8 @@ const ArenaBench = (() => {
   const opener = document.createElement('button');
   opener.type = 'button';
   opener.className = 'bench-open';
-  opener.title = 'Show frame rate and renderer benchmark';
-  opener.textContent = 'FPS';
+  opener.title = 'Show or hide frame rate and renderer statistics';
+  opener.textContent = 'Stats';
   opener.setAttribute('aria-expanded', String(settings.open));
   opener.addEventListener('click', () => toggle(panel.hidden));
   resetButton.title = 'Clear the statistics. The first second after a reset is ignored.';

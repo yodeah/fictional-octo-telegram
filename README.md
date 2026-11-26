@@ -59,7 +59,7 @@ Fighters coil before they swing and carry the weapon through after it lands, the
 
 ## Renderers and benchmark
 
-Select **FPS** next to the speed control (or open `index.html?bench`) to show the benchmark overlay. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
+The benchmark overlay is hidden by default so it never covers the fight. Select **Stats** next to the speed control to show or hide it, or open `index.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
 
 The overlay toggles the fighter painter between **Canvas** (the default) and **WebGL**, and **Polys 1×/3×** builds each fighter three times over to test three times as many polygons with the same picture. The choices are saved in the browser; `?renderer=webgl` and `?polygons=3` set them from the address bar.
 
