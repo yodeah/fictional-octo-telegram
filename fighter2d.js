@@ -1091,15 +1091,16 @@ const ArenaArt2D = (() => {
       const ball = weaponSprite(key, view.color, view.trim, 'ball');
       const link = weaponSprite(key, view.color, view.trim, 'link');
       for (const chain of chains) {
-        for (let i = 0; i < 6; i++) {
-          const [ax, ay] = toScreen(chain(i / 6));
-          const [bx, by] = toScreen(chain((i + 1) / 6));
-          place(chain((i + .5) / 6), () => {
-            if (i % 2) g.scale(1, .55);
+        // Enough links to overlap their neighbours; every other one is seen edge on.
+        for (let i = 0; i < 10; i++) {
+          const [ax, ay] = toScreen(chain(i / 10));
+          const [bx, by] = toScreen(chain((i + 1) / 10));
+          place(chain((i + .5) / 10), () => {
+            if (i % 2) g.scale(1.1, .4);
             stamp(g, link, frost);
           }, Math.atan2(by - ay, bx - ax), size, size);
         }
-        const [px, py] = toScreen(chain(5 / 6));
+        const [px, py] = toScreen(chain(9 / 10));
         const [ex, ey] = toScreen(chain(1));
         place(chain(1), () => stamp(g, ball, frost), Math.atan2(ey - py, ex - px) * (art.ball.turns ? 1 : 0), size, size);
       }
