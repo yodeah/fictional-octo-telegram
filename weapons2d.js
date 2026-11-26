@@ -397,4 +397,18 @@
       band(g, c.iron, 60, 6, 6);
     }
   };
+
+  art.flail = {
+    box: [-34, -10, 68, 10],
+    draw(g, c) {
+      haft(g, c.wood, -25, 58, 3.4);
+      wrap(g, c.grip, -20, 10, 4.2);
+      for (const x of [20, 44]) band(g, c.iron, x, 4.6);
+      band(g, c.brass, 58, 5.6, 7);
+      disc(g, 63, 0, 3.4, tone(c.iron, .1), 1);
+      disc(g, -28, 0, 4.4, tone(c.brass, 0), 1.1);
+    },
+    link: linkArt(),
+    ball: ballArt(17)
+  };
 })();
