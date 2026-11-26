@@ -226,4 +226,31 @@
       shape(g, 'M-14,-24 C-26,-30 -32,-40 -30,-46 C-24,-40 -16,-38 -8,-30 Z', clothFill(g, -30, -8, c.team), 1.1);
     }
   });
+
+  sets.tide = derive('robes', { gold: [150, 224, 218], glow: '#d6fff8' }, {
+    box: { head: [-36, -36, 28, 40] },
+    torso(g, c, base) {
+      base(g, c);
+      // Wave embroidery and a shell clasp.
+      for (let row = 0; row < 3; row++) {
+        let d = `M-16,${-32 + row * 5}`;
+        for (let i = 0; i < 5; i++) d += ' q3.4,-4.6 6.8,0';
+        stroke(g, d, tone(c.gold, .2 - row * .2), 1.2);
+      }
+      shape(g, 'M-6,-62 C-12,-66 -10,-74 -4,-74 C2,-76 8,-72 6,-66 L1,-60 Z', gradient(g, -10, -74, 6, -62, [240, 226, 214], [.3, 0, -.25]), 1.1);
+      for (let i = 0; i < 5; i++) stroke(g, `M1,-61 L${-8 + i * 3.4},-72`, 'rgba(150,110,100,.7)', .7);
+    },
+    head(g, c) {
+      // Bare-headed with flowing hair, a veil and a pearl circlet.
+      shape(g, 'M-2,-22 C-20,-26 -28,-6 -22,10 C-22,24 -28,30 -34,36 C-18,38 -6,26 -4,12 L6,-16 Z', clothFill(g, -30, 0, c.dark), 1.3);
+      face(g);
+      const hair = 'M-8,14 C-16,4 -17,-12 -6,-18 C4,-24 14,-18 15,-9 C6,-13 -2,-10 -4,-4 C-6,4 -2,10 2,16 C-1,18 -5,17 -8,14 Z';
+      shape(g, hair, gradient(g, -16, 10, 12, -18, [208, 226, 232], [-.45, -.15, .25, .05]), 1.3);
+      for (let i = 0; i < 6; i++) stroke(g, `M${10 - i * 3},${-15 + i} C${-10 - i},${-12 + i * 2} ${-13 + i},${4 + i} ${-6 + i},${15}`, 'rgba(70,120,140,.5)', .7);
+      stroke(g, 'M-12,-9 Q2,-18 15,-10', tone(c.gold, .1), 2.4);
+      for (let i = 0; i < 5; i++) disc(g, -9 + i * 5, -12.4 - Math.sin(i / 4 * Math.PI) * 2.6, 1.5, '#f4f7f2', .6);
+      shape(g, 'M6,-15 C6,-20 10,-24 13,-26 C14,-21 13,-17 10,-14 Z', gradient(g, 6, -24, 12, -14, c.gold, [.5, -.2]), 1);
+      disc(g, -5, 3, 2.2, c.glow, .7);
+    }
+  });
 })();
