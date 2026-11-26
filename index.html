@@ -2,11 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#171512">
-  <meta name="description" content="Watch two gladiators duel in a low-poly arena.">
-  <title>Arena Ledger — The Sand Pit</title>
+  <meta name="description" content="Salt &amp; Sand: a gory gladiator autobattler you can finish in a weekend.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Salt &amp; Sand</title>
   <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./game.css">
   <script src="./venues.js" defer></script>
   <script src="./matchups.js" defer></script>
   <script src="./effects.js" defer></script>
@@ -15,13 +17,14 @@
   <script src="./specials.js" defer></script>
   <script src="./finishers.js" defer></script>
   <script src="./arena.js" defer></script>
+  <script src="./duel.js" defer></script>
+  <script src="./rules.js" defer></script>
+  <script src="./art.js" defer></script>
+  <script src="./game.js" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand"><span class="mark" aria-hidden="true">Λ</span> ARENA<span class="brand-accent">LEDGER</span></div>
-    <a class="top-label" href="./mechanics.html" target="_blank">MECHANICS GUIDE</a>
-  </header>
-  <main>
+  <div id="app"></div>
+  <main id="fight">
     <section class="intro" aria-labelledby="arena-title">
       <div><p class="eyebrow">SPARRING ARENA</p><h1 id="arena-title">The Sand Pit</h1></div>
       <p class="bout-number">BOUT <strong id="bout">01</strong></p>
@@ -70,6 +73,10 @@
         <button class="scenery-target" id="scenery-secondary" type="button" hidden></button>
         <button class="hitboxes" id="hitboxes" type="button" aria-pressed="false">Hitboxes</button>
         <div class="result" id="result" hidden><span>VICTOR</span><strong id="winner"></strong></div>
+      </div>
+      <div id="fight-bar">
+        <button id="skip" type="button" data-action="skip">Skip to the end</button>
+        <button id="done" class="primary" type="button" data-action="done">Continue</button>
       </div>
       <div class="controls">
         <div class="actions"><button id="play" class="primary">Begin duel</button><button id="reset" disabled>Reset</button><button id="generate">Generate matchup</button></div>

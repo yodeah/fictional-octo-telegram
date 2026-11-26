@@ -15,13 +15,13 @@ const elements = Object.fromEntries(
 );
 const weapons = {
   sword: { name: 'Sword', range: 2.38, damage: 13, energy: 20, block: .25, tempo: 1, rest: 1.15, draw: 1.21, swing: 1.26, lift: .67, extension: .49 },
-  spear: { name: 'Spear', range: 3.05, damage: 10, energy: 18, block: .30, tempo: 1.08, rest: .31, draw: .16, swing: .31, lift: .08, extension: .49 },
-  axe: { name: 'Axe', range: 2.08, damage: 17, energy: 29, block: .31, tempo: .88, rest: 1.20, draw: 1.35, swing: 1.39, lift: .76, extension: .43 },
+  spear: { name: 'Spear', range: 3.05, damage: 12, energy: 18, block: .30, tempo: 1.08, rest: .31, draw: .16, swing: .31, lift: .08, extension: .49 },
+  axe: { name: 'Axe', range: 2.08, damage: 22, energy: 25, block: .31, tempo: .88, rest: 1.20, draw: 1.35, swing: 1.39, lift: .76, extension: .43 },
   mace: { name: 'Mace', range: 2.03, damage: 15, energy: 24, block: .25, tempo: .95, rest: .98, draw: 1.51, swing: 1.13, lift: .61, extension: .43 },
-  flail: { name: 'Flail', range: 2.48, damage: 14, energy: 26, block: .16, tempo: .84, rest: .72, draw: 1.39, swing: .82, lift: .62, extension: .46 },
-  crossbow: { name: 'Crossbow', style: 'ranged', range: 4.55, damage: 14, energy: 16, block: .19, tempo: .85, rest: .18, draw: .64, swing: .18, lift: .19, extension: .48 },
+  flail: { name: 'Flail', range: 2.48, damage: 19, energy: 22, block: .16, tempo: .84, rest: .72, draw: 1.39, swing: .82, lift: .62, extension: .46 },
+  crossbow: { name: 'Crossbow', style: 'ranged', range: 4.55, damage: 28, energy: 14, block: .08, tempo: 1.12, rest: .18, draw: .64, swing: .18, lift: .19, extension: .48 },
   staff: { name: 'Staff', range: 2.48, damage: 8, spellPower: 1.30, energy: 16, block: .24, tempo: 1, rest: 1.29, draw: 1.23, swing: 1.39, lift: .44, extension: .48 },
-  greatsword: { name: 'Greatsword', twoHanded: true, accuracy: 18, range: 2.88, damage: 23, energy: 34, block: .25, tempo: .77, rest: 1.21, draw: 1.17, swing: 1.30, lift: .65, extension: .52 },
+  greatsword: { name: 'Greatsword', twoHanded: true, accuracy: 18, range: 2.88, damage: 19, energy: 34, block: .25, tempo: .77, rest: 1.21, draw: 1.17, swing: 1.30, lift: .65, extension: .52 },
   maul: { name: 'War maul', twoHanded: true, accuracy: 15, range: 2.35, damage: 26, energy: 39, block: .30, tempo: .71, rest: 1.08, draw: 1.30, swing: 1.20, lift: .66, extension: .49 }
 };
 const axeModes = {
@@ -30,21 +30,21 @@ const axeModes = {
 };
 const variants = {
   rapier: ['sword', { name: 'Rapier', range: 2.61, damage: 11, energy: 17, accuracy: 12, tempo: 1.12, block: .29, draw: .89, swing: 1.24 }],
-  falchion: ['sword', { name: 'Falchion', range: 2.42, damage: 16, energy: 24, tempo: .93, block: .23, lift: .73 }],
-  claymore: ['greatsword', { name: 'Claymore', range: 2.98, damage: 24, energy: 36, accuracy: 20, tempo: .75 }],
+  falchion: ['sword', { name: 'Falchion', range: 2.42, damage: 15, energy: 24, tempo: .93, block: .23, lift: .73 }],
+  claymore: ['greatsword', { name: 'Claymore', range: 2.98, damage: 19, energy: 36, accuracy: 14, tempo: .75 }],
   executioner: ['greatsword', { name: 'Executioner blade', range: 2.65, damage: 28, energy: 43, accuracy: 11, tempo: .68, block: .22 }],
-  trident: ['spear', { name: 'Trident', range: 3.06, damage: 13, energy: 22, accuracy: 8, tempo: .95 }],
-  halberd: ['spear', { name: 'Halberd', twoHanded: true, range: 3.11, damage: 22, energy: 33, accuracy: 13, tempo: .76, rest: .58, draw: .78, swing: .52, lift: .20 }],
+  trident: ['spear', { name: 'Trident', range: 3.06, damage: 15, energy: 22, accuracy: 8, tempo: .95 }],
+  halberd: ['spear', { name: 'Halberd', twoHanded: true, range: 3.11, damage: 20, energy: 33, accuracy: 13, tempo: .76, rest: .58, draw: .78, swing: .52, lift: .20 }],
   beardedAxe: ['axe', { name: 'Bearded axe', range: 2.23, damage: 19, energy: 30, accuracy: 4, tempo: .87 }],
   crescentAxe: ['axe', { name: 'Crescent axe', twoHanded: true, range: 2.47, damage: 24, energy: 36, accuracy: 12, tempo: .74, lift: .80 }],
-  morningstar: ['mace', { name: 'Morningstar', range: 2.22, damage: 18, energy: 27, accuracy: 5, tempo: .89 }],
-  club: ['mace', { name: 'Bronzewood club', range: 2.15, damage: 13, energy: 17, tempo: 1.04, block: .30 }],
-  scourge: ['flail', { name: 'Chain scourge', range: 2.66, damage: 12, energy: 21, accuracy: 5, tempo: .93, block: .10, chain: .66 }],
-  twinFlail: ['flail', { name: 'Twin flail', range: 2.47, damage: 19, energy: 31, tempo: .76, block: .14 }],
+  morningstar: ['mace', { name: 'Morningstar', range: 2.22, damage: 17, energy: 27, accuracy: 5, tempo: .89 }],
+  club: ['mace', { name: 'Bronzewood club', range: 2.15, damage: 11, energy: 17, tempo: 1.04, block: .30 }],
+  scourge: ['flail', { name: 'Chain scourge', range: 2.66, damage: 16, energy: 21, accuracy: 5, tempo: .93, block: .10, chain: .66 }],
+  twinFlail: ['flail', { name: 'Twin flail', range: 2.47, damage: 24, energy: 31, tempo: .76, block: .14 }],
   pickhammer: ['maul', { name: 'War pick', range: 2.39, damage: 20, energy: 29, accuracy: 21, tempo: .82, block: .22 }],
   sledge: ['maul', { name: 'Stone sledge', range: 2.40, damage: 30, energy: 46, accuracy: 8, tempo: .65 }],
-  arbalest: ['crossbow', { name: 'Windlass arbalest', twoHanded: true, range: 4.74, damage: 21, energy: 24, tempo: .67, block: .21 }],
-  repeater: ['crossbow', { name: 'Repeating bow', range: 4.25, damage: 11, energy: 12, tempo: 1.04, block: .16 }],
+  arbalest: ['crossbow', { name: 'Windlass arbalest', twoHanded: true, range: 4.74, damage: 44, energy: 22, tempo: .86, block: .09 }],
+  repeater: ['crossbow', { name: 'Repeating bow', range: 4.25, damage: 20, energy: 11, tempo: 1.25, block: .07 }],
   ashScepter: ['staff', { name: 'Ash scepter', range: 2.40, spellPower: 1.24, castTempo: 1.13, block: .21 }],
   sunStaff: ['staff', { name: 'Sun staff', twoHanded: true, range: 2.55, spellPower: 1.41, castTempo: .88 }]
 };
@@ -54,6 +54,7 @@ const weaponGroups = { sword: 'Blades', greatsword: 'Blades', spear: 'Polearms',
   maul: 'Impact weapons', flail: 'Flails', crossbow: 'Ranged', staff: 'Staves' };
 const breaksShields = key => ['axe', 'mace'].includes(weaponFamily(key));
 const shields = {
+  none: { name: 'No shield', durability: 0, defense: 0, mobility: 1.02, energy: 99, bashTempo: 1, bashPower: 0, width: 0, height: 0, shape: 1 },
   buckler: { name: 'Buckler', durability: 1, defense: 11, mobility: 1.08, energy: 9, bashTempo: 1.35, bashPower: .8, width: .24, height: .29, shape: 1 },
   round: { name: 'Round shield', durability: 2, defense: 20, mobility: 1, energy: 15, bashTempo: 1, bashPower: 1, width: .34, height: .43, shape: 1 },
   tower: { name: 'Tower shield', durability: 3, defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
@@ -94,6 +95,9 @@ const armorVariants = {
   astral: ['robes', { name: 'Astral vestments', cut: 'astral', color: [66, 82, 119], edging: [180, 199, 246], defense: 5, mobility: 1.03, power: 1.14, attackBonus: [-5, -3, -1, 23, -7], defenseBonus: [7, 5, 6, 20, -7] }]
 };
 for (const [key, [base, stats]] of Object.entries(armorVariants)) armors[key] = { ...armors[base], ...stats };
+// Castaway clothing: no protection and no style bonus. Drawn like plain leather.
+armors.rags = { ...armors.leather, name: 'Rags', color: [128, 108, 82], defense: 0, mobility: 1.02, power: 1, melee: 1.12, ranged: 1.12, magic: 1.05,
+  attackBonus: [0, 0, 0, 0, 0], defenseBonus: [0, 0, 0, 0, 0] };
 const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor', spellbook: 'Spellbook' };
 const signed = value => value > 0 ? '+' + value : String(value);
 
@@ -136,6 +140,7 @@ const spells = {
   spark: { name: 'Staff Spark', damage: 8, cost: 0, cooldown: 0, color: '#d1b7ff', block: .10 }
 };
 const spellbooks = {
+  none: { name: 'None', focus: 'No spells learned.', spells: [] },
   general: { name: 'General', focus: 'Reliable damage, protection, and recovery.', spells: ['ember', 'ward', 'heal'] },
   vampiric: { name: 'Vampiric', focus: 'Sustain through damage and trade health for mana.', spells: ['drain', 'surge', 'pact'] },
   glacial: { name: 'Glacial', focus: 'Slow, freeze, and hold opponents at range.', spells: ['frost', 'barrage', 'shell'] },
@@ -279,7 +284,7 @@ fighters.forEach((fighter, index) => {
 });
 
 function applySpellbook(fighter) {
-  const keys = spellbooks[fighter.gear.spellbook].spells;
+  const keys = fighter.spellList || spellbooks[fighter.gear.spellbook].spells;
   if (fighter.spells === keys) return;
   fighter.spells = keys;
   fighter.hud.spells.replaceChildren();
@@ -2179,6 +2184,7 @@ function drawBolt(action) {
 
 function resize() {
   const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
   const density = ArenaBench.lowResolution ? 1 : Math.min(window.devicePixelRatio || 1, 2);
   width = rect.width;
   height = rect.height;
@@ -2215,6 +2221,7 @@ function paintFaces(geometry) {
 // contiguous paintFaces() call so either renderer can paint them without breaking layering.
 function draw() {
   // The benchmark times three sections and can skip each one; skipping only changes the picture.
+  if (!backdrop || !canvas.clientWidth) return;
   const startedAt = performance.now();
   // The still backdrop underneath fills the edges that a shake uncovers.
   ctx.drawImage(backdrop, 0, 0, width, height);
@@ -2509,13 +2516,13 @@ function startAction(attacker, defender, bash = false) {
   const perfect = block && style === 'melee' && !bash
     && (forced.has('perfect') || Math.random() < clamp(.45 + (handling.heavy ? .15 : 0) + (defense(defender) - 56) / 250, .25, .70));
   const evade = !spell && !bash && !block && defender.frozenUntil <= elapsed && defender.energy >= 11
-    && Math.random() < clamp(.18 - equipAccuracy / 520, .04, .30) * mobility(defender);
+    && Math.random() < clamp(.18 - equipAccuracy / 520 - (attacker.attack - 55) / 600, .03, .32) * mobility(defender);
   const aimRoll = Math.random();
   const aim = defender.stunnedUntil > elapsed ? -.64 : aimRoll < .19 ? -.96 : aimRoll > .69 ? .93 : .08;
   const reach = bash ? 1.18 : item.range - .23 - Math.abs(aim) * .26;
   const tempo = (bash ? 2.34 * ownShield.bashTempo : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16 * (mode?.tempo ?? 1))
     * mobility(attacker) * mix(.76, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1);
-  const attackSkill = ranged ? attacker.ranged : attacker.strength;
+  const attackSkill = ranged ? attacker.ranged : (attacker.strength * 2 + attacker.attack) / 3;
   const damage = bash ? (5.5 + attacker.strength / 28) * fatigue * ownShield.bashPower
     : spell ? (spell.damage || 0) * (item.spellPower || 1) * (.76 + attacker.magic / 300)
       : (item.damage + Math.floor(Math.random() * 7)) * (.73 + attackSkill / 245) * mix(.67, 1, fatigue) * handling.power;
@@ -2627,7 +2634,7 @@ function startBout(generated = null) {
 
 function runBout() {
   state = 'running';
-  logEvent('Varro and Cassian enter the arena.');
+  logEvent(fighters[0].name + ' and ' + fighters[1].name + ' enter the arena.');
   for (const fighter of fighters) {
     const special = ownedSpecial(fighter);
     if (special) logEvent(fighter.name + ' carries ' + special.name + ': ' + special.effect.charAt(0).toLowerCase() + special.effect.slice(1) + '.');
@@ -2729,6 +2736,9 @@ function applySpellHit(attacker, defender, spell, damage) {
     logEvent(defender.name + ' loses ' + Math.round(drained) + ' energy.');
   }
 }
+
+// After a minute every blow hurts more, so two careful fighters cannot stall.
+const suddenDeath = () => 1 + Math.max(0, elapsed - 60) / 30;
 
 const stanceLimit = fighter => 59 + defense(fighter) * .23;
 
@@ -2843,7 +2853,7 @@ function impact(action, contact) {
   const matchup = armors[defender.gear.armor][style];
   const absorption = style === 'magic' ? 1 : 1 - Math.max(0, defense(defender) - 45) / 275;
   const typeDefense = armors[defender.gear.armor].defenseBonus[action.attackType];
-  const rolledDamage = Math.max(1, Math.round(damage * multiplier * matchup * absorption * (1 - typeDefense / 600)
+  const rolledDamage = Math.max(1, Math.round(damage * suddenDeath() * multiplier * matchup * absorption * (1 - typeDefense / 600)
     * (defender.stunnedUntil > elapsed ? 1.14 : 1)));
   const absorbed = Math.min(defender.ward, rolledDamage);
   defender.ward -= absorbed;
@@ -2956,6 +2966,10 @@ function survivable(defender, attacker, damage) {
 
 // Kind is the attack style ('melee', 'ranged', 'magic') or 'special', 'burn' or 'thorns' for other damage.
 function hurt(fighter, damage, source, kind) {
+  if (damage > 0 && kind === 'melee' && source?.lifesteal && source.hp > 0) {
+    source.hp = Math.min(source.maxHP, source.hp + Math.round(damage * source.lifesteal));
+    updateHealth();
+  }
   if (damage > 0) ownedSpecial(fighter)?.onHurt?.(fighter, damage, fighter.special, source, kind);
 }
 
@@ -3150,8 +3164,8 @@ function advanceAction(action, dt) {
     action.connected = true;
     if (style === 'ranged') {
       action.crowded = closeRange(gap);
-      action.missedShot = action.shotRoll > clamp(action.shotAccuracy - action.crowded * .45, .24, .98);
-      action.damage *= 1 - action.crowded * .53;
+      action.missedShot = action.shotRoll > clamp(action.shotAccuracy - action.crowded * .22, .24, .98);
+      action.damage *= 1 - action.crowded * .2;
     }
     impact(action);
     resolved(action);
@@ -3310,7 +3324,8 @@ function frame(now) {
     visualClock += dt;
     ArenaEffects.frame(dt);
   }
-  if (dt > 0) {
+  if (typeof ArenaDuel !== 'undefined' && ArenaDuel.active) ArenaDuel.advance(dt * speed);
+  else if (dt > 0) {
     const steps = Math.max(speed, Math.ceil(dt * speed * 60));
     for (let step = 0; step < steps; step++) {
       const frozen = state === 'paused' || hitPause > 0;

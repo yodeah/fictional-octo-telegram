@@ -23,7 +23,8 @@
 
     <section class="record" id="bout">
       <h2>The bout</h2>
-      <p>Two fighters duel until one reaches 0 HP. Fights are fully idle: you prepare beforehand, then only watch. There is no time limit.</p>
+      <p>The controls below describe the <a href="./sandbox.html">sparring sandbox</a>. In the game you prepare between fights on its own screens.</p>
+      <p>Two fighters duel until one reaches 0 HP. Fights are fully idle: you prepare beforehand, then only watch. After 60 seconds, sudden death: all blows hit harder, +100% for every further 30 seconds.</p>
       <ul>
         <li><b>Before a bout:</b> pin any gear slot, or leave it on Auto to keep what the last matchup chose.</li>
         <li><b>During a bout:</b> no interaction. Gear, Reset, matchups, the venue and scene markers are locked.</li>
@@ -39,7 +40,7 @@
       <h2>Stats and resources</h2>
       <table>
         <tr><th>Stat</th><th>What it does</th></tr>
-        <tr><td>Attack</td><td>Only influences which weapon the fighter picks. It does not change hit chance or damage.</td></tr>
+        <tr><td>Attack</td><td>Weapon skill: a third of melee damage scaling, and makes blows harder to dodge. Also guides weapon choice.</td></tr>
         <tr><td>Strength</td><td>Melee and bash damage. Above 66, shortens recovery after heavy swings (full effect at 95).</td></tr>
         <tr><td>Ranged</td><td>Bolt damage and accuracy.</td></tr>
         <tr><td>Magic</td><td>Spell damage.</td></tr>
@@ -60,7 +61,7 @@
       <ul>
         <li>Support spells come first when needed: heal at 61% HP or less, ward at 77% or less, Blood Pact at 24 mana or less (with at least 41% HP), Tailwind at 40 energy or less.</li>
         <li>Without a staff in hand, attack spells are only considered some of the time. A staff can always cast, with a free Staff Spark as a fallback. Staves never swing in melee.</li>
-        <li>Fighters press crossbow users at close range. A crowded shot loses up to 53% damage and much of its accuracy.</li>
+        <li>Fighters press crossbow users at close range. A crowded shot loses up to 20% damage and some accuracy.</li>
         <li>Fighters move and act independently, so attacks can overlap. They hold back while the opponent’s shield is raised against them.</li>
       </ul>
     </section>
@@ -148,13 +149,13 @@
       <table>
         <tr><th>Weapon family</th><th>Damage</th><th>Reach</th><th>Energy</th><th>Variants</th></tr>
         <tr><td>Sword</td><td>13</td><td>2.4</td><td>20</td><td>Rapier, Falchion</td></tr>
-        <tr><td>Greatsword (two-handed)</td><td>23</td><td>2.9</td><td>34</td><td>Claymore, Executioner blade</td></tr>
-        <tr><td>Spear</td><td>10</td><td>3.1</td><td>18</td><td>Trident, Halberd</td></tr>
-        <tr><td>Axe</td><td>17</td><td>2.1</td><td>29</td><td>Bearded axe, Crescent axe</td></tr>
+        <tr><td>Greatsword (two-handed)</td><td>19</td><td>2.9</td><td>34</td><td>Claymore, Executioner blade</td></tr>
+        <tr><td>Spear</td><td>12</td><td>3.1</td><td>18</td><td>Trident, Halberd</td></tr>
+        <tr><td>Axe</td><td>22</td><td>2.1</td><td>25</td><td>Bearded axe, Crescent axe</td></tr>
         <tr><td>Mace</td><td>15</td><td>2.0</td><td>24</td><td>Morningstar, Bronzewood club</td></tr>
         <tr><td>War maul (two-handed)</td><td>26</td><td>2.4</td><td>39</td><td>War pick, Stone sledge</td></tr>
-        <tr><td>Flail</td><td>14</td><td>2.5</td><td>26</td><td>Chain scourge, Twin flail</td></tr>
-        <tr><td>Crossbow</td><td>14</td><td>4.6</td><td>16</td><td>Windlass arbalest, Repeating bow</td></tr>
+        <tr><td>Flail</td><td>19</td><td>2.5</td><td>22</td><td>Chain scourge, Twin flail</td></tr>
+        <tr><td>Crossbow</td><td>28</td><td>4.6</td><td>14</td><td>Windlass arbalest, Repeating bow</td></tr>
         <tr><td>Staff</td><td>Spells</td><td>—</td><td>—</td><td>Ash scepter, Sun staff</td></tr>
       </table>
       <p>These are base values. Heavy two-handed melee weapons gain 21% damage and cost 20% more energy.</p>

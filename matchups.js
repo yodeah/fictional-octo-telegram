@@ -28,7 +28,7 @@ const ArenaMatchups = (() => {
   }
 
   function books(previous, spellbooks, random) {
-    const keys = Object.keys(spellbooks);
+    const keys = Object.keys(spellbooks).filter(key => key !== 'none');
     const [left, right] = previous.map(fighter => fighter.gear.spellbook);
     const pairs = keys.flatMap(first => keys
       .filter(second => first !== second && first !== left && second !== right && !(first === right && second === left))
@@ -82,10 +82,10 @@ const ArenaMatchups = (() => {
         unavailable.add(reserve);
       }
 
-      const armor = pick(Object.keys(armors).filter(key => armors[key].style === build.armor
+      const armor = pick(Object.keys(armors).filter(key => armors[key].style === build.armor && key !== 'rags'
         && key !== fighter.gear.armor && !usedArmor.has(key)), random);
       usedArmor.add(armor);
-      const shieldChoices = Object.keys(shields).filter(key => key !== fighter.gear.shield);
+      const shieldChoices = Object.keys(shields).filter(key => key !== fighter.gear.shield && key !== 'none');
       const shield = pick(shieldChoices, random);
       return {
         build: buildKey,

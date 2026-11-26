@@ -1,6 +1,29 @@
-# Arena Ledger
+# Salt & Sand
 
-A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters use low-poly 3D geometry rendered on Canvas 2D with a perspective camera.
+A gory gladiator autobattler with permanent death, for phone and laptop. Static files only: no backend, no build step.
+
+**Play:** open `index.html`. You wash ashore, owe the lanista, and must kill four champions. The old sparring page is `sandbox.html`.
+
+- Dice-rolled stats and a race (human, elf or demon, each with a drawback).
+- Each day: fight, train, rest or work. The debt falls due every fifth day.
+- Sparring is safe from death; blood bouts and champions are not, apart from one mercy per champion.
+- Champions give a trophy weapon and a spell page. Mana appears with your first spell.
+- The game saves itself. A saved fight replays identically after a reload. A save code backs it up.
+- A new gladiator may start at the furthest champion reached (a Legacy).
+
+What comes next is in [docs/implementation-plan.md](docs/implementation-plan.md).
+
+## Tests
+
+```bash
+node --test tests/*.test.mjs
+```
+
+About 90 seconds. They check the rules, that a seed repeats a fight, weapon balance, and that a sensible bot can finish while a random one cannot. `node tests/report.mjs` and `node tests/weapons.mjs` print the numbers.
+
+## Combat engine
+
+The sections below describe the combat engine and the sparring sandbox. The fighters use low-poly 3D geometry rendered on Canvas 2D with a perspective camera.
 
 ## Design decision: fights are fully idle
 
@@ -14,7 +37,7 @@ This replaces the earlier idea of a "corner coach" with timed calls.
 
 ## Run locally
 
-Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
+Open `index.html` (the game) or `sandbox.html` (sparring) in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
 
 Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. These pickers, the fighter stats and the spell list are hidden so the fight stays in view; select **Show gear, stats & spells** under the fighters to open them, at any time. Pin any selection for future bouts or leave the slot on **Auto** to keep what the last matchup chose. Fighters keep their levels, stats, and gear until you select **Generate matchup**. Hover over a selector or focus it with the keyboard to read details. Gear is locked while a bout is in progress.
 
@@ -26,7 +49,7 @@ Fighters automatically switch between their two weapons based on distance, skill
 
 Melee fighters press crossbow users at close range. A crowded shot loses damage and accuracy, so the shooter favors a melee backup or retreats while casting when a spell is available.
 
-Both fighters start with 60 mana and 100 energy. They recover 3.6 mana and 5 energy per simulated second. Physical attacks, blocks, and dodges use energy. Swapping weapons costs 7 energy. Carrying a spare reduces movement speed by 4% and energy recovery by 0.35 per simulated second. Low energy reduces attack speed and damage. Heavier shields cover more area while slowing movement.
+In the sandbox, both fighters start with 60 mana and 100 energy. They recover 3.6 mana and 5 energy per simulated second. Physical attacks, blocks, and dodges use energy. Swapping weapons costs 7 energy. Carrying a spare reduces movement speed by 4% and energy recovery by 0.35 per simulated second. Low energy reduces attack speed and damage. Heavier shields cover more area while slowing movement.
 
 | Spellbook | Role | Spells |
 | --- | --- | --- |
@@ -39,7 +62,7 @@ Equip a staff and select **None** for the backup to run a dedicated mage. Staff 
 
 Melee swings check the moving weapon against the shield and body regions. Head, body, arm, and leg hits deal different damage and produce different reactions. The defeated fighter falls with a jointed ragdoll. Some killing blows end in a finisher, chosen by weapon and hit zone (`finishers.js`): a frost shatter, a bolt pin, a rare beheading, a rapier run-through with a kick, a grounded maul collapse, or a rare finishing spear throw. Finishers start after the winner is decided and only change drawing. Toggle **Hitboxes** to see collision shapes.
 
-Fighters move and act on independent clocks, so windups can overlap and either fighter can land a follow-up. Heavy two-handed melee weapons hit harder, use more energy, and recover more slowly. Very high Strength shortens their recovery. Hits and blocks can wear down the stance meter. A stance break lowers the fighter into a vulnerable stagger. Shields can bash after a block or interrupt a nearby heavy windup. A perfect block earns a riposte bash with knockback, and being knocked into the arena edge staggers. Bucklers bash faster and tower shields hit harder. Once per bout, a staggered fighter may throw sand to blind a nearby attacker for 2 seconds. To test these, open `index.html?force=perfect,wall,sand` (any subset) to make them trigger whenever they can. [Elden Ring combat guide](https://www.bandainamcoent.com/es_mx/news/elden-ring-introduction-part-4-combat-guide)
+Fighters move and act on independent clocks, so windups can overlap and either fighter can land a follow-up. Heavy two-handed melee weapons hit harder, use more energy, and recover more slowly. Very high Strength shortens their recovery. Hits and blocks can wear down the stance meter. A stance break lowers the fighter into a vulnerable stagger. Shields can bash after a block or interrupt a nearby heavy windup. A perfect block earns a riposte bash with knockback, and being knocked into the arena edge staggers. Bucklers bash faster and tower shields hit harder. Once per bout, a staggered fighter may throw sand to blind a nearby attacker for 2 seconds. To test these, open `sandbox.html?force=perfect,wall,sand` (any subset) to make them trigger whenever they can. [Elden Ring combat guide](https://www.bandainamcoent.com/es_mx/news/elden-ring-introduction-part-4-combat-guide)
 
 The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three completed bouts. Between bouts, select the venue name to preview the next one, or select a marker in the scene to cheer with spectators, startle wildlife, or stir the ruins’ birds and fireflies.
 
@@ -65,7 +88,7 @@ Fighters coil before they swing and carry the weapon through after it lands, the
 
 ## Renderers and benchmark
 
-The benchmark overlay is hidden by default so it never covers the fight. Select **FPS** next to the speed control to show or hide it, or open `index.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
+The benchmark overlay is hidden by default so it never covers the fight. Select **FPS** next to the speed control to show or hide it, or open `sandbox.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
 
 The overlay toggles the fighter painter between **Canvas** (the default) and **WebGL**, and **Polys 1×/3×** builds each fighter three times over to test three times as many polygons with the same picture. The choices are saved in the browser; `?renderer=webgl` and `?polygons=3` set them from the address bar.
 
@@ -81,6 +104,4 @@ The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in 
 
 ## Development plan
 
-1. **Duel prototype** — Establish readable attacks, hits, blocks, and a clear outcome. Use repeated matches to tune reach, damage, and timing.
-2. **Stable management** — Recruit a small roster and assign weapons and training. Give bout results consequences through earnings, fatigue, and recovery.
-3. **Idle progression** — Save the stable locally and resolve scheduled bouts when the player returns. Let the player replay bouts from the same simulation results used to update the stable.
+See [docs/implementation-plan.md](docs/implementation-plan.md).
