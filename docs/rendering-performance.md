@@ -86,6 +86,7 @@ The Quality rollout uses a fixed idle Varro and Cassian fixture for geometry cou
 | Before Quality | 2,347 / 5,138 | — | — |
 | Quality and round-shield rim and boss | 2,347 / 5,138 | 2,467 / 5,378 | 2,547 / 5,538 |
 | Fighter bodies, armor, helmets and all shields | 2,347 / 5,138 | 3,579 / 7,806 | 4,395 / 9,650 |
+| Held and stowed weapons, embedded bolts and finisher props | 2,347 / 5,138 | 3,656 / 7,967 | 4,576 / 10,026 |
 
 See the README section "Renderers and benchmark". To measure: open `?bench`, pick a renderer and polygon multiplier, tap **Reset**, and let a fight run 15–20 seconds. Use Rematch or Auto-rematch (not Generate matchup) to keep the same fighters. To reproduce the tables above from the console, wrap `drawGladiator`, `faces.sort` and `paintFaces` with timers and read `ArenaBench.snapshot()`.
 

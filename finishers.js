@@ -157,8 +157,18 @@ function drawFinisher() {
     for (const [dx, dz, size] of [[-.5, .1, .16], [-.22, -.12, .22], [.05, .2, .28], [.3, -.05, .19], [.55, .15, .13], [.15, -.25, .12]]) {
       const [x, y] = project([defender.x + dx, 0, defender.z + .2 + dz]);
       const h = size * scale;
-      polygon([[x - h * .45, y], [x - h * .15, y - h], [x + h * .3, y - h * .55], [x + h * .5, y]], '#c9ecf8d0');
-      polygon([[x - h * .15, y - h], [x + h * .3, y - h * .55], [x + h * .05, y]], '#eef8fcd0');
+      const left = [x - h * .45, y];
+      const tip = [x - h * .15, y - h];
+      const right = [x + h * .3, y - h * .55];
+      const base = [x + h * .5, y];
+      const foot = [x + h * .05, y];
+      polygon([left, tip, right, base], '#c9ecf8d0');
+      polygon([tip, right, foot], '#eef8fcd0');
+      if (modelDetail) {
+        const ridge = [x - h * .12, y - h * .44];
+        polygon([tip, ridge, left], '#9dc4dfd0');
+        if (modelDetail === 2) polygon([ridge, right, base, foot], '#b5dcefd0');
+      }
     }
     return;
   }
@@ -169,6 +179,10 @@ function drawFinisher() {
   const toward = Math.sign(attacker.x - defender.x) || 1;
   const [x0, y0] = project(shifted(from, -toward * .1, -.12));
   const [x1, y1] = project(shifted(from, toward * .42, .58));
+  if (modelDetail) {
+    drawFacetedBolt([x1, y1], [x0, y0], '#6b4a2c', '#e8dcc0');
+    return;
+  }
   ctx.save();
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#6b4a2c';

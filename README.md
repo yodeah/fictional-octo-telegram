@@ -45,7 +45,7 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
-The **Quality** menu saves your choice for the next visit. Low is the default. Switch to Medium or High for more facets on the fighters, armor, helmets and shields.
+The **Quality** menu saves your choice for the next visit. Low is the default. Switch to Medium or High for more facets on the fighters, equipment, bolts and finisher props.
 
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
 

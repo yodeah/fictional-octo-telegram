@@ -566,10 +566,24 @@ function flailTrails(key, anchor, windup, strike, clock) {
 }
 
 function forgedBlade(along, sections, render, tint = metal) {
+  const profile = modelDetail === 2
+    ? [[-1, 0], [-.75, .42, 1.30], [-.14, .90, .94], [0, .79, .72], [.14, .90, .84],
+      [.75, .42, 1.13], [1, 0, 1.35]]
+    : [[-1, 0], [-.76, .43, 1.26], [0, 1, .88], [.76, .43, 1.13], [1, 0, 1.30]];
   for (let index = 1; index < sections.length; index++) {
     const [s0, bend0, half0, bevel0] = sections[index - 1];
     const [s1, bend1, half1, bevel1] = sections[index];
     const point = (s, bend, shift, depth) => shifted(along(s, bend + shift), 0, 0, depth);
+    if (modelDetail) {
+      const section = (s, bend, half, bevel) => profile.map(([across, height]) =>
+        point(s, bend, across * half, mix(.015, bevel, height)));
+      const start = section(s0, bend0, half0, bevel0);
+      const end = section(s1, bend1, half1, bevel1);
+      for (let facet = 1; facet < profile.length; facet++) {
+        render([start[facet - 1], start[facet], end[facet], end[facet - 1]], tint, profile[facet][2]);
+      }
+      continue;
+    }
     const leftA = point(s0, bend0, -half0, .015);
     const spineA = point(s0, bend0, 0, bevel0);
     const rightA = point(s0, bend0, half0, .015);
@@ -1409,7 +1423,6 @@ function drawGladiator(fighter, pose, parts) {
   const robed = kit.style === 'magic';
   const world = point => worldPoint(fighter, point);
   const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides, modelDetail);
-  const weaponLimb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides);
   let partStart = faces.length;
 
   for (const side of ['rear', 'front']) {
@@ -1464,7 +1477,7 @@ function drawGladiator(fighter, pose, parts) {
     const mount = torso(long ? [-.43, .39, -.51] : [-.39, .03, -.43]);
     const scaleStowed = long ? .80 : .69;
     const stow = point => pointBetween(mount, point, scaleStowed);
-    const holder = (a, b, r1, r2, color, sides) => weaponLimb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
+    const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
     weaponModel(fighter, mount, torsoAngle + (long ? 2.0 : -2.34), 0, 0, 0, holder, point => world(stow(point)), spare);
   }
   partStart = recordGeometry(parts, 'stowed', partStart);
@@ -1524,7 +1537,7 @@ function drawGladiator(fighter, pose, parts) {
   }
 
   partStart = recordGeometry(parts, 'body', partStart);
-  weaponModel(fighter, j.weaponHand, pose.angle, pose.windup, pose.strike, weaponClock(), weaponLimb, world);
+  weaponModel(fighter, j.weaponHand, pose.angle, pose.windup, pose.strike, weaponClock(), limb, world);
   partStart = recordGeometry(parts, 'held', partStart);
   const wieldingShield = shieldReady(fighter);
   const [sx, sy, sz] = wieldingShield ? j.shieldHand : torso([-.36, .34, -.42]);
@@ -1543,7 +1556,7 @@ function drawGladiator(fighter, pose, parts) {
 
 function stuckBolts(fighter, transform) {
   const { width: halfWidth, height: halfHeight } = shields[fighter.gear.shield];
-  const piece = (a, b, radius, tip, color) => prism(a, b, [radius, radius], [tip, tip], color, transform, 6);
+  const piece = (a, b, radius, tip, color) => prism(a, b, [radius, radius], [tip, tip], color, transform, 6, modelDetail);
   for (const bolt of ArenaEffects.stuckBolts(fighter.name)) {
     // The shaft leans out of the shield face toward the shooter and the viewer.
     const head = [bolt.x * halfWidth, bolt.y * halfHeight, .25];
@@ -1551,7 +1564,14 @@ function stuckBolts(fighter, transform) {
     piece(head, tail, .019, .019, [226, 196, 142]);
     for (const side of [-1, 1]) {
       const vane = pointBetween(head, tail, .72);
-      surface([vane, shifted(tail, -.02, side * .065), shifted(tail, .035, side * .06), tail], [222, 214, 190], 1, transform);
+      const front = shifted(tail, -.02, side * .065);
+      const back = shifted(tail, .035, side * .06);
+      const color = [222, 214, 190];
+      if (modelDetail) {
+        const crease = shifted(pointBetween(front, back, .55), 0, 0, .014);
+        surface([vane, front, crease, tail], color, 1.07, transform);
+        surface([crease, back, tail], color, .79, transform);
+      } else surface([vane, front, back, tail], color, 1, transform);
     }
     piece(shifted(head, -.012, 0, -.01), pointBetween(head, tail, .1), .036, .024, darkSteel);
   }
@@ -2033,6 +2053,23 @@ function drawBolts() {
   }
 }
 
+function drawFacetedBolt([x, y], [tailX, tailY], shaft, head) {
+  const dx = x - tailX;
+  const dy = y - tailY;
+  const length = Math.hypot(dx, dy) || 1;
+  const across = clamp(length * .08, .9, 2.7) / length;
+  const point = (along, side = 0) => [tailX + dx * along - dy * across * side, tailY + dy * along + dx * across * side];
+  const top = point(.84, -.33);
+  const bottom = point(.84, .33);
+  polygon([point(0, -.35), top, bottom, point(0, .35)], shaft);
+  polygon([point(.74), point(0, -1.08), point(.17), point(0, 1.08)], '#b7a486');
+  polygon([point(1), point(.74, -.86), point(.82), point(.74, .86)], head);
+  if (modelDetail === 2) {
+    polygon([point(.84), bottom, point(0, .35), point(0)], '#684e34');
+    polygon([point(1), point(.82), point(.74, .86)], '#b1a18c');
+  }
+}
+
 function drawBolt(action) {
   const { attacker, defender, missedShot, hitAt, phase } = action;
   if (phase > 1.02 || action.lodged) return;
@@ -2044,23 +2081,30 @@ function drawBolt(action) {
   const point = pointBetween(from, target, travel);
   const [x, y] = project(point);
   const tail = project(shifted(point, -attacker.direction * .33, -.015));
-  ctx.strokeStyle = action.snare ? specials.snarecaster.color : action.doubleShot || action.echo ? fireColors[0] : travel > 0 ? '#fae3ac' : '#cdb592';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(...tail.slice(0, 2));
-  ctx.lineTo(x, y);
-  ctx.stroke();
-  ellipse(x, y, 2.6, 1.5, '#ebe3c7');
+  const shaft = action.snare ? specials.snarecaster.color : action.doubleShot || action.echo ? fireColors[0] : travel > 0 ? '#fae3ac' : '#cdb592';
+  if (modelDetail) drawFacetedBolt([x, y], tail, shaft, '#ebe3c7');
+  else {
+    ctx.strokeStyle = shaft;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(...tail.slice(0, 2));
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ellipse(x, y, 2.6, 1.5, '#ebe3c7');
+  }
   if (action.doubleShot && travel > .12) {
     // The second, burning bolt trails the first.
     const echo = project(shifted(pointBetween(from, target, travel - .12), 0, .09));
     const echoTail = project(shifted(pointBetween(from, target, travel - .12), -attacker.direction * .33, .075));
-    ctx.strokeStyle = fireColors[0];
-    ctx.beginPath();
-    ctx.moveTo(echoTail[0], echoTail[1]);
-    ctx.lineTo(echo[0], echo[1]);
-    ctx.stroke();
-    ellipse(echo[0], echo[1], 3, 1.8, fireColors[1]);
+    if (modelDetail) drawFacetedBolt(echo, echoTail, fireColors[0], fireColors[1]);
+    else {
+      ctx.strokeStyle = fireColors[0];
+      ctx.beginPath();
+      ctx.moveTo(echoTail[0], echoTail[1]);
+      ctx.lineTo(echo[0], echo[1]);
+      ctx.stroke();
+      ellipse(echo[0], echo[1], 3, 1.8, fireColors[1]);
+    }
   }
 }
 
