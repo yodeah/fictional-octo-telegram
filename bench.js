@@ -168,7 +168,8 @@ const ArenaBench = (() => {
   const fighterButton = probeButton('fighters', 'Skip building, sorting and painting the fighters, to test their cost');
   const sceneButton = probeButton('scene', 'Skip the animated crowd and wildlife, to test their cost');
   const effectsButton = probeButton('effects', 'Skip dust, trails, blood, sparks, magic, bolts and damage numbers, to test their cost');
-  const resetButton = button('Reset', () => { resetStats(); render(performance.now()); });
+  const reset = () => { resetStats(); render(performance.now()); };
+  const resetButton = button('Reset', reset);
   const rendererButton = button('', () => {
     settings.renderer = settings.renderer === 'webgl' ? 'canvas' : 'webgl';
     store();
@@ -195,7 +196,7 @@ const ArenaBench = (() => {
   resetButton.title = 'Clear the statistics. The first second after a reset is ignored.';
 
   let active = 'canvas';
-  let info = { polygons: 0, complex: 0, pixels: '' };
+  let info = { polygons: 0, complex: 0, pixels: '', geometry: null };
   function labels() {
     rendererButton.textContent = settings.renderer === 'webgl' ? 'WebGL' : 'Canvas';
     polygonButton.textContent = 'Polys ' + settings.polygons + '×';
@@ -243,6 +244,13 @@ const ArenaBench = (() => {
         + ' · cap ' + CAP_FPS + status
         + (probe.lowRes || !probe.fighters || !probe.scene || !probe.effects ? ' · TEST TOGGLE ON' : '')
     ];
+    if (info.geometry) {
+      lines.push('Geometry (faces / triangles)');
+      for (const { name, parts } of info.geometry) {
+        lines.push(name + ' · ' + Object.entries(parts).map(([part, count]) =>
+          part + ' ' + count.faces + '/' + count.triangles).join(' · '));
+      }
+    }
     text.textContent = lines.join('\n');
   }
 
@@ -255,22 +263,25 @@ const ArenaBench = (() => {
   return {
     gate,
     record,
+    reset,
     get renderer() { return settings.renderer; },
     get polygons() { return settings.polygons; },
     get lowResolution() { return probe.lowRes; },
     get drawFighters() { return probe.fighters; },
     get drawScenery() { return probe.scene; },
     get drawEffects() { return probe.effects; },
+    get measureGeometry() { return query.has('bench') && !panel.hidden; },
     parts,
     onResolutionChange(callback) { onResolution = callback; },
     // Read-only copy of the statistics for scripted comparisons.
     snapshot() {
-      return { ...stats, recent: stats.recent.slice(), avg: stats.frames ? stats.frames * 1000 / stats.time : null,
+      return { ...stats, recent: stats.recent.slice(), geometry: structuredClone(info.geometry),
+        avg: stats.frames ? stats.frames * 1000 / stats.time : null,
         drawAvg: stats.frames ? stats.drawSum / stats.frames : null, hz: 1000 / refresh, expected: expected(), renderer: active, polys: info.polygons };
     },
-    report(renderer, polygons, complex, pixels) {
+    report(renderer, polygons, complex, pixels, geometry) {
       active = renderer;
-      info = { polygons, complex, pixels };
+      info = { polygons, complex, pixels, geometry };
     }
   };
 })();

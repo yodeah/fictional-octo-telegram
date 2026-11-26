@@ -2,6 +2,13 @@
 
 const canvas = document.querySelector('#arena');
 const ctx = canvas.getContext('2d');
+const qualitySelect = document.getElementById('quality');
+const qualityLevels = ['low', 'medium', 'high'];
+const savedQuality = (() => {
+  try { return localStorage.getItem('arena-quality'); } catch { return null; }
+})();
+let modelDetail = Math.max(0, qualityLevels.indexOf(savedQuality));
+qualitySelect.value = qualityLevels[modelDetail];
 const elements = Object.fromEntries(
   ['bout', 'status', 'cast', 'hitboxes', 'result', 'winner', 'play', 'reset', 'generate', 'speed', 'repeat', 'log', 'record']
     .map(id => [id, document.getElementById(id)])
@@ -458,6 +465,7 @@ function prism(from, to, base, tip, color, transform, sides = 4, roll = Math.PI 
 
 function shield(cx, cy, z, fighter, transform) {
   const gear = shields[fighter.gear.shield];
+  const detail = fighter.gear.shield === 'round' ? modelDetail : 0;
   const contour = value => Math.sign(value) * Math.pow(Math.abs(value), gear.shape);
   const sides = gear.shape < .9 ? 16 : 20;
   const ring = (radius, depth) => circleProfile(sides, Math.PI / sides).map(({ cosine, sine }) =>
@@ -467,13 +475,26 @@ function shield(cx, cy, z, fighter, transform) {
   const panel = ring(.80, z + .034);
   const boss = ring(.29, z + .10);
   const crown = ring(.22, z + .158);
+  const bands = [
+    [rim],
+    ...(detail ? [[ring(.966, z + .025), darkSteel, .83]] : []),
+    [bead, darkSteel, .97],
+    ...(detail === 2 ? [[ring(.85, z + .044), bronze, 1.37]] : []),
+    [panel, bronze, 1.21],
+    ...(detail ? [[ring(.752, z + .028), fighter.trim, .85]] : []),
+    ...(detail === 2 ? [[ring(.355, z + .061), fighter.color, .86]] : []),
+    [boss, fighter.color, 1],
+    ...(detail ? [[ring(.252, z + .139), armor, .82]] : []),
+    [crown, armor, 1]
+  ];
   for (let i = 0; i < sides; i++) {
     const j = (i + 1) % sides;
     const light = 1 + Math.cos((i + .5) * Math.PI * 2 / sides - .60) * .26;
-    surface([rim[i], rim[j], bead[j], bead[i]], darkSteel, light * .97, transform);
-    surface([bead[i], bead[j], panel[j], panel[i]], bronze, light * 1.21, transform);
-    surface([panel[i], panel[j], boss[j], boss[i]], fighter.color, light, transform);
-    surface([boss[i], boss[j], crown[j], crown[i]], armor, light, transform);
+    for (let row = 1; row < bands.length; row++) {
+      const [outer] = bands[row - 1];
+      const [inner, color, shade] = bands[row];
+      surface([outer[i], outer[j], inner[j], inner[i]], color, light * shade, transform);
+    }
     if (i % 2 === 0) {
       const [rx, ry] = bead[i];
       surface([[rx, ry + .017, z + .07], [rx + .014, ry, z + .07], [rx, ry - .018, z + .07], [rx - .014, ry, z + .07]], metal, 1.11, transform);
@@ -1327,13 +1348,24 @@ function armorHelmet(fighter, kit, transform) {
   }
 }
 
-function drawGladiator(fighter, pose) {
+function recordGeometry(parts, name, start) {
+  const end = faces.length;
+  if (parts) {
+    const part = parts[name] ??= { faces: 0, triangles: 0 };
+    part.faces += end - start;
+    for (let index = start; index < end; index++) part.triangles += faces[index].projected.length - 2;
+  }
+  return end;
+}
+
+function drawGladiator(fighter, pose, parts) {
   const { joints: j } = pose;
   const kit = armors[fighter.gear.armor];
   const plated = kit.style === 'melee';
   const robed = kit.style === 'magic';
   const world = point => worldPoint(fighter, point);
   const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides);
+  let partStart = faces.length;
 
   for (const side of ['rear', 'front']) {
     const hip = j[side + 'Hip'];
@@ -1377,7 +1409,9 @@ function drawGladiator(fighter, pose) {
       j.hips[2] + z - x * pose.twist + y * (j.chest[2] - j.hips[2]) / .625
     ];
   };
+  partStart = recordGeometry(parts, 'body', partStart);
   armorTorso(fighter, pose, point => world(torso(point)));
+  partStart = recordGeometry(parts, 'armor', partStart);
 
   const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
   if (weapons[spare]) {
@@ -1388,6 +1422,7 @@ function drawGladiator(fighter, pose) {
     const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
     weaponModel(fighter, mount, torsoAngle + (long ? 2.0 : -2.34), 0, 0, 0, holder, point => world(stow(point)), spare);
   }
+  partStart = recordGeometry(parts, 'stowed', partStart);
 
   if (pose.severed) {
     // Beheaded: a short stump stays on the body and the head tumbles on its own.
@@ -1403,7 +1438,9 @@ function drawGladiator(fighter, pose) {
     j.head[0] + x * Math.cos(headTurn) - y * Math.sin(headTurn),
     j.head[1] + x * Math.sin(headTurn) + y * Math.cos(headTurn), j.head[2] + z
   ]);
+  partStart = recordGeometry(parts, 'body', partStart);
   armorHelmet(fighter, kit, headPoint);
+  partStart = recordGeometry(parts, 'helmet', partStart);
 
   for (const side of ['weapon', 'shield']) {
     const shoulder = j[side + 'Shoulder'];
@@ -1431,7 +1468,9 @@ function drawGladiator(fighter, pose) {
     }
   }
 
+  partStart = recordGeometry(parts, 'body', partStart);
   weaponModel(fighter, j.weaponHand, pose.angle, pose.windup, pose.strike, weaponClock(), limb, world);
+  partStart = recordGeometry(parts, 'held', partStart);
   const wieldingShield = shieldReady(fighter);
   const [sx, sy, sz] = wieldingShield ? j.shieldHand : torso([-.36, .34, -.42]);
   const tilt = wieldingShield ? pose.shieldTilt : torsoAngle - .29;
@@ -1442,7 +1481,9 @@ function drawGladiator(fighter, pose) {
     sz + z
   ]);
   shield(0, 0, .11, fighter, shieldTransform);
+  partStart = recordGeometry(parts, 'shield', partStart);
   stuckBolts(fighter, shieldTransform);
+  recordGeometry(parts, 'bolts', partStart);
 }
 
 function stuckBolts(fighter, transform) {
@@ -1989,14 +2030,14 @@ function resize() {
 // batches them and is about 4× cheaper on the main thread at phone size (1.8 ms vs 0.4 ms
 // for 2,347 faces). Build and sort cost the same for both. See docs/rendering-performance.md.
 let glRenderer;
-function paintFaces() {
+function paintFaces(geometry) {
   if (ArenaBench.renderer === 'webgl' && glRenderer === undefined) glRenderer = ArenaGL.create();
   const useGL = ArenaBench.renderer === 'webgl' && glRenderer && !glRenderer.lost
     && glRenderer.paint(faces, width, height, canvas.width, canvas.height);
   if (useGL) ctx.drawImage(glRenderer.canvas, 0, 0, width, height);
   else for (const face of faces) polygon(face.projected, 'rgb(' + face.rgb.join(',') + ')');
   ArenaBench.report(useGL ? 'webgl' : 'canvas', faces.length, useGL ? glRenderer.paint.complex : 0,
-    canvas.width + '×' + canvas.height + ' px');
+    canvas.width + '×' + canvas.height + ' px', geometry);
 }
 
 // Frame order: cached still backdrop, animated scenery, stains and shadows, fighter faces
@@ -2018,6 +2059,7 @@ function draw() {
   if (ArenaBench.drawEffects) ArenaEffects.drawStains(ctx, project, scale);
   const stainsDone = performance.now();
   const poses = fighters.map(fighter => fighter.ragdoll?.pose || finisherPose(fighter) || displayPose(fighter));
+  const geometry = ArenaBench.measureGeometry ? [] : null;
   if (ArenaBench.drawFighters) fighters.forEach((fighter, index) => {
     if (fighter.shattered) return;
     const pose = poses[index];
@@ -2035,7 +2077,9 @@ function draw() {
     }
     // The benchmark's polygon multiplier rebuilds each fighter in place: same picture, more polygons.
     const firstFace = faces.length;
-    for (let copy = 0; copy < ArenaBench.polygons; copy++) drawGladiator(fighter, pose);
+    const parts = geometry ? {} : null;
+    if (geometry) geometry.push({ name: fighter.name, parts });
+    for (let copy = 0; copy < ArenaBench.polygons; copy++) drawGladiator(fighter, pose, parts);
     // A frost-shatter finisher turns the body to ice before it breaks.
     const frost = finisherFrost(fighter);
     if (frost) for (let i = firstFace; i < faces.length; i++) {
@@ -2043,7 +2087,7 @@ function draw() {
     }
   });
   faces.sort((a, b) => a.depth - b.depth);
-  paintFaces();
+  paintFaces(geometry);
   faces.length = 0;
   const fightersDone = performance.now();
   const effects = ArenaBench.drawEffects;
@@ -3029,6 +3073,13 @@ elements.speed.addEventListener('click', () => {
   speedIndex = (speedIndex + 1) % speeds.length;
   elements.speed.textContent = speeds[speedIndex] + '×';
   elements.speed.setAttribute('aria-label', 'Simulation speed, ' + speeds[speedIndex] + ' times');
+});
+
+qualitySelect.addEventListener('change', () => {
+  modelDetail = qualityLevels.indexOf(qualitySelect.value);
+  try { localStorage.setItem('arena-quality', qualitySelect.value); } catch { /* private mode */ }
+  ArenaBench.reset();
+  draw();
 });
 
 // Showing gear and stats only changes the page layout, so it stays available during a fight.

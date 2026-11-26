@@ -102,8 +102,12 @@ canvas{display:block;width:100%;height:clamp(310px,40vw,420px)}
 .triangle{padding:0 16px 12px;color:var(--muted);font-size:13px}
 .triangle b{margin-right:8px;color:var(--gold)}
 .actions,.options{display:flex;gap:8px;align-items:center}
+.options{flex-wrap:wrap}
 .controls button,.toggle{border:1px solid #544333;background:#2a231b;color:var(--ink);min-height:42px;padding:0 13px;font-size:14px;font-weight:700;white-space:nowrap}
 .controls button:hover,.toggle:hover{border-color:var(--gold)}
+.quality{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.quality select{min-height:42px;background:#2a231b;color:var(--ink);border:1px solid #544333;padding:0 6px;font:inherit;cursor:pointer}
+.quality select:hover{border-color:var(--gold)}
 .controls .primary{background:var(--gold);color:#271b10;border-color:var(--gold);min-width:112px}
 .controls .primary:hover{background:#f6ce95}
 .controls button:disabled{opacity:.4;cursor:default}

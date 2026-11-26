@@ -79,6 +79,13 @@ On the Mac (60 Hz, phone-size view, WebGL) the split was about 0.4 ms scene, 2�
 
 ## Benchmark overlay
 
+The Quality rollout uses a fixed idle Varro and Cassian fixture for geometry counts. Each pair gives emitted faces / triangle equivalents. Browser frame timings above are historical unless a new timing run is identified by viewport and renderer.
+
+| Change | Low | Medium | High |
+| --- | ---: | ---: | ---: |
+| Before Quality | 2,347 / 5,138 | — | — |
+| Quality and round-shield rim and boss | 2,347 / 5,138 | 2,467 / 5,378 | 2,547 / 5,538 |
+
 See the README section "Renderers and benchmark". To measure: open `?bench`, pick a renderer and polygon multiplier, tap **Reset**, and let a fight run 15–20 seconds. Use Rematch or Auto-rematch (not Generate matchup) to keep the same fighters. To reproduce the tables above from the console, wrap `drawGladiator`, `faces.sort` and `paintFaces` with timers and read `ArenaBench.snapshot()`.
 
 The 120 FPS cap was checked with simulated timestamps: 60, 90 and 120 Hz screens draw every frame, and 144, 165 and 240 Hz screens average 120 FPS with no false drops.

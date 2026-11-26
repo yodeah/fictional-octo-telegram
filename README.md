@@ -7,7 +7,7 @@ A browser prototype for an idle gladiator manager. The first milestone is an aut
 **Decided 2026-11-26.** Once a fight starts, the player cannot interact with it. All choices happen between fights, and the fighters decide everything until one falls.
 
 - **Locked during a fight, including while paused:** gear and spellbook pickers, Reset, Generate matchup, the venue selector and the scene markers.
-- **Still available, because they only change how you watch:** Pause/Resume, playback speed, Hitboxes and Auto-rematch.
+- **Still available, because they only change how you watch:** Pause/Resume, playback speed, Quality, Hitboxes and Auto-rematch.
 - **For future features:** do not add in-fight commands, abilities, cheers or other inputs. Put player choices in preparation and progression between fights.
 
 This replaces the earlier idea of a "corner coach" with timed calls.
@@ -45,6 +45,8 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
+The **Quality** menu saves your choice for the next visit. Low is the default. Switch to Medium or High to see the round shield's raised rim and more faceted boss.
+
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
 
 The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and lists improvement ideas. Its numbers are written by hand, so update it when combat values change.
@@ -66,6 +68,8 @@ Fighters coil before they swing and carry the weapon through after it lands, the
 The benchmark overlay is hidden by default so it never covers the fight. Select **FPS** next to the speed control to show or hide it, or open `index.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
 
 The overlay toggles the fighter painter between **Canvas** (the default) and **WebGL**, and **Polys 1×/3×** builds each fighter three times over to test three times as many polygons with the same picture. The choices are saved in the browser; `?renderer=webgl` and `?polygons=3` set them from the address bar.
+
+Opening with `?bench` adds face and triangle-equivalent counts by fighter part. The same breakdown is available from `ArenaBench.snapshot().geometry` while that overlay is open. Use **Polys 1×** to compare Quality levels.
 
 The second row of buttons finds what limits the frame rate on a device. **Res full / Res 1×** draws the arena at up to 2 pixels per CSS pixel or at 1 (`?res=1`), which tests fill rate. **Fighters**, **Scenery** and **Effects** each skip drawing that part: the fighters' polygons and shadows, the animated crowd and wildlife, or dust, trails, blood, sparks, magic, bolts and damage numbers. These toggles change only the picture, are never saved, and add **TEST TOGGLE ON** to the overlay while active. The **Scene · Fighters · FX** line shows the main-thread milliseconds each part took per frame. Only the depth-sorted fighter polygons move to WebGL (`gl-renderer.js`). They are painted in sorted order into an offscreen WebGL canvas that is drawn into the arena canvas where Canvas 2D would have filled them, so backdrops, shadows and effects keep their layering. Concave and self-crossing polygons use a stencil pass with the same nonzero fill rule as Canvas 2D. Rendering is capped at 120 FPS; skipped frames leave the simulation clock alone, so the next frame advances by the full elapsed time.
 
