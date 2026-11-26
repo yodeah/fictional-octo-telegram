@@ -647,4 +647,12 @@
     stroke(g, 'M44,5 C40,20 20,24 22,14 C24,8 36,12 34,22 L30,30', '#92c470', 1.5);
     disc(g, 30, 31, 3, '#4f6a3a', 1);
   });
+
+  special('lastOath', 'greatsword', { steel: [158, 146, 154], grip: [112, 24, 30], brass: [226, 210, 180], iron: [100, 30, 36], teamCss: '#ff5a4a' }, g => {
+    stroke(g, 'M42,0 L140,0', 'rgba(255,70,50,.55)', 4.6);
+    stroke(g, 'M42,0 L140,0', '#ffb09a', 1);
+    for (let x = 52; x < 124; x += 11) stroke(g, `M${x},-2.6 L${x + 3},2.6 M${x + 3},-2.6 L${x + 5},0`, '#ff7a5a', .8);
+    // An oath ribbon tied at the guard.
+    shape(g, 'M12,6 C6,16 -6,18 -12,30 L-7,27 L-4,32 C0,22 10,18 17,8 Z', tone([150, 30, 36], 0), 1);
+  });
 })();
