@@ -48,10 +48,11 @@ for (const [key, [family, stats]] of Object.entries(variants)) weapons[key] = { 
 const weaponFamily = key => weapons[key]?.family || key;
 const weaponGroups = { sword: 'Blades', greatsword: 'Blades', spear: 'Polearms', axe: 'Axes', mace: 'Impact weapons',
   maul: 'Impact weapons', flail: 'Flails', crossbow: 'Ranged', staff: 'Staves' };
+const breaksShields = key => ['axe', 'mace'].includes(weaponFamily(key));
 const shields = {
-  buckler: { name: 'Buckler', defense: 11, mobility: 1.08, energy: 9, bashTempo: 1.35, bashPower: .8, width: .24, height: .29, shape: 1 },
-  round: { name: 'Round shield', defense: 20, mobility: 1, energy: 15, bashTempo: 1, bashPower: 1, width: .34, height: .43, shape: 1 },
-  tower: { name: 'Tower shield', defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
+  buckler: { name: 'Buckler', durability: 1, defense: 11, mobility: 1.08, energy: 9, bashTempo: 1.35, bashPower: .8, width: .24, height: .29, shape: 1 },
+  round: { name: 'Round shield', durability: 2, defense: 20, mobility: 1, energy: 15, bashTempo: 1, bashPower: 1, width: .34, height: .43, shape: 1 },
+  tower: { name: 'Tower shield', durability: 3, defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
 };
 // Testing only: ?force=perfect,wall,sand,oath,mender,pull,verdict makes those events trigger whenever they can,
 // and ?force=behead (impale, crumple, lastCast, shatter, pin) picks that finisher for every kill
@@ -214,6 +215,7 @@ function equipmentPicker(fighter, prefix, type, choices) {
       const handling = powerProfile(item, fighter.strength);
       lines.push('Base damage ' + Math.round(item.damage * handling.power) + ' · Reach ' + item.range.toFixed(1),
         'Speed ' + Math.round(item.tempo * 100) + '% · ' + handling.cost + ' energy per attack');
+      if (breaksShields(key)) lines.push('Damages shields on blocked melee hits');
       if (handling.heavy) lines.push('High stance damage · Strength shortens recovery');
       if (item.spellPower) lines.push('+' + Math.round((item.spellPower - 1) * 100) + '% spell power · Free Staff Spark');
       if (item.style === 'ranged') lines.push('Ranged bolts · Strong against robes', 'Reduced damage and accuracy up close');
@@ -221,6 +223,7 @@ function equipmentPicker(fighter, prefix, type, choices) {
       if (item.twoHanded) lines.push('Uses both hands · Shield is stowed');
       if (type === 'reserve') lines.push('Carrying a spare lowers speed by 4% · Swaps cost ' + switchCost + ' energy');
     } else if (type === 'shield') {
+      lines.push('Axe or mace blocks before breaking · ' + item.durability);
       lines.push('Defense +' + item.defense, 'Speed ' + Math.round(item.mobility * 100) + '% · ' + item.energy + ' energy per block');
       lines.push('Bash speed ' + Math.round(item.bashTempo * 100) + '% · Bash power ' + Math.round(item.bashPower * 100) + '%',
         '14 energy per shield bash · Active with one-handed weapons');
@@ -318,7 +321,7 @@ const choose = options => options[Math.floor(Math.random() * options.length)];
 const weaponClass = key => weapons[key].spellPower ? 'magic' : weapons[key].style || 'melee';
 const weaponKeys = fighter => [fighter.gear.weapon, fighter.gear.reserve].filter(key => key !== 'none');
 const carriesSpare = fighter => fighter.gear.reserve !== 'none';
-const shieldReady = fighter => !weapons[fighter.weapon].twoHanded;
+const shieldReady = fighter => fighter.shieldHitsLeft > 0 && !weapons[fighter.weapon].twoHanded;
 const mobility = fighter => (shieldReady(fighter) ? shields[fighter.gear.shield].mobility : 1) * armors[fighter.gear.armor].mobility
   * (carriesSpare(fighter) ? .96 : 1) * (fighter.hastedUntil > elapsed ? 1.12 : 1);
 const defense = fighter => fighter.defense + (shieldReady(fighter) ? shields[fighter.gear.shield].defense : 0) + armors[fighter.gear.armor].defense;
@@ -363,6 +366,7 @@ function applyGear(fighter) {
   const keep = kept && [gear.weapon, gear.reserve].includes(kept.weapon) && !slots.includes(kept.weapon);
   gear.special = slots.find(value => specials[value]) || (keep ? previous.special : 'none');
   fighter.gear = gear;
+  fighter.shieldHitsLeft = shields[gear.shield].durability;
   fighter.weapon = gear.weapon;
   applySpellbook(fighter);
   Object.values(fighter.loadout).forEach(picker => picker.describe());
@@ -377,7 +381,10 @@ function updateStats(fighter) {
   const stowed = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
   const marked = key => (specialOf(fighter, key) ? specialMark : '') + weaponName(fighter, key);
   fighter.hud.active.textContent = marked(fighter.weapon) + ' held' + (weapons[stowed] ? ' · ' + marked(stowed) + ' stowed' : ' · No spare')
-    + (shieldReady(fighter) ? '' : ' · Shield on back');
+    + (fighter.shieldHitsLeft === 0 ? ' · Shield broken' : shieldReady(fighter) ? '' : ' · Shield on back');
+  if (fighter.shieldHitsLeft > 0 && fighter.shieldHitsLeft < shields[fighter.gear.shield].durability) {
+    fighter.hud.active.textContent += ' · Shield ' + fighter.shieldHitsLeft + '/' + shields[fighter.gear.shield].durability;
+  }
   const power = (weapons[fighter.weapon].spellPower || 1) * armorPower(fighter, 'magic');
   for (const key of fighter.spells) {
     const spell = spells[key];
@@ -1548,6 +1555,7 @@ function drawGladiator(fighter, pose, parts) {
   weaponModel(fighter, thrown?.hand || j.weaponHand, thrown?.angle ?? pose.angle, pose.windup, pose.strike,
     weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon);
   partStart = recordGeometry(parts, 'held', partStart);
+  if (fighter.shieldHitsLeft === 0) return;
   const wieldingShield = shieldReady(fighter);
   const [sx, sy, sz] = wieldingShield ? j.shieldHand : torso([-.36, .34, -.42]);
   const tilt = wieldingShield ? pose.shieldTilt : torsoAngle - .29;
@@ -2786,6 +2794,16 @@ function impact(action, contact) {
       spell?.color || '#ffb63f', action.heavy ? 26 : 16, action.heavy ? 1.4 : 1);
     if (action.heavy) kickDust(defender, 1.1, 8);
     logEvent(defender.name + (perfect ? ' times a perfect block against ' : ' blocks ') + attacker.name + '’s ' + name + '.');
+    if (style === 'melee' && !bash && !spell && breaksShields(action.key)) {
+      defender.shieldHitsLeft--;
+      if (defender.shieldHitsLeft === 0) {
+        defender.riposte = false;
+        floatLabel(defender, 'SHIELD BROKEN', '#ffd49c');
+        ArenaEffects.strike(point, attacker.direction, '#c49259', 18, 1.15);
+        logEvent(attacker.name + ' breaks ' + defender.name + '’s ' + shields[defender.gear.shield].name.toLowerCase() + '.');
+      }
+      updateStats(defender);
+    }
     applyStanceDamage(action, perfect ? .3 : .54);
     if (defender.energy < 2.5 && defender.stunnedUntil <= elapsed) breakStance(defender, 1.08);
     special?.onBlocked?.(attacker, defender, action, attacker.special);
