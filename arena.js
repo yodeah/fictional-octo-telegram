@@ -2663,7 +2663,7 @@ function impact(action, contact) {
 
 function finishBout(attacker, defender, zone, blood, action = null) {
   defender.ragdoll = makeRagdoll(defender, zone);
-  defender.ragdoll.bleeding = blood && gore;
+  defender.ragdoll.bleeding = blood;
   // The winner is settled here; the finisher only changes what the fall looks like. It starts before
   // the actions are cleared so it can read the finishing pose.
   const finisherDelay = startFinisher(attacker, defender, zone, action);
@@ -3030,19 +3030,6 @@ detailsToggle.addEventListener('click', () => {
   document.getElementById('scoreboard').dataset.details = open ? 'shown' : 'hidden';
   detailsToggle.setAttribute('aria-expanded', String(open));
   detailsToggle.textContent = open ? 'Hide gear, stats & spells' : 'Show gear, stats & spells';
-});
-
-// Gore only changes the picture, so like Hitboxes it stays available during a fight.
-const goreToggle = document.getElementById('gore');
-const showGore = () => {
-  goreToggle.setAttribute('aria-pressed', String(gore));
-  goreToggle.textContent = gore ? 'Gore on' : 'Gore off';
-};
-ArenaEffects.setGore(gore);
-showGore();
-goreToggle.addEventListener('click', () => {
-  setGore(!gore);
-  showGore();
 });
 
 elements.hitboxes.addEventListener('click', () => {

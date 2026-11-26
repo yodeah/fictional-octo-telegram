@@ -5,13 +5,6 @@
 // drawing, so it can never change who wins. Like effects.js, nothing here calls Math.random.
 // Testing: ?force=behead (or impale, launch, shatter, pin) uses that finisher on every kill.
 let finisher = null;
-let gore = (() => {
-  try {
-    return localStorage.getItem('arena-gore') !== 'off';
-  } catch {
-    return true;
-  }
-})();
 
 const finisherTypes = {
   behead: { name: 'BEHEADED', verb: 'beheads', color: '#ffb0a0' },
@@ -23,14 +16,14 @@ const finisherTypes = {
 
 function chooseFinisher(attacker, defender, zone, action) {
   const pick = Object.keys(finisherTypes).find(type => forced.has(type));
-  if (pick) return pick === 'behead' && !gore ? null : pick;
+  if (pick) return pick;
   const key = action?.key;
   const iced = action?.spell?.ice || (key && specialOf(attacker, key) === specials.wintersBite)
     || (defender.frozenUntil > elapsed && defender.rootedUntil <= elapsed);
   if (iced) return 'shatter';
   if (!action || action.bash || action.spell || !key) return null;
   if (action.style === 'ranged') return 'pin';
-  if (zone === 'head' && meleeType(key) === 1) return gore ? 'behead' : null;
+  if (zone === 'head' && meleeType(key) === 1) return 'behead';
   if (key === 'rapier' && zone === 'body') return 'impale';
   if (weaponFamily(key) === 'maul') return 'launch';
   return null;
@@ -78,7 +71,6 @@ function startFinisher(attacker, defender, zone, action) {
     const room = 3.5 + defender.direction * defender.x;
     const speed = clamp(room / .9, .4, 3.3);
     for (const node of all) node.speed = [-speed - node.point[1] * .3, 1.5, node.speed[2]];
-    ragdoll.bleeding = ragdoll.bleeding && gore;
   }
   const { name, verb, color } = finisherTypes[type];
   ArenaEffects.label([defender.x, 2.9, defender.z + .3], name, color, { power: .2 });
@@ -111,7 +103,7 @@ function stepFinisher(dt) {
     const grounded = nodes.head.point[1] <= nodes.head.floor + .02;
     finisher.spin *= Math.exp(-dt * (grounded ? 6 : .4));
     ragdoll.pose.headSpin += finisher.spin * dt;
-    if (gore && t < .8 && (finisher.tick -= dt) <= 0) {
+    if (t < .8 && (finisher.tick -= dt) <= 0) {
       finisher.tick = .12;
       ArenaEffects.bleed(worldPoint(defender, shifted(nodes.chest.point, 0, .2)), attacker.direction, .1);
     }
@@ -126,7 +118,7 @@ function stepFinisher(dt) {
       for (const node of Object.values(nodes)) node.speed = [node.speed[0] - 3.4, node.speed[1] + 1.2, node.speed[2]];
       ArenaEffects.shake(.4);
       kickDust(attacker, 1, 8);
-      if (gore) ArenaEffects.bleed(worldPoint(defender, nodes.chest.point), attacker.direction, .5);
+      ArenaEffects.bleed(worldPoint(defender, nodes.chest.point), attacker.direction, .5);
     }
   } else if (type === 'pin') {
     if (!finisher.pinned && nodes.chest.point[1] <= nodes.chest.floor + .03) {
@@ -189,14 +181,4 @@ function drawFinisher() {
   ctx.arc(x1, y1, 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
-}
-
-function setGore(on) {
-  gore = on;
-  ArenaEffects.setGore(on);
-  try {
-    localStorage.setItem('arena-gore', on ? 'on' : 'off');
-  } catch {
-    // Without storage the setting lasts for this page only.
-  }
 }

@@ -89,7 +89,6 @@ canvas{display:block;width:100%;height:clamp(310px,40vw,420px)}
 .stage-action{position:absolute;top:13px;right:14px;padding:6px 9px;background:#271c14eb;color:var(--spell-color);font-size:13px;font-weight:750}
 .hitboxes,.venue-control{position:absolute;bottom:10px;padding:5px 8px;border:1px solid #e1b48855;background:#271c14e8;color:#f7d6a4;font-size:13px}
 .hitboxes{right:12px}.venue-control{left:12px}
-.hitboxes.gore-toggle{right:98px}
 .hitboxes:hover,.venue-control:hover,.hitboxes[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
 .scenery-target{position:absolute;display:grid;place-items:center;width:36px;height:36px;border:1px solid transparent;border-radius:50%;background:transparent;transform:translate(-50%,-50%);color:#ffe6b1}
 .scenery-target[hidden]{display:none}
