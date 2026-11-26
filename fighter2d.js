@@ -956,18 +956,18 @@ const ArenaArt2D = (() => {
       };
     });
   }
-  // part is the haft by default; a flail also has a ball.
-  const weaponSprite = (key, team, trim, part = 'draw') => lookup(['weapon', key, part, team, trim].join(), () => {
+  // part is the haft by default; a flail also has a ball. Stowed gear is dimmed, so it sits back.
+  const weaponSprite = (key, team, trim, part = 'draw', dim = false) => lookup(['weapon', key, part, team, trim, dim].join(), () => {
     const art = weaponArt[key];
     const colors = palette(team, trim, LEATHER, art.colors);
     const piece = part === 'draw' ? art : art[part];
     return bake(piece.box, g => {
       piece.draw(g, colors);
       if (part === 'draw') art.extra?.(g, colors);
-    }, bakedScale / 100);
+    }, bakedScale / 100, dim);
   });
-  const shieldSprite = (key, team, trim) => lookup(['shield', key, team, trim].join(), () =>
-    bake(shieldArt[key].box, g => shieldArt[key].draw(g, palette(team, trim, LEATHER)), bakedScale / 100));
+  const shieldSprite = (key, team, trim, dim = false) => lookup(['shield', key, team, trim, dim].join(), () =>
+    bake(shieldArt[key].box, g => shieldArt[key].draw(g, palette(team, trim, LEATHER)), bakedScale / 100, dim));
   const glows = {
     blue: ['200,235,255', '120,160,255'], teal: ['220,255,245', '80,210,200'], sun: ['255,244,200', '255,170,60']
   };
@@ -1095,10 +1095,10 @@ const ArenaArt2D = (() => {
     const torsoFrame = paint => place(j.hips, paint, torsoTurn, 1 - Math.min(.18, Math.abs(pose.twist) * .3), torsoStretch);
 
     // Chain links and balls hang from the haft along the same curves the 3D flail and its hit test use.
-    function drawChains(key, chains, size) {
+    function drawChains(key, chains, size, dim) {
       const art = weaponArt[key];
-      const ball = weaponSprite(key, view.color, view.trim, 'ball');
-      const link = weaponSprite(key, view.color, view.trim, 'link');
+      const ball = weaponSprite(key, view.color, view.trim, 'ball', dim);
+      const link = weaponSprite(key, view.color, view.trim, 'link', dim);
       for (const chain of chains) {
         // Enough links to overlap their neighbours; every other one is seen edge on.
         for (let i = 0; i < 10; i++) {
@@ -1145,14 +1145,14 @@ const ArenaArt2D = (() => {
       g.stroke();
     }
 
-    function drawWeapon(key, hand, angle, size, fallback, chains) {
+    function drawWeapon(key, hand, angle, size, fallback, chains, dim = false) {
       if (!key) {
         fallback();
         return;
       }
       const art = weaponArt[key];
       item(hand, angle, size, () => {
-        stamp(g, weaponSprite(key, view.color, view.trim), frost);
+        stamp(g, weaponSprite(key, view.color, view.trim, 'draw', dim), frost);
         if (art.string) drawString(art.string);
         if (art.glow) {
           const glow = glowSprite(art.glow.color);
@@ -1164,7 +1164,7 @@ const ArenaArt2D = (() => {
           g.restore();
         }
       });
-      if (art.ball) drawChains(key, chains, size);
+      if (art.ball) drawChains(key, chains, size, dim);
     }
 
     function drawShield() {
@@ -1173,7 +1173,7 @@ const ArenaArt2D = (() => {
         shield.draw();
         return;
       }
-      const sprite = shieldSprite(shield.key, view.color, view.trim);
+      const sprite = shieldSprite(shield.key, view.color, view.trim, shield.stowed);
       const [halfWidth, halfHeight] = shieldArt[shield.key].half;
       place(shield.at, () => {
         g.scale(.94, 1);
@@ -1243,7 +1243,7 @@ const ArenaArt2D = (() => {
 
     // Back to front. Stowed gear and the cloak sit behind everything.
     if (view.shield?.stowed) drawShield();
-    if (view.spare) drawWeapon(view.spare.key, view.spare.mount, view.spare.angle, view.spare.scale, view.spare.draw, view.spare.chains);
+    if (view.spare) drawWeapon(view.spare.key, view.spare.mount, view.spare.angle, view.spare.scale, view.spare.draw, view.spare.chains, true);
     if (parts.cape) place(view.torsoPoint([-.1, .62, -.2]), () => {
       // A cape that flares out also lifts a little.
       g.transform(1, 0, swing, 1 - Math.min(.16, Math.abs(swing) * .2), 0, 0);
