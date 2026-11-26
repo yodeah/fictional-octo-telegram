@@ -29,6 +29,8 @@ Equip a staff and select **None** for the backup to run a dedicated mage. Staff 
 
 Melee swings check the moving weapon against the shield and body regions. Head, body, arm, and leg hits deal different damage and produce different reactions. The defeated fighter falls with a jointed ragdoll. Toggle **Hitboxes** to see collision shapes.
 
+Fighters move and act on independent clocks, so windups can overlap and either fighter can land a follow-up. Heavy two-handed melee weapons hit harder, use more energy, and recover more slowly. Very high Strength shortens their recovery. Hits and blocks can wear down the stance meter. A stance break lowers the fighter into a vulnerable stagger. Shields can bash after a block or interrupt a nearby heavy windup. [Elden Ring combat guide](https://www.bandainamcoent.com/es_mx/news/elden-ring-introduction-part-4-combat-guide)
+
 The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three completed bouts. Select the venue name to preview the next one. Select a marker in the scene to cheer with spectators, startle wildlife, or stir the ruins’ birds and fireflies.
 
 Pause or change speed during a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
@@ -37,7 +39,7 @@ Pause or change speed during a bout. Auto-rematch runs back-to-back bouts until 
 
 ## Armor geometry
 
-The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the plate torso and helmet submit 943 triangle equivalents, leather submits 694, and robes submit 431. They previously submitted 407, 310, and 171. The nine original weapons each submit at least twice as many triangle equivalents as before. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
+The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents, leather submits 853, and robes submit 695. The nine original weapons each submit at least twice as many triangle equivalents as before the armory expansion. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
 
 ## Development plan
 

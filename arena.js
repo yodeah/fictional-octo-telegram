@@ -181,8 +181,10 @@ function equipmentPicker(fighter, prefix, type, choices) {
     } else if (type === 'reserve' && key === 'none') {
       lines.push('Travel lighter with one weapon');
     } else if (type === 'weapon' || type === 'reserve') {
-      lines.push('Base damage ' + item.damage + ' · Reach ' + item.range.toFixed(1),
-        'Speed ' + Math.round(item.tempo * 100) + '% · ' + item.energy + ' energy per attack');
+      const handling = powerProfile(item, fighter.strength);
+      lines.push('Base damage ' + Math.round(item.damage * handling.power) + ' · Reach ' + item.range.toFixed(1),
+        'Speed ' + Math.round(item.tempo * 100) + '% · ' + handling.cost + ' energy per attack');
+      if (handling.heavy) lines.push('High stance damage · Strength shortens recovery');
       if (item.spellPower) lines.push('+' + Math.round((item.spellPower - 1) * 100) + '% spell power · Free Staff Spark');
       if (item.style === 'ranged') lines.push('Ranged bolts · Strong against robes', 'Reduced damage and accuracy up close');
       if (item.accuracy) lines.push('+' + item.accuracy + ' ' + bonusTypes[meleeType(key)] + ' attack');
@@ -190,7 +192,7 @@ function equipmentPicker(fighter, prefix, type, choices) {
       if (type === 'reserve') lines.push('Carrying a spare lowers speed by 4% · Swaps cost ' + switchCost + ' energy');
     } else if (type === 'shield') {
       lines.push('Defense +' + item.defense, 'Speed ' + Math.round(item.mobility * 100) + '% · ' + item.energy + ' energy per block');
-      lines.push('Active with one-handed weapons');
+      lines.push('14 energy per shield bash · Active with one-handed weapons');
     }
     if (select.value === 'auto') lines.push('Rerolls this slot each new bout.');
     detail.textContent = lines.join('\n');
@@ -212,7 +214,7 @@ function equipmentPicker(fighter, prefix, type, choices) {
 
 fighters.forEach((fighter, index) => {
   const prefix = index === 0 ? 'red-' : 'blue-';
-  fighter.hud = Object.fromEntries(['hp', 'meter', 'mp', 'mana', 'ep', 'energy', 'stats', 'loadout', 'book', 'queued', 'spells', 'level', 'active']
+  fighter.hud = Object.fromEntries(['hp', 'meter', 'mp', 'mana', 'ep', 'energy', 'stance', 'balance', 'stats', 'loadout', 'book', 'queued', 'spells', 'level', 'active']
     .map(key => [key, document.getElementById(prefix + key)]));
   fighter.loadout = Object.fromEntries(Object.entries(gearChoices)
     .map(([type, choices]) => [type, equipmentPicker(fighter, prefix, type, choices)]));
@@ -262,10 +264,7 @@ let bout = 1;
 let elapsed = 0;
 let visualClock = 0;
 let sceneryClock = 0;
-let phase = 0;
 let rematchDelay = 0;
-let exchange;
-let lastAttacker;
 let fall = 0;
 let showHitboxes = false;
 let hitPause = 0;
@@ -742,22 +741,23 @@ function stepFoot(stride, offset) {
   return { x: mix(-.30, .30, ease(swing)), y: arc * .17, pitch: arc * mix(-.43, .34, swing) };
 }
 
-function fighterPose(fighter, at = phase) {
+function fighterPose(fighter) {
   const active = state !== 'ready';
-  const attacking = active && exchange.attacker === fighter;
-  const defending = active && exchange.defender === fighter;
-  const swinging = attacking && exchange.style === 'melee';
-  const shooting = attacking && exchange.style === 'ranged';
-  const swingAt = active ? exchange.hitAt : .78;
+  const action = fighter.action;
+  const incoming = otherFighter(fighter).action;
+  const at = action?.phase ?? 0;
+  const swinging = action?.style === 'melee' && !action.bash;
+  const shooting = action?.style === 'ranged';
+  const swingAt = action?.hitAt ?? .78;
   const release = smooth((at - .48) / (swingAt - .48));
   const windup = swinging ? smooth((at - .11) / .37) * (1 - release) : 0;
   const strike = swinging ? release * (1 - smooth((at - swingAt - .045) / .46)) : 0;
-  const casting = attacking && exchange.spell ? ease((at - .25) / .32) * (1 - ease((at - 1.01) / .43)) : 0;
+  const casting = action?.spell ? ease((at - .25) / .32) * (1 - ease((at - 1.01) / .43)) : 0;
   const aiming = shooting ? ease((at - .15) / .33) * (1 - ease((at - .99) / .40)) : 0;
   const shotRecoil = shooting ? ease((at - .55) / .09) * (1 - ease((at - .66) / .30)) : 0;
-  const swapping = attacking && exchange.switched ? Math.sin(Math.PI * clamp(at / .30, 0, 1)) : 0;
-  const guard = defending && exchange.block
-    ? ease((at - swingAt + .34) / .25) * (1 - ease((at - swingAt - .09) / .31))
+  const swapping = action?.switched ? Math.sin(Math.PI * clamp(at / .30, 0, 1)) : 0;
+  const guard = incoming && isGuarding(incoming)
+    ? ease((incoming.phase - incoming.hitAt + .34) / .25) * (1 - ease((incoming.phase - incoming.hitAt - .09) / .31))
     : 0;
   const reactionAge = elapsed - (fighter.reaction?.time ?? -10);
   const recoil = ease(reactionAge / .11) * (1 - ease((reactionAge - .14) / .35));
@@ -767,19 +767,21 @@ function fighterPose(fighter, at = phase) {
   const sway = Math.sin(stride) * gait;
   const weightShift = Math.cos(stride * 2) * gait;
   const breath = Math.sin(visualClock * 3 + fighter.direction) * .025;
-  const drop = guard * .085 + strike * .065 + weightShift * .021 - casting * .08 + (zone === 'leg' ? recoil * .16 : 0);
-  const evasion = defending && exchange.evade ? ease((at - .40) / .29) * (1 - ease((at - .92) / .43)) : 0;
-  const lean = strike * .23 - windup * .17 + casting * .13 - recoil * .25 + guard * .08 - evasion * .18 + aiming * .09;
+  const stun = ease((elapsed - fighter.stunStarted) / .16) * ease((fighter.stunnedUntil - elapsed) / .24);
+  const bash = action?.bash ? release * (1 - smooth((at - swingAt - .06) / .32)) : 0;
+  const drop = guard * .085 + strike * .065 + weightShift * .021 - casting * .08 + stun * .36 + (zone === 'leg' ? recoil * .16 : 0);
+  const evasion = incoming?.evade && !action ? ease((incoming.phase - .40) / .29) * (1 - ease((incoming.phase - .92) / .43)) : 0;
+  const lean = strike * .23 - windup * .17 + casting * .13 - recoil * .25 + guard * .08 - evasion * .18 + aiming * .09 + stun * .20 + bash * .21;
   const twist = sway * .11 - windup * .12 + strike * .18 + guard * .05;
   const hips = [-.10 + sway * .045, 1.095 + breath - drop, weightShift * .024];
   const chest = [-.11 + lean + sway * .075, 1.72 + breath - drop, twist * .26];
   const head = shifted(chest, -.015 + strike * .055 - recoil * (zone === 'head' ? .27 : .09) - sway * .025,
-    .33 - (zone === 'head' ? recoil * .055 : 0), -twist * .16);
+    .33 - (zone === 'head' ? recoil * .055 : 0) - stun * .15, -twist * .16);
   const joints = { hips, chest, head };
   for (const side of ['rear', 'front']) {
     const sign = side === 'front' ? 1 : -1;
     const step = stepFoot(fighter.stride, sign < 0 ? .50 : 0);
-    const plant = sign * (guard * .13 + strike * .20 + casting * .08);
+    const plant = sign * (guard * .13 + strike * .20 + casting * .08 + stun * .12 + bash * .18);
     joints[side + 'Hip'] = shifted(hips, sign * .077, -.016, sign * .165);
     joints[side + 'Ankle'] = [sign * .355 + step.x * gait + plant, .157 + step.y * gait, sign * .22];
     joints[side + 'Knee'] = bendJoint(joints[side + 'Hip'], joints[side + 'Ankle'], .515, .505, 1);
@@ -788,21 +790,21 @@ function fighterPose(fighter, at = phase) {
   }
 
   const weapon = weapons[fighter.weapon];
-  const aim = swinging ? exchange.aim * strike : 0;
+  const aim = swinging ? action.aim * strike : 0;
   joints.weaponShoulder = shifted(chest, .02 - windup * .06 + twist * .35, .04, -.30);
   const channeling = weapon.spellPower ? casting * .54 : -casting * .47;
   joints.weaponHand = [.32 + channeling + strike * weapon.extension - windup * .47 - recoil * .12 + sway * .11
     + aiming * .43 - shotRecoil * .10 - swapping * .36,
-    1.43 - drop + windup * weapon.lift + aim * .22 + sway * .07 + aiming * .17 - swapping * .14, -.30 + strike * .31 + aiming * .20];
+    1.43 - drop + windup * weapon.lift + aim * .22 + sway * .07 + aiming * .17 - swapping * .14 - stun * .27, -.30 + strike * .31 + aiming * .20];
   joints.weaponElbow = bendJoint(joints.weaponShoulder, joints.weaponHand, .51, .53, -1);
 
   joints.shieldShoulder = shifted(chest, -.02 - twist * .35, -.025, .30);
-  joints.shieldHand = [.36 + guard * .30 + casting * .12 - recoil * (zone === 'arm' ? .31 : .09) - sway * .11,
-    1.39 - drop + guard * .25 - recoil * .16 + casting * .16, .48];
+  joints.shieldHand = [.36 + guard * .30 + casting * .12 - recoil * (zone === 'arm' ? .31 : .09) - sway * .11 + bash * .46,
+    1.39 - drop + guard * .25 - recoil * .16 + casting * .16 + bash * .20 - stun * .24, .48 - bash * .26];
   const aimScale = weaponFamily(fighter.weapon) === 'spear' ? .44 : .65;
   const castAngle = weapon.spellPower ? -.79 : 1.19;
   const angle = weapon.rest + casting * castAngle + windup * weapon.draw - strike * weapon.swing
-    + aim * aimScale + sway * .08 - aiming * .16 + shotRecoil * .09 + swapping * .35;
+    + aim * aimScale + sway * .08 - aiming * .16 + shotRecoil * .09 + swapping * .35 - stun * .76;
   if (weapon.twoHanded) {
     const grip = weaponAxis(joints.weaponHand, angle)(-.32);
     joints.shieldHand = shifted(grip, 0, 0, .08);
@@ -810,7 +812,7 @@ function fighterPose(fighter, at = phase) {
   joints.shieldElbow = bendJoint(joints.shieldShoulder, joints.shieldHand, .43, .47, -1);
   const pose = { joints, angle, windup, strike: strike + shotRecoil,
     shieldTilt: guard * .16 - recoil * .27 - sway * .10, twist, cloth: -sway * .08 - lean * .31 + recoil * .065 };
-  const previous = active && exchange.entryPoses.get(fighter);
+  const previous = action?.previousPose;
   if (previous && at < .22) {
     const blend = smooth(at / .22);
     for (const name of Object.keys(joints)) joints[name] = pointBetween(previous.joints[name], joints[name], blend);
@@ -995,63 +997,95 @@ function armorSignature(kit, pose, panel, piece) {
 }
 
 function armorHelmet(fighter, kit, transform) {
-  const piece = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, transform, sides);
+  const piece = (a, b, r1, r2, color, sides = 8) => prism(a, b, r1, r2, color, transform, sides);
   const panel = (points, color, light = 1) => surface(points, color, light, transform);
-  const face = fighter.direction > 0 ? [191, 128, 86] : [165, 111, 77];
-  if (kit.style === 'magic') {
-    loft([[-.15, .225, .227], [.05, .278, .26], [.21, .265, .218], [.315, .128, .135], [.38, .02, .03]], kit.color, transform);
-    panel([[-.02, -.12, .234], [.17, -.13, .23], [.25, .012, .205], [.17, .16, .235], [.015, .14, .268]], clothLining, .75);
-    panel([[.035, -.11, .247], [.16, -.105, .25], [.226, -.027, .225], [.175, .095, .261], [.061, .106, .275]], face);
-    piece([.052, .138, .271], [.22, .087, .246], [.024, .029], [.026, .025], kit.edging || bronze, 6);
-    if (kit.cut === 'astral') {
-      piece([-.19, .19, .14], [-.32, .40, .13], [.127, .089], [.040, .051], kit.color, 8);
-      piece([.04, .258, .168], [.055, .385, .143], [.065, .061], [.019, .027], kit.edging, 8);
-    }
-    panel([[-.20, .07, .217], [-.077, .22, .223], [.146, .235, .179], [.182, .182, .21],
-      [-.057, .193, .248], [-.169, .047, .247]], kit.color, 1.41);
-  } else if (kit.style === 'ranged') {
-    loft([[-.15, .185, .20], [-.09, .228, .235], [.12, .238, .24], [.233, .205, .21]], face, transform);
-    loft([[.095, .234, .249], [.171, .266, .255], [.291, .18, .189], [.322, .08, .09]], kit.shell || leather, transform);
-    piece([-.235, .14, .19], [.246, .157, .182], [.028, .087], [.024, .057], fighter.trim, 8);
-    panel([[-.23, .176, .177], [-.135, .174, .254], [-.109, -.118, .249], [-.21, -.15, .203]], [118, 87, 57], 1.1);
-    piece([.208, .139, .235], [.212, -.036, .233], [.025, .039], [.029, .028], bronze, 6);
-    for (const x of [-.19, -.115, -.033, .052]) {
-      panel([[x - .012, .169, .257], [x + .009, .194, .26], [x + .03, .166, .259],
-        [x + .009, .146, .261]], bronze, 1.2);
-    }
-    if (kit.cut === 'night') panel([[-.103, -.021, .275], [.146, .007, .263], [.215, -.052, .247],
-      [.14, -.135, .260], [-.07, -.148, .259]], kit.color, .78);
-  } else {
-    loft([[-.155, .216, .222], [-.035, .241, .254], [.13, .272, .264], [.255, .205, .234], [.31, .105, .135]], kit.shell || metal, transform);
-    panel([[-.165, .053, .217], [.09, .077, .287], [.245, .039, .237],
-      [.212, -.039, .249], [.042, -.063, .292], [-.132, -.036, .239]], [47, 40, 34], .9);
-    panel([[-.155, .083, .23], [.095, .108, .292], [.25, .065, .245], [.238, .036, .253],
-      [.090, .073, .30], [-.152, .05, .245]], kit.edging || bronze, 1.19);
-    panel([[-.206, .04, .21], [-.106, .015, .274], [-.047, -.138, .27],
-      [-.133, -.194, .221], [-.22, -.108, .194]], armor, 1.14);
-    piece([-.10, .248, .075], [-.12, .314, .062], [.230, .13], [.18, .09], darkSteel, 8);
-    piece([-.11, .298, .065], [-.19, .426, .055], [.22, .112], [.13, .059], fighter.color, 8);
-    piece([-.19, .396, .06], [-.31, .397, .03], [.12, .092], [.055, .065], fighter.trim, 6);
-    for (const x of [.055, .109, .161]) {
-      panel([[x - .018, -.063, .288], [x - .003, -.064, .29], [x + .004, -.119, .274],
-        [x - .014, -.119, .273]], darkSteel, .82);
-    }
-    piece([-.11, .234, .208], [.118, .209, .215], [.014, .035], [.015, .031], bronze, 6);
-    if (kit.cut === 'fortress') {
-      piece([-.25, .145, .16], [-.33, .33, .14], [.092, .097], [.032, .053], kit.shell, 8);
-      piece([-.19, -.06, .209], [-.12, -.235, .182], [.14, .10], [.081, .061], kit.shell, 8);
-    }
+  const face = fighter.direction > 0 ? [190, 128, 88] : [155, 106, 81];
+  const shadow = [45, 33, 28];
+  const trim = kit.edging || bronze;
+  const steel = kit.shell || [151, 160, 154];
+
+  function faceProfile() {
+    loft([[-.19, .115, .116], [-.134, .183, .176], [-.07, .213, .215], [.011, .235, .234],
+      [.102, .224, .23], [.185, .206, .204], [.238, .165, .169]], face, transform);
+    panel([[.055, .09, .250], [.177, .083, .239], [.174, .047, .251], [.059, .055, .263]], shadow, .86);
+    panel([[.112, .051, .267], [.167, .05, .257], [.157, .031, .26], [.119, .032, .273]], [207, 190, 155], .92);
+    panel([[.136, .052, .277], [.152, .051, .276], [.149, .028, .276], [.137, .027, .278]], shadow);
+    panel([[.159, .066, .254], [.224, .018, .263], [.268, -.033, .202], [.216, -.046, .254],
+      [.161, -.017, .272]], face, 1.15);
+    panel([[.216, -.046, .254], [.267, -.033, .202], [.21, -.065, .223], [.161, -.052, .257]], face, .73);
+    panel([[.049, -.004, .253], [.15, -.028, .273], [.198, -.061, .246], [.126, -.117, .222],
+      [.023, -.092, .224]], face, 1.11);
+    panel([[.103, -.082, .260], [.207, -.071, .226], [.203, -.088, .226],
+      [.149, -.094, .250], [.105, -.095, .256]], shadow, .92);
+    panel([[.112, -.121, .226], [.190, -.103, .220], [.162, -.145, .193], [.084, -.151, .197]], face, 1.10);
   }
-  if (kit.style !== 'melee') {
-    panel([[.092, .063, .282], [.176, .060, .27], [.169, .027, .273], [.100, .028, .288]], [54, 40, 33], .98);
-    panel([[.108, .051, .294], [.141, .049, .294], [.136, .037, .296], [.111, .037, .296]], [222, 188, 151], 1);
-    panel([[.176, .054, .287], [.227, .009, .257], [.173, -.012, .278]], face, 1.20);
-    panel([[.128, -.063, .283], [.188, -.055, .268], [.174, -.077, .273], [.131, -.078, .281]], face, .65);
-    panel([[.073, .017, .291], [.128, .025, .31], [.20, .005, .272], [.149, -.038, .30], [.086, -.027, .291]], face, 1.10);
-    panel([[.078, -.083, .286], [.142, -.104, .287], [.183, -.066, .265], [.16, -.127, .249],
-      [.085, -.128, .234]], face, .79);
+
+  if (kit.style === 'magic') {
+    const tall = kit.cut === 'astral';
+    loft([[-.195, .211, .209], [-.10, .240, .265], [.02, .280, .282], [.15, .280, .265],
+      [.22, .260, .238], [.33, .177, .180], [.38, .075, .085], [tall ? .44 : .395, .015, .027]], kit.color, transform);
+    panel([[-.10, -.185, .265], [.123, -.165, .260], [.263, -.06, .226], [.255, .105, .226],
+      [.171, .208, .220], [0, .24, .279], [-.124, .12, .295]], [47, 38, 59], .8);
+    faceProfile();
+    panel([[-.248, .047, .185], [-.190, .172, .226], [-.066, .259, .272], [.088, .249, .268],
+      [.195, .188, .230], [.255, .10, .243], [.134, .159, .275], [-.015, .158, .297],
+      [-.071, .068, .302], [-.118, -.155, .272], [-.195, -.089, .249]], kit.color, 1.13);
+    piece([-.068, .18, .296], [.202, .14, .272], [.018, .026], [.014, .024], trim);
+    piece([-.082, .115, .285], [-.123, -.159, .286], [.023, .024], [.017, .022], trim);
+    if (tall) {
+      piece([-.22, .185, .13], [-.33, .444, .15], [.095, .086], [.017, .035], kit.color);
+      panel([[.047,.207,.310],[.088,.274,.292],[.132,.225,.286],[.108,.164,.299]], trim, 1.32);
+    }
+    return;
+  }
+
+  if (kit.style === 'ranged' || kit.cut === 'lamellar') {
+    const helmet = kit.style === 'melee' ? steel : kit.shell || leather;
+    faceProfile();
+    loft([[.075, .247, .243], [.113, .259, .268], [.162, .257, .263], [.228, .235, .228],
+      [.279, .179, .186], [.310, .096, .104], [.315, .042, .05]], helmet, transform);
+    piece([-.234,.120,.206], [.257,.123,.204], [.026,.053], [.019,.046], kit.style === 'melee' ? trim : fighter.trim);
+    panel([[-.226,.122,.213],[-.107,.105,.277],[-.071,-.093,.260],[-.106,-.160,.226],[-.224,-.118,.189]],
+      helmet, 1.14);
+    piece([.196,.119,.233], [.227,-.019,.226], [.022,.031], [.022,.026], trim);
+    if (kit.cut === 'night') {
+      panel([[-.182,-.037,.276],[-.106,.006,.286],[.13,-.014,.289],[.238,-.033,.258],
+        [.155,-.155,.233], [-.09,-.157,.240]], kit.color, .79);
+    } else if (kit.style === 'melee') {
+      panel([[-.193,.105,.257],[-.087,.08,.303],[-.073,-.086,.285],[-.126,-.163,.245],[-.177,-.124,.250]], steel, 1.18);
+    }
+    for (const x of [-.165, -.112, -.054, .007]) {
+      panel([[x-.012,.121,.291],[x+.005,.141,.295],[x+.020,.12,.295],[x+.005,.099,.294]], trim, 1.17);
+    }
+    return;
+  }
+
+  const fortress = kit.cut === 'fortress';
+  loft([[-.184, .158, .168], [-.153, .216, .222], [-.06, .245, .25], [.07, .269, .27],
+    [.153, .271, .264], [.231, .246, .234], [.29, .174, .188], [.323, .086, .098]], steel, transform);
+  const visor = fortress
+    ? [[-.192,.105,.251],[.115,.123,.306],[.27,.076,.229],[.264,-.136,.211],[.09,-.178,.294],[-.158,-.134,.259]]
+    : [[-.171,.111,.243],[.097,.117,.293],[.273,.038,.222],[.214,-.110,.247],[.09,-.172,.28],[-.139,-.127,.261]];
+  panel(visor, steel, .84);
+  panel([[-.139,.095,.282],[.088,.116,.323],[.257,.064,.258],[.224,.023,.274],[.079,.056,.326],
+    [-.131,.050,.284]], shadow);
+  panel([[-.161,.112,.273],[.095,.135,.324],[.274,.077,.238],[.246,.063,.261],
+    [.089,.109,.333],[-.150,.09,.290]], trim, 1.20);
+  panel([[-.129,.03,.291],[.076,.040,.328],[.222,.004,.276],[.180,-.076,.285],[.057,-.11,.321],
+    [-.131,-.055,.293]], steel, 1.19);
+  panel([[.012,.143,.287],[.120,.152,.303],[.220,.097,.269],[.106,.123,.316]], steel, 1.31);
+  for (const x of [.061,.112,.163]) {
+    const z = .327 - (x - .061) * .31;
+    panel([[x-.012,-.034,z],[x+.005,-.037,z],[x+.012,-.086,z-.012],[x-.004,-.084,z-.011]], shadow, .88);
+  }
+  piece([-.202,.019,.253], [-.161,-.123,.248], [.050,.038], [.037,.039], trim);
+  if (fortress) {
+    piece([-.231,.141,.131], [-.281,.322,.138], [.088,.083], [.015,.044], steel);
+    piece([-.144,-.097,.254], [-.092,-.211,.226], [.092,.058], [.036,.046], steel);
   } else {
-    panel([[.094, .034, .304], [.154, .031, .29], [.151, .012, .292], [.097, .013, .306]], face, .81);
+    piece([-.093,.258,.060], [-.115,.319,.061], [.197,.118], [.170,.099], trim);
+    piece([-.114,.311,.060], [-.186,.432,.055], [.178,.107], [.057,.069], fighter.color, 10);
+    piece([-.174,.398,.061], [-.286,.386,.049], [.101,.081], [.038,.054], fighter.trim, 8);
   }
 }
 
@@ -1233,12 +1267,19 @@ function nearestPoint(point, from, to) {
   return pointBetween(from, to, lengthSquared > 0 ? clamp(dot / lengthSquared, 0, 1) : 0);
 }
 
-function checkContact(attacker, defender, previous, current) {
-  const source = weaponSegments(attacker, fighterPose(attacker));
-  const zones = bodyZones(defender, fighterPose(defender), exchange.block).map(([zone, from, to, radius]) =>
+function attackSegments(action, pose) {
+  if (!action.bash) return weaponSegments(action.attacker, pose);
+  const hand = shifted(pose.joints.shieldHand, .20, .02);
+  return [[shifted(hand, 0, -.18), shifted(hand, 0, .20), .26]];
+}
+
+function checkContact(action, previous, current) {
+  const { attacker, defender } = action;
+  const source = attackSegments(action, fighterPose(attacker));
+  const zones = bodyZones(defender, fighterPose(defender), isGuarding(action)).map(([zone, from, to, radius]) =>
     [zone, worldPoint(defender, from), worldPoint(defender, to), radius]);
-  const prior = exchange.weaponSweep || source.map(([start, end]) => [worldPoint(attacker, start), worldPoint(attacker, end)]);
-  exchange.weaponSweep = source.map(([start, end]) => [worldPoint(attacker, start), worldPoint(attacker, end)]);
+  const prior = action.weaponSweep || source.map(([start, end]) => [worldPoint(attacker, start), worldPoint(attacker, end)]);
+  action.weaponSweep = source.map(([start, end]) => [worldPoint(attacker, start), worldPoint(attacker, end)]);
 
   let contact;
   // Sample the swept blade between frames as well as along its length.
@@ -1247,7 +1288,7 @@ function checkContact(attacker, defender, previous, current) {
     if (framePhase < .68 || framePhase > .99) continue;
     for (const [index, [, , thickness]] of source.entries()) {
       const [oldStart, oldEnd] = prior[index];
-      const [newStart, newEnd] = exchange.weaponSweep[index];
+      const [newStart, newEnd] = action.weaponSweep[index];
       const from = pointBetween(oldStart, newStart, t / 4);
       const to = pointBetween(oldEnd, newEnd, t / 4);
       for (let i = 0; i <= 5; i++) {
@@ -1347,8 +1388,8 @@ function stepRagdoll(ragdoll, dt) {
 function drawHitboxes(fighter, pose) {
   const colors = { head: '#f6bb7a7d', body: '#bade9c63', arm: '#91d8fd79', leg: '#91d8fd79', shield: '#f5e5a89a' };
   const zones = bodyZones(fighter, pose, true).map(([zone, a, b, radius]) => [colors[zone], a, b, radius]);
-  if (state !== 'ready' && exchange.attacker === fighter && exchange.style === 'melee' && !fighter.ragdoll) {
-    zones.push(...weaponSegments(fighter, pose).map(([a, b, radius]) => ['#ff857ab8', a, b, radius]));
+  if (fighter.action?.style === 'melee' && !fighter.ragdoll) {
+    zones.push(...attackSegments(fighter.action, pose).map(([a, b, radius]) => ['#ff857ab8', a, b, radius]));
   }
   ctx.lineCap = 'round';
   for (const [color, a, b, radius] of zones) {
@@ -1510,8 +1551,13 @@ function drawMagic() {
       ellipse(x, y, scale * .57, scale * .11, '#d9ee9966');
     }
   }
-  if (state === 'ready' || !exchange.spell || phase < .30 || phase > 1.10) return;
-  const { attacker, defender, spell, hitAt } = exchange;
+  for (const fighter of fighters) {
+    if (fighter.action?.spell) drawCast(fighter.action);
+  }
+}
+
+function drawCast({ attacker, defender, spell, hitAt, phase }) {
+  if (phase < .30 || phase > 1.10) return;
   const pose = fighterPose(attacker);
   const staffTip = weaponAxis(pose.joints.weaponHand, pose.angle)(1.40);
   const start = weapons[attacker.weapon].spellPower ? project(worldPoint(attacker, staffTip))
@@ -1558,13 +1604,19 @@ function boltTarget(defender, block) {
   return worldPoint(defender, block ? joints.shieldHand : shifted(joints.chest, 0, -.17, .22));
 }
 
-function drawBolt() {
-  if (state === 'ready' || exchange.style !== 'ranged' || phase > 1.02) return;
-  const { attacker, defender, missedShot, block, hitAt } = exchange;
+function drawBolts() {
+  for (const fighter of fighters) {
+    if (fighter.action?.style === 'ranged') drawBolt(fighter.action);
+  }
+}
+
+function drawBolt(action) {
+  const { attacker, defender, missedShot, hitAt, phase } = action;
+  if (phase > 1.02) return;
   const pose = fighterPose(attacker);
   const tip = weaponAxis(pose.joints.weaponHand, pose.angle)(.79, .05);
   const from = worldPoint(attacker, tip);
-  const target = shifted(boltTarget(defender, block), missedShot ? attacker.direction * .8 : 0, missedShot ? .48 : 0);
+  const target = shifted(boltTarget(defender, isGuarding(action)), missedShot ? attacker.direction * .8 : 0, missedShot ? .48 : 0);
   const travel = clamp((phase - .55) / (hitAt - .55), 0, 1.16);
   const point = pointBetween(from, target, travel);
   const [x, y] = project(point);
@@ -1624,7 +1676,7 @@ function draw() {
   faces.length = 0;
   if (showHitboxes) fighters.forEach((fighter, index) => drawHitboxes(fighter, poses[index]));
   drawMagic();
-  drawBolt();
+  drawBolts();
   for (const particle of particles) {
     const [x, y] = project([particle.x, particle.y, particle.z]);
     ellipse(x, y, particle.size, particle.size * .82, particle.color);
@@ -1721,7 +1773,8 @@ function pickAction(attacker, defender) {
   for (const key of keys) {
     const weapon = weapons[key];
     const style = weapon.style || 'melee';
-    const stamina = clamp(attacker.energy / weapon.energy, 0, 1);
+    const handling = powerProfile(weapon, attacker.strength);
+    const stamina = clamp(attacker.energy / handling.cost, 0, 1);
     const level = style === 'ranged' ? attacker.ranged : (attacker.attack + attacker.strength) / 2;
     const reach = style === 'ranged'
       ? (.95 + Math.min(distance, 4.7) * .075) * mix(1, .27, crowding)
@@ -1729,8 +1782,9 @@ function pickAction(attacker, defender) {
     const repeat = key === attacker.lastWeapon ? Math.pow(.88, Math.min(attacker.weaponStreak, 4)) : 1;
     const switchFactor = key === attacker.weapon ? 1 : .92;
     const pressure = opposingCrossbow && style === 'melee' ? (key === 'sword' ? 1.50 : 1.24) : 1;
-    const score = (weapon.damage + 3) * targetArmor[style] * (.69 + level / 205)
+    const score = (weapon.damage * handling.power + 3) * targetArmor[style] * (.69 + level / 205)
       * weapon.tempo * mix(.68, 1, stamina) * reach * repeat * armorPower(attacker, style) * pressure
+      * (1.28 / (.78 + handling.recovery))
       * (1 + accuracyBonus(attacker, defender, style, key) / 250) * switchFactor;
     if (!weapon.spellPower) candidates.push({ key, style, score });
     const choices = weapon.spellPower ? [...available, 'spark'] : key === attacker.weapon ? available : [];
@@ -1767,87 +1821,111 @@ function updateControls() {
   fighters.forEach(updateGearNote);
 }
 
-function nextExchange() {
-  const entryPoses = new Map(elapsed > 0 ? fighters.map(fighter => [fighter, fighterPose(fighter)]) : []);
-  const preferred = elapsed === 0 ? fighters[1] : fighters.find(fighter => fighter !== lastAttacker);
-  const attacker = Math.random() < .78 ? preferred : fighters.find(fighter => fighter !== preferred);
-  const defender = fighters.find(fighter => fighter !== attacker);
-  const { key, style, spellKey } = pickAction(attacker, defender);
+function powerProfile(item, strength) {
+  const heavy = item.twoHanded && !item.style && !item.spellPower;
+  const handling = smooth((strength - 66) / 29);
+  return {
+    heavy,
+    cost: Math.ceil(item.energy * (heavy ? 1.20 : 1)),
+    power: heavy ? 1.21 : 1,
+    recovery: heavy ? mix(1.03, .38, handling) : .50
+  };
+}
+
+function otherFighter(fighter) {
+  return fighters.find(other => other !== fighter);
+}
+
+function canGuard(fighter) {
+  const own = fighter.action;
+  return shieldReady(fighter) && fighter.stunnedUntil <= elapsed
+    && (!own || (own.connected && own.phase > own.hitAt + .12 && !own.bash));
+}
+
+function isGuarding(action) {
+  const { defender } = action;
+  return action.block && canGuard(defender) && defender.energy >= (action.guardCost || shields[defender.gear.shield].energy);
+}
+
+function shouldBash(attacker, defender, gap) {
+  const incoming = defender.action;
+  return shieldReady(attacker) && attacker.energy >= 14 && attacker.bashReady <= elapsed
+    && gap < 2.05 && (attacker.counterUntil > elapsed
+    || (incoming?.heavy && !incoming.connected && incoming.phase < .53));
+}
+
+function startAction(attacker, defender, bash = false) {
+  const gap = (defender.x - attacker.x) * attacker.direction;
+  const { key, style, spellKey } = bash ? { key: attacker.weapon, style: 'melee' } : pickAction(attacker, defender);
+  const previousPose = fighterPose(attacker);
   const previousWeapon = attacker.weapon;
   const switched = previousWeapon !== key;
-  if (switched) spendEnergy(attacker, switchCost);
-  attacker.weapon = key;
-  attacker.weaponStreak = key === attacker.lastWeapon ? attacker.weaponStreak + 1 : 1;
-  attacker.lastWeapon = key;
-  const weapon = weapons[key];
+  if (switched) {
+    spendEnergy(attacker, switchCost);
+    attacker.weapon = key;
+    updateStats(attacker);
+    logEvent(attacker.name + ' switches to ' + weapons[key].name + ' for ' + switchCost + ' energy.');
+  }
+  const item = weapons[key];
   const spell = spells[spellKey];
   const ranged = style === 'ranged';
-  const initialGap = Math.abs(attacker.x - defender.x);
-  const press = ranged && canPress(defender);
-  const castingRetreat = !!spell && (initialGap < 3.45 || weapons[previousWeapon].style === 'ranged');
+  const handling = style === 'melee' && !bash ? powerProfile(item, attacker.strength)
+    : { heavy: false, cost: bash ? 14 : item.energy, power: 1, recovery: .51 };
+  const fatigue = spell ? 1 : clamp(attacker.energy / handling.cost, 0, 1);
+  const equipAccuracy = accuracyBonus(attacker, defender, style, key);
   const guard = shields[defender.gear.shield];
-  const fatigue = spell ? 1 : clamp(attacker.energy / weapon.energy, 0, 1);
-  const blockChance = (spell ? spell.block || 0 : weapon.block) + clamp((defense(defender) - 56) / (spell ? 350 : 150), -.10, .20);
-  const block = shieldReady(defender) && (!spell || spell.damage) && defender.energy >= guard.energy && Math.random() < Math.max(.025, blockChance);
-  const equipmentAccuracy = accuracyBonus(attacker, defender, style, key);
-  const baseEvasion = style === 'ranged' ? .18 - attacker.ranged / 1000 : .22 - attacker.attack / 850;
-  const evasionChance = clamp(baseEvasion - equipmentAccuracy / 520, .03, .35) * mobility(defender);
-  const defenderFrozen = defender.frozenUntil > elapsed;
-  const evade = !spell && !block && !defenderFrozen && defender.energy >= 11 && Math.random() < evasionChance;
+  const blockChance = (bash ? .12 : spell ? spell.block || 0 : item.block)
+    + clamp((defense(defender) - 56) / (spell ? 350 : 150), -.10, .20);
+  const guardCost = guard.energy + (handling.heavy ? 7 : 0);
+  const block = shieldReady(defender) && (!spell || spell.damage) && defender.energy >= guardCost
+    && Math.random() < Math.max(.03, blockChance);
+  const evade = !spell && !bash && !block && defender.frozenUntil <= elapsed && defender.energy >= 11
+    && Math.random() < clamp(.18 - equipAccuracy / 520, .04, .30) * mobility(defender);
   const aimRoll = Math.random();
-  const aim = aimRoll < .22 ? -.96 : aimRoll > .70 ? .93 : .08;
-  let distance = weapon.range - .23 - Math.abs(aim) * .26;
-  if (spell) {
-    distance = castingRetreat ? clamp(initialGap + .93 * mobility(attacker), 2.44, 3.88) : spell.damage ? 3.75 : 3.35;
-  } else if (ranged) {
-    distance = clamp(initialGap + .84 * mobility(attacker) - (press ? 1.42 * mobility(defender) : .23), 1.62, weapon.range);
-  }
-  const crowded = ranged ? closeRange(distance) : 0;
-  const shift = castingRetreat ? -.49 : ranged ? -.44 : .20 + Math.random() * .23;
-  const center = defenderFrozen ? defender.x + defender.direction * distance / 2
-    : clamp((attacker.x + defender.x) / 2 + attacker.direction * shift, -.83, .83);
-  const depth = (Math.random() - .5) * .58;
-  lastAttacker = attacker;
-  phase = 0;
-  elements.cast.hidden = !spell && !ranged;
-  if (spell) {
-    elements.cast.textContent = attacker.name + ' · ' + spell.name;
-    elements.cast.style.setProperty('--spell-color', spell.color);
-  } else if (ranged) {
-    elements.cast.textContent = attacker.name + (crowded > .35 ? ' · Crowded shot' : ' · ' + weapon.name);
-    elements.cast.style.setProperty('--spell-color', '#e5cf8e');
-  }
-  if (switched) {
-    updateStats(attacker);
-    logEvent(attacker.name + ' switches to ' + weapon.name + ' for ' + switchCost + ' energy.');
-  }
+  const aim = defender.stunnedUntil > elapsed ? -.64 : aimRoll < .19 ? -.96 : aimRoll > .69 ? .93 : .08;
+  const reach = bash ? 1.18 : item.range - .23 - Math.abs(aim) * .26;
+  const tempo = (bash ? 2.34 : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16)
+    * mobility(attacker) * mix(.76, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1);
   const attackSkill = ranged ? attacker.ranged : attacker.strength;
-  const damage = spell ? (spell.damage || 0) * (weapon.spellPower || 1) * (.76 + attacker.magic / 300)
-    : (weapon.damage + Math.floor(Math.random() * 7)) * (.73 + attackSkill / 245) * mix(.67, 1, fatigue);
-  exchange = {
-    attacker, defender, entryPoses,
-    block, evade, spell, spellKey, aim, style, switched, crowded, damage: damage * armorPower(attacker, style) * (1 - crowded * .53),
-    missedShot: ranged && (evade || Math.random() > clamp(.75 + attacker.ranged / 390 + equipmentAccuracy / 430 - crowded * .45, .24, .98)),
-    resistedSpell: spell?.damage && Math.random() > clamp(.95 + equipmentAccuracy / 410, .72, .99),
-    attackType: attackType(style, key),
-    tempo: (spell ? .88 * (weapon.castTempo || 1) : weapon.tempo) * mobility(attacker) * mix(.68, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1),
-    hitAt: spell || ranged ? .94 : .78,
-    duration: (spell || ranged ? 1.60 : 1.45) + (switched ? .12 : 0),
-    positions: fighters.map(fighter => {
-      const isAttacker = fighter === attacker;
-      const position = clamp(center - fighter.direction * distance / 2, -3.3, 3.3);
-      const speed = mobility(fighter);
-      const hit = !isAttacker && evade ? position - fighter.direction * .62 * speed : position;
-      return {
-        start: fighter.x,
-        startZ: fighter.z,
-        brace: position - fighter.direction * (isAttacker ? (spell || ranged ? .16 : .37) : -.09),
-        hit,
-        retreat: hit - fighter.direction * (isAttacker && (ranged || castingRetreat) ? .50 : isAttacker ? .27 : press ? -.16 : .47) * speed,
-        depth: depth + (isAttacker ? -.07 : .07)
-      };
-    })
+  const damage = bash ? (5.5 + attacker.strength / 28) * fatigue
+    : spell ? (spell.damage || 0) * (item.spellPower || 1) * (.76 + attacker.magic / 300)
+      : (item.damage + Math.floor(Math.random() * 7)) * (.73 + attackSkill / 245) * mix(.67, 1, fatigue) * handling.power;
+  const hitAt = spell || ranged ? .94 : .78;
+  const now = elapsed;
+  attacker.action = {
+    attacker, defender, phase: 0, created: now, previousPose, bash, key,
+    block, guardCost, evade, spell, spellKey, aim, style, switched,
+    damage: damage * (bash ? 1 : armorPower(attacker, style)),
+    crowded: ranged ? closeRange(gap) : 0,
+    shotRoll: Math.random(),
+    shotAccuracy: .75 + attacker.ranged / 390 + equipAccuracy / 430,
+    resistedSpell: spell?.damage && Math.random() > clamp(.95 + equipAccuracy / 410, .72, .99),
+    attackType: bash ? 2 : attackType(style, key),
+    heavy: handling.heavy, cost: handling.cost, tempo, hitAt, reach,
+    stanceDamage: bash ? 47 : spell ? 12 : ranged ? 16 : handling.heavy ? 49 : 24 + item.damage * .36,
+    duration: hitAt + (bash ? .43 : handling.recovery) + (switched ? .13 : 0)
   };
+  if (bash) {
+    attacker.counterUntil = 0;
+    attacker.bashReady = now + 2.8;
+  } else {
+    attacker.weaponStreak = key === attacker.lastWeapon ? attacker.weaponStreak + 1 : 1;
+    attacker.lastWeapon = key;
+  }
+}
+
+function showCurrentAction() {
+  const current = fighters.map(fighter => fighter.action)
+    .filter(action => action && !action.connected && (action.spell || action.style === 'ranged' || action.bash))
+    .sort((a, b) => b.created - a.created)[0];
+  elements.cast.hidden = !current;
+  if (!current) return;
+  const name = current.bash ? 'Shield bash' : current.spell?.name ?? (current.crowded > .35 ? 'Crowded shot' : weapons[current.key].name);
+  const label = current.attacker.name + ' · ' + name;
+  if (elements.cast.textContent !== label) {
+    elements.cast.textContent = label;
+    elements.cast.style.setProperty('--spell-color', current.spell?.color ?? '#e5cf8e');
+  }
 }
 
 function startBout(reroll = false, generated = null) {
@@ -1857,7 +1935,11 @@ function startBout(reroll = false, generated = null) {
   particles.length = labels.length = stains.length = 0;
   fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
-    fighter.z = fighter.gait = 0;
+    fighter.z = fighter.gait = fighter.velocity = 0;
+    fighter.action = null;
+    fighter.stance = fighter.stunnedUntil = fighter.stunStarted = fighter.counterUntil = fighter.bashReady = 0;
+    fighter.lastStanceHit = -10;
+    fighter.readyAt = .14 + Math.random() * .24;
     fighter.stride = .13 + (fighter.direction < 0 ? .50 : 0);
     if (generated) {
       Object.assign(fighter, generated[index]);
@@ -1877,6 +1959,7 @@ function startBout(reroll = false, generated = null) {
     fighter.reaction = fighter.ragdoll = null;
     updateStats(fighter);
     updateEnergy(fighter);
+    updateStance(fighter);
     updateGearNote(fighter);
   });
   elements.bout.textContent = String(bout).padStart(2, '0');
@@ -1892,13 +1975,12 @@ function startBout(reroll = false, generated = null) {
 
 function runBout() {
   state = 'running';
-  nextExchange();
   logEvent('Varro and Cassian enter the arena.');
   updateControls();
 }
 
-function floatLabel(fighter, text, color, small = false) {
-  labels.push({ x: fighter.x, z: fighter.z, y: 2.64, age: 0, life: 1.08, text, color, small });
+function floatLabel(fighter, text, color, small = false, height = 2.64) {
+  labels.push({ x: fighter.x, z: fighter.z, y: height, age: 0, life: 1.08, text, color, small });
 }
 
 function burst(fighter, { offset = 0, y = 1.35, point, direction, colors, count, blood = false, gravity = 5 }) {
@@ -1916,8 +1998,8 @@ function burst(fighter, { offset = 0, y = 1.35, point, direction, colors, count,
   }
 }
 
-function payForSpell() {
-  const { attacker, spell, spellKey } = exchange;
+function payForSpell(action) {
+  const { attacker, spell, spellKey } = action;
   attacker.mp -= spell.cost;
   attacker.cooldowns[spellKey] = elapsed + spell.cooldown;
   updateMana();
@@ -1983,34 +2065,75 @@ function applySpellHit(attacker, defender, spell, damage) {
   }
 }
 
-function impact(contact) {
-  const { attacker, defender, block, damage, spell, style } = exchange;
+const stanceLimit = fighter => 59 + defense(fighter) * .23;
+
+function updateStance(fighter) {
+  const staggered = fighter.stunnedUntil > elapsed;
+  const { stance, balance } = fighter.hud;
+  const value = staggered ? 0 : Math.max(0, Math.round(100 * (1 - fighter.stance / stanceLimit(fighter))));
+  if (stance.value !== value) stance.value = value;
+  const label = staggered ? 'Staggered' : 'Stance';
+  if (balance.textContent !== label) {
+    balance.textContent = label;
+    stance.parentElement.dataset.stunned = String(staggered);
+  }
+}
+
+function breakStance(fighter, duration) {
+  fighter.stance = 0;
+  fighter.stunStarted = elapsed;
+  fighter.stunnedUntil = elapsed + duration;
+  fighter.readyAt = fighter.stunnedUntil + .08;
+  fighter.action = null;
+  fighter.velocity = -fighter.direction * .55;
+  updateStance(fighter);
+  floatLabel(fighter, 'STAGGERED', '#f4c483', true, 2.34);
+  logEvent(fighter.name + ' staggers and drops their guard.');
+}
+
+function applyStanceDamage(action, scale, interrupt = false) {
+  const { defender } = action;
+  if (defender.stunnedUntil > elapsed) return;
+  const heavyWindup = defender.action?.heavy && !defender.action.connected && defender.action.phase < .73;
+  defender.stance += action.stanceDamage * scale;
+  defender.lastStanceHit = elapsed;
+  if (defender.stance >= stanceLimit(defender) || (interrupt && heavyWindup)) {
+    breakStance(defender, interrupt ? .94 : 1.21);
+  }
+  updateStance(defender);
+}
+
+function impact(action, contact) {
+  const { attacker, defender, damage, spell, style, bash } = action;
   if (spell && !spell.damage) {
     applySupportSpell(attacker, spell, (weapons[attacker.weapon].spellPower || 1) * armorPower(attacker, 'magic'));
     return;
   }
 
-  const action = spell ? spell.name : attacker.weapon;
-  if ((style === 'melee' && !contact) || exchange.missedShot) {
+  const name = bash ? 'shield bash' : spell?.name || weapons[action.key].name.toLowerCase();
+  if ((style === 'melee' && !contact) || action.missedShot) {
     floatLabel(defender, 'MISS', '#e1cfb3', true);
-    logEvent(attacker.name + (exchange.crowded > .35 ? ' misses a crowded crossbow shot.' : ' misses with the ' + action + '.'));
+    logEvent(attacker.name + (action.crowded > .35 ? ' misses a crowded crossbow shot.' : ' misses with the ' + name + '.'));
     return;
   }
-  const stopped = style === 'melee' ? contact.zone === 'shield' : block;
+  const stopped = style === 'melee' ? contact.zone === 'shield' : isGuarding(action);
   const point = style === 'ranged' ? boltTarget(defender, stopped) : contact?.point;
   if (stopped) {
-    spendEnergy(defender, shields[defender.gear.shield].energy);
+    spendEnergy(defender, action.guardCost);
+    defender.counterUntil = elapsed + (action.heavy ? .95 : .56);
     defender.reaction = { zone: 'arm', time: elapsed };
     hitPause = .035;
     floatLabel(defender, 'BLOCKED', '#ffe2a0', true);
     burst(defender, { point, offset: -attacker.direction * .56, y: 1.55, direction: -attacker.direction, colors: ['#ffe3a1', spell?.color || '#fff6dd'], count: 13, gravity: 9 });
-    logEvent(defender.name + ' blocks ' + attacker.name + '’s ' + action + '.');
+    logEvent(defender.name + ' blocks ' + attacker.name + '’s ' + name + '.');
+    applyStanceDamage(action, .54);
+    if (defender.energy < 2.5 && defender.stunnedUntil <= elapsed) breakStance(defender, 1.08);
     return;
   }
-  if (exchange.resistedSpell) {
+  if (action.resistedSpell) {
     floatLabel(defender, 'RESISTED', spell.color, true);
     burst(defender, { colors: [spell.color, '#fff3d3'], count: 8 });
-    logEvent(defender.name + ' resists ' + attacker.name + '’s ' + action + '.');
+    logEvent(defender.name + ' resists ' + attacker.name + '’s ' + name + '.');
     return;
   }
 
@@ -2018,13 +2141,14 @@ function impact(contact) {
   const multiplier = { head: 1.24, body: 1, arm: .88, leg: .85 }[zone];
   const matchup = armors[defender.gear.armor][style];
   const absorption = style === 'magic' ? 1 : 1 - Math.max(0, defense(defender) - 45) / 275;
-  const typeDefense = armors[defender.gear.armor].defenseBonus[exchange.attackType];
-  const rolledDamage = Math.max(1, Math.round(damage * multiplier * matchup * absorption * (1 - typeDefense / 600)));
+  const typeDefense = armors[defender.gear.armor].defenseBonus[action.attackType];
+  const rolledDamage = Math.max(1, Math.round(damage * multiplier * matchup * absorption * (1 - typeDefense / 600)
+    * (defender.stunnedUntil > elapsed ? 1.14 : 1)));
   const absorbed = Math.min(defender.ward, rolledDamage);
   defender.ward -= absorbed;
   const actualDamage = Math.min(rolledDamage - absorbed, defender.hp);
   if (absorbed) logEvent(defender.name + '’s ' + defender.wardName + ' absorbs ' + absorbed + ' damage.');
-  const blood = actualDamage > 0 && !spell;
+  const blood = actualDamage > 0 && !spell && !bash;
   const color = absorbed && !actualDamage ? defender.wardColor : spell?.color || '#ffd0ba';
   burst(defender, {
     point,
@@ -2041,16 +2165,21 @@ function impact(contact) {
   hitPause = zone === 'head' ? .066 : .045;
   defender.hp -= actualDamage;
   if (actualDamage) {
-    const weaponName = spell ? spell.name : 'the ' + weapons[action].name.toLowerCase();
+    const weaponName = spell ? spell.name : 'the ' + name;
     logEvent(attacker.name + ' hits ' + defender.name + (contact ? '’s ' + zone : '') + ' with ' + weaponName + ' for '
       + actualDamage + ' damage.' + (matchup >= 1.2 ? ' Armor weakness.' : ''));
     if (spell) applySpellHit(attacker, defender, spell, actualDamage);
   }
   updateHealth();
-  if (defender.hp > 0) return;
+  if (defender.hp > 0) {
+    applyStanceDamage(action, (zone === 'head' ? 1.25 : 1) * (actualDamage ? 1 : .36), bash);
+    return;
+  }
   defender.ragdoll = makeRagdoll(defender, zone);
   attacker.wins++;
   state = 'finished';
+  for (const fighter of fighters) fighter.action = null;
+  elements.cast.hidden = true;
   rematchDelay = 2.5;
   elements.winner.textContent = attacker.name;
   elements.result.hidden = false;
@@ -2095,6 +2224,77 @@ function beginRematch(automatic = false) {
   runBout();
 }
 
+function moveFighter(fighter, dt) {
+  const rival = otherFighter(fighter);
+  const gap = (rival.x - fighter.x) * fighter.direction;
+  const action = fighter.action;
+  const incoming = rival.action;
+  const speed = mobility(fighter);
+  let intent = 0;
+  if (fighter.stunnedUntil > elapsed || fighter.frozenUntil > elapsed) {
+    intent = 0;
+  } else if (action?.style === 'melee' && !action.connected) {
+    intent = clamp((gap - action.reach + .07) * (action.bash ? 9 : 5.5), -.34, action.bash ? 4.5 : 4.0) * speed;
+  } else if (action && !action.connected) {
+    intent = gap < 3.35 ? -1.28 * speed : 0;
+  } else if (incoming && !incoming.connected && incoming.evade && !action && incoming.phase > .35) {
+    intent = -.93 * speed;
+  } else if (action?.heavy && action.connected) {
+    intent = -.24 * speed;
+  } else if (canPress(fighter) && weapons[rival.weapon].style === 'ranged') {
+    intent = clamp((gap - 1.83) * 1.6, -.25, 2.15) * speed;
+  } else {
+    intent = clamp((gap - 2.23) * .95, -.54, 1.65) * speed;
+  }
+  if (incoming && !incoming.connected && isGuarding(incoming)) intent *= .38;
+
+  fighter.velocity = mix(fighter.velocity, fighter.direction * intent, 1 - Math.exp(-dt * 11));
+  const previous = fighter.x;
+  const minimum = fighter.direction > 0 ? -3.36 : rival.x + .86;
+  const maximum = fighter.direction > 0 ? rival.x - .86 : 3.36;
+  fighter.x = fighter.frozenUntil > elapsed ? fighter.freezeX : clamp(fighter.x + fighter.velocity * dt, minimum, maximum);
+  const targetZ = fighter.frozenUntil > elapsed ? fighter.freezeZ : Math.sin(elapsed * .85 + fighter.direction) * .16;
+  fighter.z = mix(fighter.z, targetZ, 1 - Math.exp(-dt * 6));
+  const motion = (fighter.x - previous) * fighter.direction;
+  fighter.stride += motion / .96;
+  fighter.gait = mix(fighter.gait, clamp(Math.abs(motion) / dt * .36, 0, 1), 1 - Math.exp(-dt * 12));
+}
+
+function advanceAction(action, dt) {
+  const { attacker, defender, style } = action;
+  const previous = action.phase;
+  const gap = (defender.x - attacker.x) * attacker.direction;
+  action.phase += dt * action.tempo;
+  if (style === 'melee' && previous <= .42 && gap > action.reach + .42 && elapsed - action.created < 1.13) {
+    action.phase = Math.min(action.phase, .42);
+  }
+  if (action.spell && previous < .55 && action.phase >= .55) payForSpell(action);
+  if (previous < .50 && action.phase >= .50) {
+    if (!action.spell) spendEnergy(attacker, action.cost);
+    if (action.evade && !defender.action && defender.stunnedUntil <= elapsed) spendEnergy(defender, 11);
+  }
+  if (!action.connected && style === 'melee' && action.phase >= .60 && previous < .99) {
+    const contact = checkContact(action, previous, action.phase);
+    if (contact || action.phase >= .99) {
+      action.connected = true;
+      impact(action, contact);
+    }
+  } else if (!action.connected && style !== 'melee' && previous < action.hitAt && action.phase >= action.hitAt) {
+    action.connected = true;
+    if (style === 'ranged') {
+      action.crowded = closeRange(gap);
+      action.missedShot = action.shotRoll > clamp(action.shotAccuracy - action.crowded * .45, .24, .98);
+      action.damage *= 1 - action.crowded * .53;
+    }
+    impact(action);
+  }
+  if (attacker.action === action && action.phase >= action.duration) {
+    attacker.action = null;
+    const pause = (.08 + Math.random() * .29) * (attacker.energy < 18 ? 1.7 : 1);
+    attacker.readyAt = elapsed + pause;
+  }
+}
+
 function update(dt, realTime) {
   if (state === 'paused') return;
   if (hitPause > 0) {
@@ -2110,8 +2310,6 @@ function update(dt, realTime) {
         stepRagdoll(fighter.ragdoll, dt / 2);
       }
     }
-    phase += dt * exchange.tempo;
-    if (phase > 1.14) elements.cast.hidden = true;
     if (elements.repeat.checked) rematchDelay -= realTime;
     if (rematchDelay <= 0) beginRematch(true);
     return;
@@ -2126,42 +2324,28 @@ function update(dt, realTime) {
     if (fighter.wardUntil <= elapsed) fighter.ward = 0;
   }
   updateMana();
-  const previousPhase = phase;
-  phase += dt * exchange.tempo;
-  fighters.forEach((fighter, index) => {
-    const { start, startZ, brace, hit, retreat, depth } = exchange.positions[index];
-    const approach = smooth(phase * mobility(fighter) / .47);
-    const lunge = ease((phase - .52) / (exchange.hitAt - .52));
-    const recover = smooth((phase - exchange.hitAt - .14) / .47);
-    let x = mix(mix(mix(start, brace, approach), hit, lunge), retreat, recover);
-    let z = mix(startZ, depth, approach);
-    if (fighter.frozenUntil > 0 && elapsed < fighter.frozenUntil + .26) {
-      const thaw = smooth((elapsed - fighter.frozenUntil) / .26);
-      x = mix(fighter.freezeX, x, thaw);
-      z = mix(fighter.freezeZ, z, thaw);
-    }
-    const movement = Math.hypot(x - fighter.x, z - fighter.z);
-    fighter.stride += (x - fighter.x) * fighter.direction / .96;
-    const speed = movement / dt;
-    fighter.gait = mix(fighter.gait, clamp(speed * .31, 0, 1), 1 - Math.exp(-dt * 12));
-    fighter.x = x;
-    fighter.z = z;
-  });
-  if (exchange.spell && previousPhase < .55 && phase >= .55) payForSpell();
-  if (previousPhase < .50 && phase >= .50) {
-    if (!exchange.spell) spendEnergy(exchange.attacker, weapons[exchange.attacker.weapon].energy);
-    if (exchange.evade) spendEnergy(exchange.defender, 11);
-  }
-  if (exchange.style !== 'melee') {
-    if (previousPhase < exchange.hitAt && phase >= exchange.hitAt) impact();
-  } else if (!exchange.connected && phase >= .60 && previousPhase < .99) {
-    const contact = checkContact(exchange.attacker, exchange.defender, previousPhase, phase);
-    if (contact || phase >= .99) {
-      exchange.connected = true;
-      impact(contact);
+  for (const fighter of fighters) {
+    if (elapsed - fighter.lastStanceHit > 1.35) fighter.stance = Math.max(0, fighter.stance - dt * 13);
+    updateStance(fighter);
+    const rival = otherFighter(fighter);
+    const own = fighter.action;
+    const recoveryCounter = own?.connected && !own.heavy && !own.bash && own.phase > own.hitAt + .19;
+    const idle = !own && fighter.readyAt <= elapsed;
+    const gap = (rival.x - fighter.x) * fighter.direction;
+    if ((idle || recoveryCounter) && fighter.stunnedUntil <= elapsed) {
+      const bash = shouldBash(fighter, rival, gap);
+      const underGuard = rival.action && !rival.action.connected
+        && isGuarding(rival.action) && rival.action.phase > .17;
+      if (bash || (idle && !underGuard)) startAction(fighter, rival, bash);
     }
   }
-  if (state === 'running' && phase >= exchange.duration) nextExchange();
+  fighters.forEach(fighter => moveFighter(fighter, dt));
+  const active = fighters.map(fighter => fighter.action).filter(Boolean)
+    .sort((a, b) => (a.hitAt - a.phase) / a.tempo - (b.hitAt - b.phase) / b.tempo);
+  for (const action of active) {
+    if (state === 'running' && action.attacker.action === action) advanceAction(action, dt);
+  }
+  if (state === 'running') showCurrentAction();
 }
 
 elements.play.addEventListener('click', () => {
