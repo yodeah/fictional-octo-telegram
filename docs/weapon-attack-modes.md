@@ -4,7 +4,7 @@ Give each weapon a cheap move the fighter can rely on and a more demanding move 
 
 ## First playable moves
 
-These are starting values to playtest. Energy (EP) pays for physical effort. Mana (MP) pays for spellbook casts. Today the rapier costs 17 base EP, the axe costs 29, and Staff Spark already deals 8 base magic damage for 0 MP.
+These are starting values to playtest. Energy (EP) pays for physical effort. Mana (MP) pays for spellbook casts. The rapier currently costs 17 base EP, the ordinary axe uses the two costs below, and Staff Spark already deals 8 base magic damage for 0 MP.
 
 | Weapon and move | Proposed cost | When the fighter uses it | What the spectator sees |
 | --- | ---: | --- | --- |
@@ -43,7 +43,7 @@ Work down this table one row per playable commit. Impact rates the expected chan
 | Order | Impact | Change and effect | Check before committing |
 | ---: | ---: | --- | --- |
 | 1 | 5 | **Shipped.** Axe and mace shield breaks give sustained pressure a visible payoff. | Break a shield on a block, finish the bout, then verify a fresh shield on rematch. |
-| 2 | 5 | Axe light chop and heavy cleave introduce the shared mode choice with an immediate energy tradeoff. | See both moves in one matchup. Check energy cost, wind-up, recovery, and shield contact. |
+| 2 | 5 | **Shipped.** Axe light chop and heavy cleave introduce the shared mode choice with an immediate energy tradeoff. | See both moves in one matchup. Check energy cost, wind-up, recovery, and shield contact. |
 | 3 | 5 | Staff tap and ranged Spark let an empty-mana caster fight at either distance. | At zero MP, watch the tap up close and Spark at distance. With mana restored, confirm a useful book spell still wins. |
 | 4 | 5 | Rapier draw cut, chest thrust and high lunge make aim readable. | Watch a shield intercept a thrust and a high lunge miss. Award head damage only on head contact. |
 | 5 | 4 | Mace quick knock and heavy blow give shield pressure a second rhythm. | Compare block, stance damage and recovery. Verify the club double knock resolves each contact once. |

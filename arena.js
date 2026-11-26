@@ -24,6 +24,10 @@ const weapons = {
   greatsword: { name: 'Greatsword', twoHanded: true, accuracy: 18, range: 2.88, damage: 23, energy: 34, block: .25, tempo: .77, rest: 1.21, draw: 1.17, swing: 1.30, lift: .65, extension: .52 },
   maul: { name: 'War maul', twoHanded: true, accuracy: 15, range: 2.35, damage: 26, energy: 39, block: .30, tempo: .71, rest: 1.08, draw: 1.30, swing: 1.20, lift: .66, extension: .49 }
 };
+const axeModes = {
+  chop: { name: 'Light chop', baseCost: 16, power: .78, tempo: 1.18, recovery: .70, windup: .55, stance: 20, heavy: false },
+  cleave: { name: 'Overhead cleave', baseCost: 36, power: 1.27, tempo: .85, recovery: 1.48, windup: 1.20, stance: 49, heavy: true }
+};
 const variants = {
   rapier: ['sword', { name: 'Rapier', range: 2.61, damage: 11, energy: 17, accuracy: 12, tempo: 1.12, block: .29, draw: .89, swing: 1.24 }],
   falchion: ['sword', { name: 'Falchion', range: 2.42, damage: 16, energy: 24, tempo: .93, block: .23, lift: .73 }],
@@ -213,8 +217,16 @@ function equipmentPicker(fighter, prefix, type, choices) {
       lines.push('Travel lighter with one weapon');
     } else if (type === 'weapon' || type === 'reserve') {
       const handling = powerProfile(item, fighter.strength);
-      lines.push('Base damage ' + Math.round(item.damage * handling.power) + ' · Reach ' + item.range.toFixed(1),
-        'Speed ' + Math.round(item.tempo * 100) + '% · ' + handling.cost + ' energy per attack');
+      if (weaponFamily(key) === 'axe') {
+        lines.push('Reach ' + item.range.toFixed(1));
+        for (const mode of Object.values(axeModes)) {
+          const profile = powerProfile(item, fighter.strength, mode);
+          lines.push(mode.name + ' · ' + profile.cost + ' energy · ' + Math.round(item.damage * profile.power) + ' base damage');
+        }
+      } else {
+        lines.push('Base damage ' + Math.round(item.damage * handling.power) + ' · Reach ' + item.range.toFixed(1),
+          'Speed ' + Math.round(item.tempo * 100) + '% · ' + handling.cost + ' energy per attack');
+      }
       if (breaksShields(key)) lines.push('Damages shields on blocked melee hits');
       if (handling.heavy) lines.push('High stance damage · Strength shortens recovery');
       if (item.spellPower) lines.push('+' + Math.round((item.spellPower - 1) * 100) + '% spell power · Free Staff Spark');
@@ -872,7 +884,7 @@ function fighterPose(fighter) {
   const shooting = action?.style === 'ranged';
   const swingAt = action?.hitAt ?? .78;
   const release = smooth((at - .48) / (swingAt - .48));
-  const windup = swinging ? smooth((at - .11) / .37) * (1 - release) : 0;
+  const windup = swinging ? smooth((at - .11) / .37) * (1 - release) * (action.mode?.windup ?? 1) : 0;
   const strike = swinging ? release * (1 - smooth((at - swingAt - .045) / .46)) : 0;
   const casting = action?.spell ? ease((at - .25) / .32) * (1 - ease((at - 1.01) / .43)) : 0;
   const aiming = shooting ? ease((at - .15) / .33) * (1 - ease((at - .99) / .40)) : 0;
@@ -2363,7 +2375,15 @@ function pickAction(attacker, defender) {
   for (const key of keys) {
     const weapon = weapons[key];
     const style = weapon.style || 'melee';
-    const handling = powerProfile(weapon, attacker.strength);
+    let mode;
+    if (weaponFamily(key) === 'axe') {
+      const energy = attacker.energy - (key === attacker.weapon ? 0 : switchCost);
+      const opening = defender.stunnedUntil > elapsed || defender.frozenUntil > elapsed || defender.action?.connected
+        || attacker.counterUntil > elapsed || defender.stance >= stanceLimit(defender) * .55;
+      const canCleave = distance <= weapon.range + .2 && opening && energy >= powerProfile(weapon, attacker.strength, axeModes.cleave).cost;
+      mode = canCleave ? axeModes.cleave : axeModes.chop;
+    }
+    const handling = powerProfile(weapon, attacker.strength, mode);
     const stamina = clamp(attacker.energy / handling.cost, 0, 1);
     const level = style === 'ranged' ? attacker.ranged : (attacker.attack + attacker.strength) / 2;
     const reach = style === 'ranged'
@@ -2373,10 +2393,10 @@ function pickAction(attacker, defender) {
     const switchFactor = key === attacker.weapon ? 1 : .92;
     const pressure = opposingCrossbow && style === 'melee' ? (key === 'sword' ? 1.50 : 1.24) : 1;
     const score = (weapon.damage * handling.power + 3) * targetArmor[style] * (.69 + level / 205)
-      * weapon.tempo * mix(.68, 1, stamina) * reach * repeat * armorPower(attacker, style) * pressure
+      * weapon.tempo * (mode?.tempo ?? 1) * mix(.68, 1, stamina) * reach * repeat * armorPower(attacker, style) * pressure
       * (1.28 / (.78 + handling.recovery))
       * (1 + accuracyBonus(attacker, defender, style, key) / 250) * switchFactor;
-    if (!weapon.spellPower) candidates.push({ key, style, score });
+    if (!weapon.spellPower) candidates.push({ key, style, mode, score });
     const choices = weapon.spellPower ? [...available, 'spark'] : key === attacker.weapon ? available : [];
     for (const spellKey of choices) {
       const spell = spells[spellKey];
@@ -2422,14 +2442,14 @@ function updateControls() {
   fighters.forEach(updateGearNote);
 }
 
-function powerProfile(item, strength) {
+function powerProfile(item, strength, mode) {
   const heavy = item.twoHanded && !item.style && !item.spellPower;
   const handling = smooth((strength - 66) / 29);
   return {
-    heavy,
-    cost: Math.ceil(item.energy * (heavy ? 1.20 : 1)),
-    power: heavy ? 1.21 : 1,
-    recovery: heavy ? mix(1.03, .38, handling) : .50
+    heavy: mode ? mode.heavy : heavy,
+    cost: Math.ceil(item.energy * (mode ? mode.baseCost / weapons.axe.energy : 1) * (heavy ? 1.20 : 1)),
+    power: (heavy ? 1.21 : 1) * (mode?.power ?? 1),
+    recovery: (heavy ? mix(1.03, .38, handling) : .50) * (mode?.recovery ?? 1)
   };
 }
 
@@ -2461,7 +2481,7 @@ function shouldBash(attacker, defender, gap) {
 
 function startAction(attacker, defender, bash = false) {
   const gap = (defender.x - attacker.x) * attacker.direction;
-  const { key, style, spellKey } = bash ? { key: attacker.weapon, style: 'melee' } : pickAction(attacker, defender);
+  const { key, style, spellKey, mode } = bash ? { key: attacker.weapon, style: 'melee' } : pickAction(attacker, defender);
   const previousPose = fighterPose(attacker);
   const previousWeapon = attacker.weapon;
   const switched = previousWeapon !== key;
@@ -2474,7 +2494,7 @@ function startAction(attacker, defender, bash = false) {
   const item = weapons[key];
   const spell = spells[spellKey];
   const ranged = style === 'ranged';
-  const handling = style === 'melee' && !bash ? powerProfile(item, attacker.strength)
+  const handling = style === 'melee' && !bash ? powerProfile(item, attacker.strength, mode)
     : { heavy: false, cost: bash ? 14 : item.energy, power: 1, recovery: .51 };
   const fatigue = spell ? 1 : clamp(attacker.energy / handling.cost, 0, 1);
   const equipAccuracy = accuracyBonus(attacker, defender, style, key);
@@ -2493,7 +2513,7 @@ function startAction(attacker, defender, bash = false) {
   const aimRoll = Math.random();
   const aim = defender.stunnedUntil > elapsed ? -.64 : aimRoll < .19 ? -.96 : aimRoll > .69 ? .93 : .08;
   const reach = bash ? 1.18 : item.range - .23 - Math.abs(aim) * .26;
-  const tempo = (bash ? 2.34 * ownShield.bashTempo : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16)
+  const tempo = (bash ? 2.34 * ownShield.bashTempo : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16 * (mode?.tempo ?? 1))
     * mobility(attacker) * mix(.76, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1);
   const attackSkill = ranged ? attacker.ranged : attacker.strength;
   const damage = bash ? (5.5 + attacker.strength / 28) * fatigue * ownShield.bashPower
@@ -2502,7 +2522,7 @@ function startAction(attacker, defender, bash = false) {
   const hitAt = spell || ranged ? .94 : .78;
   const now = elapsed;
   attacker.action = {
-    attacker, defender, phase: 0, created: now, previousPose, bash, key,
+    attacker, defender, phase: 0, created: now, previousPose, bash, key, mode, label: mode?.name,
     block, guardCost, evade, spell, spellKey, aim, style, switched, perfect,
     riposte: bash && attacker.riposte && attacker.counterUntil > now, bashPower: bash ? ownShield.bashPower : 1,
     damage: damage * (bash ? 1 : armorPower(attacker, style)),
@@ -2512,9 +2532,10 @@ function startAction(attacker, defender, bash = false) {
     resistedSpell: spell?.damage && Math.random() > clamp(.95 + equipAccuracy / 410, .72, .99),
     attackType: bash ? 2 : attackType(style, key),
     heavy: handling.heavy, cost: handling.cost, tempo, hitAt, reach,
-    stanceDamage: bash ? 47 * ownShield.bashPower : spell ? 12 : ranged ? 16 : handling.heavy ? 49 : 24 + item.damage * .36,
+    stanceDamage: bash ? 47 * ownShield.bashPower : spell ? 12 : ranged ? 16 : mode?.stance ?? (handling.heavy ? 49 : 24 + item.damage * .36),
     duration: hitAt + (bash ? .43 : handling.recovery) + (switched ? .13 : 0)
   };
+  if (mode?.heavy) spendEnergy(attacker, handling.cost);
   if (!bash && !spell) specialOf(attacker, key)?.modifyAction?.(attacker, attacker.action, attacker.special);
   if (bash) {
     attacker.counterUntil = 0;
@@ -2760,7 +2781,8 @@ function impact(action, contact) {
 
   const special = !bash && !spell ? specialOf(attacker, action.key) : null;
   const name = bash ? 'shield bash' : spell?.name || (special ? special.name : weapons[action.key].name.toLowerCase());
-  const usedName = spell || special ? name : 'the ' + name;
+  const moveName = action.mode ? name + ' ' + action.mode.name.toLowerCase() : name;
+  const usedName = spell || special ? moveName : 'the ' + moveName;
   if (attacker.blindUntil > elapsed && Math.random() < .45) {
     if (style === 'ranged') action.missedShot = true;
     floatLabel(defender, 'MISS', '#d8cbb8', { tag: 'BLINDED' });
@@ -2793,7 +2815,7 @@ function impact(action, contact) {
     ArenaEffects.strike(point || [defender.x - attacker.direction * .56, 1.55, defender.z + .55], -attacker.direction,
       spell?.color || '#ffb63f', action.heavy ? 26 : 16, action.heavy ? 1.4 : 1);
     if (action.heavy) kickDust(defender, 1.1, 8);
-    logEvent(defender.name + (perfect ? ' times a perfect block against ' : ' blocks ') + attacker.name + '’s ' + name + '.');
+    logEvent(defender.name + (perfect ? ' times a perfect block against ' : ' blocks ') + attacker.name + '’s ' + moveName + '.');
     if (style === 'melee' && !bash && !spell && breaksShields(action.key)) {
       defender.shieldHitsLeft--;
       if (defender.shieldHitsLeft === 0) {
@@ -3114,7 +3136,7 @@ function advanceAction(action, dt) {
   }
   if (action.spell && previous < .55 && action.phase >= .55) payForSpell(action);
   if (previous < .50 && action.phase >= .50) {
-    if (!action.spell) spendEnergy(attacker, action.cost);
+    if (!action.spell && !action.mode?.heavy) spendEnergy(attacker, action.cost);
     if (action.evade && !defender.action && defender.stunnedUntil <= elapsed) spendEnergy(defender, 11);
   }
   if (!action.connected && style === 'melee' && action.phase >= .60 && previous < .99) {
