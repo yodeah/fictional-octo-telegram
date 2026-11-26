@@ -111,4 +111,24 @@
       shape(g, 'M-20,-5 C-27,-8 -33,-4 -31,2 C-31,7 -25,8 -20,5 Z', gradient(g, -32, -6, -20, 6, c.brass, [.6, 0, -.45]), 1.2);
     }
   };
+
+  art.greatsword = {
+    box: [-68, -38, 169, 38],
+    draw(g, c) {
+      const blade = 'M19,-6.4 L36,-6 L38,-10.6 L42,-7.6 L129,-7.2 L163,0 L129,7.2 L42,7.6 L38,10.6 L36,6 L19,6.4 Z';
+      metal(g, blade, 9, c.steel, 17);
+      shape(g, 'M44,-1.8 L126,-1.2 L134,0 L126,1.2 L44,1.8 Z', across(g, 1.8, c.iron, [-.3, .3]), .5);
+      wrap(g, c.grip, -52, 14, 4.4);
+      band(g, c.brass, -22, 5.4, 3.6);
+      for (const s of [-1, 1]) {
+        shape(g, `M14,${s * 5} C16,${s * 15} 20,${s * 24} 31,${s * 32} C33,${s * 36} 27,${s * 36} 25,${s * 33} C16,${s * 27} 11,${s * 16} 13,${s * 5} Z`,
+          steelAcross(g, 34, c.brass), 1.2);
+        disc(g, 29.5, s * 33.4, 3, gradient(g, 27, -3, 32, 3, c.brass, [.6, -.3]), 1);
+      }
+      shape(g, 'M10,-7 L22,-6 L24,0 L22,6 L10,7 Z', steelAcross(g, 7, c.iron), 1.1);
+      disc(g, 17, 0, 3, c.teamCss, .8);
+      shape(g, 'M-52,-5 L-58,-8.6 L-66,0 L-58,8.6 L-52,5 Z', gradient(g, -64, -7, -52, 7, c.brass, [.6, 0, -.45]), 1.2);
+      disc(g, -58, 0, 2.6, c.teamCss, .7);
+    }
+  };
 })();
