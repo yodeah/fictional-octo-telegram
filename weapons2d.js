@@ -451,4 +451,32 @@
     link: linkArt(),
     ball: ballArt(12.5)
   };
+
+  art.arbalest = {
+    box: [-74, -52, 90, 52],
+    string: { tip: 50, span: 46, nock: -2, pull: 20, bolt: 80 },
+    draw(g, c) {
+      const stock = 'M-60,-5 L-44,-7 C-20,-6 -4,-9 14,-8 L78,-6 L81,0 L78,6 L12,7 C0,8 -8,15 -22,15 L-30,10 C-42,12 -52,16 -61,15 Z';
+      shape(g, stock, across(g, 14, c.wood, [.25, .05, -.15, -.45]), 1.4);
+      wear(g, stock, [-60, -9, 81, 15], 110, 'rgba(255,214,160,.28)', 'rgba(25,10,2,.4)', 131, 9);
+      shape(g, 'M-14,-9 L84,-7 L84,-3 L-14,-4 Z', steelAcross(g, 6, c.steel), 1);
+      // Windlass crank at the butt.
+      stroke(g, 'M-52,-6 L-52,-20 M-60,-20 L-44,-20', OUTLINE, 4.6);
+      stroke(g, 'M-52,-6 L-52,-20 M-60,-20 L-44,-20', tone(c.iron, .15), 2.6);
+      disc(g, -52, -7, 6, gradient(g, -57, -12, -47, -2, c.brass, [.6, -.35]), 1.2);
+      for (const y of [-20]) for (const x of [-60, -44]) disc(g, x, y, 2.6, tone(c.wood, .1), .9);
+      stroke(g, 'M4,7 Q3,18 15,17 Q24,15 23,7', OUTLINE, 3);
+      stroke(g, 'M4,7 Q3,18 15,17 Q24,15 23,7', tone(c.brass, 0), 1.6);
+      for (const s of [-1, 1]) {
+        metal(g, `M66,${s * 4} C76,${s * 18} 70,${s * 36} 52,${s * 45} L48,${s * 50} L47,${s * 44} C60,${s * 34} 64,${s * 18} 58,${s * 4} Z`, 50, c.steel, 137);
+        stroke(g, `M62,${s * 22} L70,${s * 24}`, tone(c.brass, 0), 3);
+        rivet(g, 50, s * 46, 1.8, c.brass);
+      }
+      shape(g, 'M54,-9 L70,-8 L70,8 L54,9 Z', steelAcross(g, 9, c.iron), 1.2);
+      for (const x of [59, 65]) rivet(g, x, 0, 1.5, c.brass);
+      stroke(g, 'M78,-8 C92,-9 92,9 78,8', OUTLINE, 4);
+      stroke(g, 'M78,-8 C92,-9 92,9 78,8', tone(c.iron, .1), 2.2);
+      shape(g, 'M24,-3 L46,-2.6 L46,3 L24,3.4 Z', across(g, 3, c.grip, [.15, -.3]), .8);
+    }
+  };
 })();
