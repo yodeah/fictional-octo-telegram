@@ -956,6 +956,31 @@ const ArenaArt2D = (() => {
     g.fillRect(-30, -30, 60, 60);
   }, bakedScale / 200));
 
+  // ---------------------------------------------------------------- cloth
+  // Capes and skirts trail the body on a damped spring, so they swing out on a lunge and settle after.
+  // Drawing only, and kept here so the simulation never sees it.
+  const drapes = new WeakMap();
+  function drapeSwing(owner, forward, rest, clock) {
+    let drape = drapes.get(owner);
+    const dt = drape ? clock - drape.clock : -1;
+    // A new bout or a long gap starts the cloth at rest. A paused frame (dt 0) leaves it as it is.
+    if (dt < 0 || dt > .25) {
+      drape = { clock, forward, swing: rest, speed: 0 };
+      drapes.set(owner, drape);
+    } else if (dt > 0) {
+      const velocity = clamp((forward - drape.forward) / dt, -4, 4);
+      const target = clamp(rest - velocity * .2, -.7, .45);
+      const steps = Math.ceil(dt * 120);
+      for (let i = 0; i < steps; i++) {
+        drape.speed += ((target - drape.swing) * 90 - drape.speed * 8) * dt / steps;
+        drape.swing = clamp(drape.swing + drape.speed * dt / steps, -.8, .55);
+      }
+      drape.clock = clock;
+      drape.forward = forward;
+    }
+    return drape.swing;
+  }
+
   // ---------------------------------------------------------------- per frame
   function stamp(g, sprite, frost) {
     g.drawImage(sprite.image, sprite.x, sprite.y, sprite.w, sprite.h);
@@ -979,6 +1004,7 @@ const ArenaArt2D = (() => {
 
   // view: { ctx, toScreen(localPoint) -> [x, y, pixelsPerMetre], direction (1 or -1), pixelsPerMetre,
   //   color, trim, style, base, pose, torsoPoint, frost, clock,
+  //   owner (the fighter, to remember its cloth) and forward (its chest position along the way it faces),
   //   weapon: { key (null = use draw), draw() }, spare: { key, draw, mount, angle, scale } | null,
   //   shield: { sprite (false = use draw), draw, at, tilt, size, stowed, bolts, width, height } | null }
   function drawFighter(view) {
@@ -1162,11 +1188,14 @@ const ArenaArt2D = (() => {
       if (!thrown) fist('weapon', parts.far);
     }
 
+    const swing = drapeSwing(view.owner, view.forward, clamp(pose.cloth * 1.5, -.5, .35), view.clock);
+
     // Back to front. Stowed gear and the cloak sit behind everything.
     if (view.shield?.stowed) drawShield();
     if (view.spare) drawWeapon(view.spare.key, view.spare.mount, view.spare.angle, view.spare.scale, view.spare.draw);
     place(view.torsoPoint([-.1, .62, -.2]), () => {
-      g.transform(1, 0, clamp(pose.cloth * 1.5, -.5, .35), 1, 0, 0);
+      // A cape that flares out also lifts a little.
+      g.transform(1, 0, swing, 1 - Math.min(.16, Math.abs(swing) * .2), 0, 0);
       stamp(g, parts.cape, frost);
     }, torsoTurn * .5);
     // The far arm and its weapon pass behind the body unless the swing brings them across it.
@@ -1181,7 +1210,8 @@ const ArenaArt2D = (() => {
       const [bx] = j.rearAnkle;
       const drop = Math.max(.12, j.hips[1] - .27);
       place(j.hips, () => {
-        g.transform(1, 0, clamp(((ax + bx) / 2 - j.hips[0]) / drop, -2.4, 2.4), 1, 0, 0);
+        // The hem follows the feet and lags a little behind the body.
+        g.transform(1, 0, clamp(((ax + bx) / 2 - j.hips[0]) / drop + swing * .15, -2.4, 2.4), 1, 0, 0);
         stamp(g, parts.skirt, frost);
       }, 0, clamp(1 + (Math.abs(ax - bx) - .71) * .4, .85, 1.35), clamp(drop / .825, .2, 1.1));
     }

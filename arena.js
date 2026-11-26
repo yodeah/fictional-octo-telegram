@@ -1549,6 +1549,8 @@ function drawGladiator2D(fighter, pose) {
     torsoPoint: torsoTransform(pose),
     frost,
     clock: weaponClock(),
+    owner: fighter,
+    forward: fighter.x * fighter.direction + pose.joints.chest[0],
     weapon: {
       key: thrown ? null : art(fighter.weapon),
       twoHanded: weapons[fighter.weapon].twoHanded,

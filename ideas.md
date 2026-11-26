@@ -26,8 +26,8 @@ Fights stay fully idle (see README): ideas must not add in-fight input.
 | 14 | **Crowd hype meter** | 3 | 90k | 0.3 | Rises with perfect blocks, specials, staggers and comebacks; a full meter makes the crowd roar and drops a small cosmetic reward. |
 | 15 | **Fighter personalities** | 4 | 120k | 0.3 | Traits such as reckless, patient or showman that shift AI choices (aggression, blocking, sand throws). |
 | 16 | **Weapon attack modes** | 5 | 180k | 0.3 | Give the idle AI cheap and committed attacks, staff range choices and a spear throw finisher. See the [weapon plan](docs/weapon-attack-modes.md). |
-| 17 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
-| 18 | **Finish the 2D art** | 5 | 230k | 0.2 | If the 2D proof of concept wins: joint polish, the other six weapon families, variants and shields. See the [2D art plan](docs/2d-art-poc.md). |
+| 17 | **Finish the 2D art** | 5 | 190k | 0.3 | If the 2D proof of concept wins: the other six weapon families, variants and shields. See the [2D art plan](docs/2d-art-poc.md). |
+| 18 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
 
 ## Adding ideas
 

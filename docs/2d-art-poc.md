@@ -1,6 +1,6 @@
 # Detailed 2D art: investigation, proof of concept and plan
 
-Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Measured 2026-11-26.
+Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Measured 2026-11-26, after the joint and cloth polish.
 
 ## Answer
 
@@ -49,8 +49,10 @@ Nothing in the simulation changed. Sprites hang on the same joints as before, so
 ## How it works
 
 1. Each body part and item is vector art written in code (paths, gradients, mail rings, rivets, stitching, wear).
-2. At the size it appears on screen it is painted once into its own offscreen canvas: 37 sprites for the first matchup.
-3. Each frame moves, rotates and stretches those sprites along the skeleton with `drawImage`, about 20 calls per fighter in place of about 1,100–1,400 projected, sorted and filled faces.
+2. At the size it appears on screen it is painted once into its own offscreen canvas: 53 sprites for the first matchup.
+3. Each frame moves, rotates and stretches those sprites along the skeleton with `drawImage`, about 30 calls per fighter in place of about 1,100–1,400 projected, sorted and filled faces.
+
+Fillers sit under each knee, elbow and the waist, and the knee and elbow guards turn halfway between the two limb parts. Capes and robe hems trail the body on a damped spring.
 
 So detail costs bake time, not frame time. Far-side limbs get a shaded copy for depth, and the frost finisher uses a lazily made ice-tinted copy.
 
@@ -62,16 +64,16 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 
 | Measure | 3D, Quality Low | 2D |
 | --- | ---: | ---: |
-| Main-thread time per `draw()`, desktop 1900×800 | 3.7 ms | 0.26 ms |
-| Main-thread time per `draw()`, phone size 706×620 | 4.1 ms | 0.22 ms |
-| Frame time with 20 full redraws per frame, desktop | 95 ms | 16.7 ms (still 60 FPS) |
-| Frame time with 60 full redraws per frame, desktop | 375 ms | 26 ms |
-| Per draw with the GPU turned off, desktop | 10.9 ms | 6.6 ms |
-| Per draw with the GPU turned off, phone size | 8.3 ms | 4.2 ms |
+| Main-thread time per `draw()`, desktop 1900×800 | 3.4 ms | 0.32 ms |
+| Main-thread time per `draw()`, phone size 706×620 | 3.4 ms | 0.22 ms |
+| Frame time with 20 full redraws per frame, desktop | 87 ms | 16.7 ms (still 60 FPS) |
+| Frame time with 60 full redraws per frame, desktop | 305 ms | 29 ms |
+| Per draw with the GPU turned off, desktop | 11.1 ms | 7.6 ms |
+| Per draw with the GPU turned off, phone size | 8.5 ms | 4.2 ms |
 
 - The repeated redraws are a stress test that includes graphics-chip work, which main-thread timing misses.
 - 3D at Quality High costs about twice Low on the main thread, and 2D already shows far more detail than High.
-- Sprite memory for the first matchup: about 2.6 MB on desktop and 0.5 MB at phone size. Baking took 7–60 ms, once, and repeats after a resize or a new look.
+- Sprite memory for the first matchup: about 2.8 MB on desktop and 0.5 MB at phone size. Baking took 7–60 ms, once, and repeats after a resize or a new look.
 - A forced-readback timing in the app's hidden browser pane showed 2D as slower. Neither real frame measurement above reproduced that, so it is not counted.
 - **Not measured on a real phone.** Add `?style=2d&cast=1&bench` to the served address and compare with `?style=3d&cast=1&bench`. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
 
@@ -87,7 +89,7 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 
 ## What still looks or behaves roughly
 
-- Parts are rigid: elbows, knees and the waist show seams in extreme poses.
+- Parts are rigid: a fully folded limb or a fallen body can still overlap awkwardly, and the tunic strips do not swing.
 - One side-on drawing per part, so there is no true twist or turn of the torso or shield.
 - Sprites do not interleave by depth between the two fighters. The attacker is drawn on top.
 - The backdrop and crowd are still flat, softer art, so the fighters stand out more than the scenery.
@@ -101,7 +103,7 @@ Each step is a playable commit. Token estimates are rough and cover drawing, bro
 | # | Step | Est. tokens | Done when |
 | --- | --- | ---: | --- |
 | 1 | Look at the proof of concept, test on the phone, and decide | — | 2D or 3D is chosen |
-| 2 | Joint polish: overlap pieces at knee, elbow and waist; a swing pose for the cape and skirt | 40k | No visible gaps in a full bout |
+| 2 | **Done:** joint fillers and guards at knee, elbow and waist; spring swing for the cape and skirt | 40k | No visible gaps in a full bout |
 | 3 | Remaining six weapon families: spear, axe, mace, flail, greatsword, maul | 90k | Every family draws in 2D |
 | 4 | Eighteen weapon variants and the buckler and tower shield | 100k | No variant falls back to 3D |
 | 5 | Nine remaining armor kits as variations of the three sets (colors, helmet, one signature piece) | 110k | All twelve kits read apart at game zoom |
@@ -109,6 +111,6 @@ Each step is a playable commit. Token estimates are rough and cover drawing, bro
 | 7 | Matching backdrop and crowd art for the three venues | 80k | Arena and fighters share one style |
 | 8 | Make 2D the default, remove the 3D painter, WebGL path and Quality setting, update docs | 40k | One renderer remains |
 
-Steps 2–8 come to about 530k tokens. Steps 2–4 (about 230k) remove the mixed look on weapons and shields.
+Steps 3–8 come to about 490k tokens. Steps 3–4 (about 190k) remove the mixed look on weapons and shields.
 
 If 2D is chosen, stop adding 3D mesh detail, because step 8 deletes it.
