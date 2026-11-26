@@ -1,0 +1,40 @@
+# Arena Ledger
+
+A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters use low-poly 3D geometry rendered on Canvas 2D with a perspective camera.
+
+## Run locally
+
+Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
+
+Each fighter has a main weapon, backup weapon, shield, and armor. Pick any item to keep it for future bouts, or leave the slot on **Auto** to reroll it when the next bout starts. New bouts also roll fresh fighter levels and stats. Hover over a selector or focus it with the keyboard to read item details. Changes made during a bout apply at the next one.
+
+Armor has separate attack and defense bonuses for stab, slash, crush, magic, and ranged. The greatsword and war maul trade slower, more expensive swings for higher accuracy and damage. They use both hands, so the shield moves to the back and stops providing defense or blocks until a one-handed weapon is drawn.
+
+Fighters automatically switch between their two weapons based on distance, skills, energy, mana, and the opponent’s armor. Unused weapons stay visible on the back or hip. Crossbows fire ranged bolts. Staves increase spell power by 30%. The combat triangle gives melee an advantage against leather, ranged an advantage against robes, and magic an advantage against plate. Armor also gives a small boost to its own combat style. [Old School RuneScape combat triangle](https://oldschool.runescape.wiki/w/Combat_triangle)
+
+Melee fighters press crossbow users at close range. A crowded shot loses damage and accuracy, so the shooter favors a melee backup or retreats while casting when a spell is available.
+
+Both fighters start with 60 mana and regenerate 3.6 mana per simulated second, up to 100. They start with 100 energy and recover 5 per simulated second. Physical attacks, blocks, and dodges use energy. Low energy reduces attack speed and damage, and heavier shields cover more area while slowing movement.
+
+| Fighter | Spell | Cost | Base effect |
+| --- | --- | --- | --- |
+| Varro | Ember Bolt | 28 MP | Throws a fire projectile with 19 base damage. |
+| Varro | Iron Ward | 32 MP | Absorbs up to 18 damage for 6 seconds. |
+| Cassian | Frost Lance | 30 MP | Throws an ice projectile with 15 base damage and briefly slows the opponent. |
+| Cassian | Second Wind | 34 MP | Restores up to 21 health. |
+
+Melee swings check the moving weapon against the shield and body regions. Head, body, arm, and leg hits deal different damage and produce different reactions. The defeated fighter falls with a jointed ragdoll. Toggle **Hitboxes** to see collision shapes.
+
+The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three completed bouts. Select the venue name to preview the next one. Select a marker in the scene to cheer with spectators, startle wildlife, or stir the ruins’ birds and fireflies.
+
+Pause or change speed during a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
+
+## Armor geometry
+
+The prototype projects procedural 3D shapes onto Canvas 2D. In the fixed idle pose, the plate torso and helmet submit 407 triangle equivalents, leather submits 310, and robes submit 171. These counts triangulate the polygons sent by the torso and helmet renderers and exclude weapons, shields, and other character parts. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
+
+## Development plan
+
+1. **Duel prototype** — Establish readable attacks, hits, blocks, and a clear outcome. Use repeated matches to tune reach, damage, and timing.
+2. **Stable management** — Recruit a small roster and assign weapons and training. Give bout results consequences through earnings, fatigue, and recovery.
+3. **Idle progression** — Save the stable locally and resolve scheduled bouts when the player returns. Let the player replay bouts from the same simulation results used to update the stable.
