@@ -53,6 +53,10 @@ The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and
 
 Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake on the finishing blow. The shake is off when the system asks for reduced motion. Melee swings leave a short trail behind the weapon head, warmer for heavy weapons. Blows flash at the contact point, blocks and hits on plate throw sparks, and footfalls, heavy blows, stance breaks, and falling bodies raise dust tinted to the venue. A blocked crossbow bolt stays stuck in the shield for the rest of the bout. Weapon wounds spray blood that stains the ground until the next bout, and a fighter felled by a weapon leaves a spreading pool. Damage numbers grow with the share of health lost, show the hit zone and armor weakness underneath, turn gold for head hits and green for healing, and stay readable at any playback speed. All effects live in `effects.js` and are cosmetic: they never change fight state or use the simulation's random rolls.
 
+## Animation
+
+Fighters coil before they swing and carry the weapon through after it lands, then settle back to guard. Heavy two-handed weapons coil deepest, spears draw back for a thrust, crossbows steady the aim and kick on release, and staves gather power before pushing a spell out. This motion is drawing only: `fighterPose` stays the combat pose that hit detection, guarding and movement use, and `displayPose` adds the animation on top for rendering. While a blow can still connect, both fighters are drawn exactly in their combat pose, so **Hitboxes** match what you see when it matters.
+
 ## Armor geometry
 
 The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents, leather submits 853, and robes submit 695. The nine original weapons each submit at least twice as many triangle equivalents as before the armory expansion. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.

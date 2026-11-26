@@ -807,6 +807,138 @@ function fighterPose(fighter) {
   return pose;
 }
 
+// Drawing-only motion. fighterPose is the combat pose that checkContact, bodyZones and startAction use.
+// displayPose layers anticipation and follow-through over a fresh copy of it. Nothing here writes fight
+// state or calls Math.random, and its memory lives in a map that the simulation never reads.
+const motionMemory = new WeakMap();
+
+function liveContact(action) {
+  // How close an unresolved melee attack is to the window where checkContact tests it.
+  return action?.style === 'melee' && !action.connected ? smooth((action.phase - .46) / .12) : 0;
+}
+
+function actionMotion(fighter, action, memory) {
+  const offsets = {};
+  if (!action) return offsets;
+  const add = (amount, values) => {
+    if (amount > 0) for (const [key, value] of Object.entries(values)) offsets[key] = (offsets[key] || 0) + value * amount;
+  };
+  const at = action.phase;
+  const weapon = weapons[action.key];
+  if (action.style === 'melee') {
+    if (action.connected && memory.connectedPhase === null) memory.connectedPhase = at;
+    const heft = action.bash ? .9 : weapon.twoHanded || action.heavy ? 1.18 : action.key === 'rapier' ? .7 : 1;
+    const thrust = weaponFamily(action.key) === 'spear' && !action.bash;
+    // Coil before the swing, then let go before the contact window so the drawn weapon matches its hitbox.
+    const coil = heft * smooth((at - .06) / .32) * (1 - smooth((at - .46) / .11));
+    if (action.bash) {
+      add(coil, { hipX: -.03, drop: .05, leanX: -.07, offX: -.16, offY: -.03, frontX: -.03, frontY: .02, twist: -.08, tilt: -.10 });
+    } else if (thrust) {
+      add(coil, { hipX: -.06, drop: .05, leanX: -.07, headX: -.01, handX: -.06, handY: .03, angle: .06, offX: .07,
+        frontX: -.05, frontY: .03, twist: -.10 });
+    } else {
+      add(coil, { hipX: -.05, drop: .08, leanX: -.13, leanY: -.01, headX: -.03, handX: -.12, handY: .11, angle: .40,
+        offX: .10, offY: .04, frontX: -.05, frontY: .045, twist: -.15, cloth: .05 });
+    }
+    if (memory.connectedPhase !== null) {
+      // Carry the weapon past the target, then settle back to guard by the end of recovery.
+      const from = Math.max(action.hitAt, memory.connectedPhase);
+      const t = at - from;
+      const carry = heft * ease(t / .09) * (1 - smooth((t - .09) / Math.max(.12, action.duration - from - .11)));
+      if (action.bash) {
+        add(carry, { hipX: .05, drop: .03, leanX: .07, offX: .10, offY: -.02, frontX: .06, rearX: .04, rearY: .03, twist: .06 });
+      } else if (thrust) {
+        add(carry, { hipX: .05, drop: .04, leanX: .09, headX: .02, handX: .14, handY: -.03, angle: -.05, offX: -.06,
+          frontX: .07, rearX: .05, rearY: .04, twist: .10 });
+      } else {
+        add(carry, { hipX: .04, drop: .05, leanX: .10, leanY: -.02, headX: .03, handX: .06, handY: -.12, angle: -.34,
+          offX: -.09, offY: -.04, frontX: .06, rearX: .05, rearY: .045, twist: .12, cloth: -.05 });
+      }
+    }
+  } else if (action.style === 'ranged') {
+    // Settle and steady the aim, then take the kick of the release.
+    const steady = smooth((at - .26) / .26) * (1 - smooth((at - .54) / .04));
+    add(steady, { drop: .045, leanX: .03, headX: .02, handY: -.02, offY: -.02, frontX: .03, twist: -.04 });
+    const kick = (weapon.twoHanded ? 1.3 : 1) * ease((at - .55) / .05)
+      * (1 - smooth((at - .60) / Math.max(.3, action.duration - .62)));
+    add(kick, { hipX: -.04, drop: .02, leanX: -.08, headX: -.04, handX: -.11, handY: .07, angle: .20, offX: -.05, offY: .04,
+      rearX: -.04, frontY: .03, twist: -.06, cloth: .04 });
+  } else if (action.spell) {
+    // Gather power toward the body, then push it out as the spell releases.
+    const staff = Boolean(weapon.spellPower);
+    const [handX, handY] = staff ? ['handX', 'handY'] : ['offX', 'offY'];
+    const gather = smooth((at - .10) / .30) * (1 - smooth((at - .48) / .18));
+    const push = ease((at - .88) / .08) * (1 - smooth((at - .98) / Math.max(.3, action.duration - 1)));
+    add(gather, { drop: .04, leanX: -.07, headX: -.02, [handX]: -.13, [handY]: .09, angle: staff ? .22 : 0, frontY: .025, twist: -.06 });
+    add(push, { hipX: .03, drop: .04, leanX: .08, headX: .02, [handX]: .12, [handY]: -.03, angle: staff ? -.16 : 0,
+      frontX: .05, rearY: .03, twist: .07 });
+  }
+  return offsets;
+}
+
+function applyMotion(fighter, pose, offsets, amount) {
+  const j = pose.joints;
+  const value = key => (offsets[key] || 0) * amount;
+  const move = (names, dx, dy) => { for (const name of names) j[name] = shifted(j[name], dx, dy); };
+  const hipX = value('hipX'), hipY = -value('drop');
+  const chestX = hipX + value('leanX'), chestY = hipY + value('leanY');
+  move(['hips', 'frontHip', 'rearHip'], hipX, hipY);
+  move(['chest', 'weaponShoulder', 'shieldShoulder'], chestX, chestY);
+  move(['head'], chestX + value('headX'), chestY);
+  // Middle joints move by the average of their ends instead of being solved again. Solving them again
+  // would snap away from the blended start of an action, and a zero offset leaves the combat pose unchanged.
+  for (const side of ['front', 'rear']) {
+    const footX = value(side + 'X'), footY = value(side + 'Y');
+    move([side + 'Ankle', side + 'Toe'], footX, footY);
+    move([side + 'Knee'], (hipX + footX) / 2, (hipY + footY) / 2);
+  }
+  const handX = chestX + value('handX'), handY = chestY + value('handY');
+  const grip = weaponAxis(j.weaponHand, pose.angle)(-.32);
+  move(['weaponHand'], handX, handY);
+  move(['weaponElbow'], (chestX + handX) / 2, (chestY + handY) / 2);
+  pose.angle += value('angle');
+  // A two-handed grip stays on the shaft as the weapon hand and angle change.
+  const newGrip = weaponAxis(j.weaponHand, pose.angle)(-.32);
+  const [offX, offY] = weapons[fighter.weapon].twoHanded
+    ? [newGrip[0] - grip[0], newGrip[1] - grip[1]] : [chestX + value('offX'), chestY + value('offY')];
+  move(['shieldHand'], offX, offY);
+  move(['shieldElbow'], (chestX + offX) / 2, (chestY + offY) / 2);
+  pose.twist += value('twist');
+  pose.cloth += value('cloth');
+  pose.shieldTilt += value('tilt');
+}
+
+function displayPose(fighter) {
+  const pose = fighterPose(fighter);
+  // Keep counting after the bout ends so a cut-off motion can still settle.
+  const clock = elapsed + fall;
+  let memory = motionMemory.get(fighter);
+  if (!memory || clock < memory.clock) {
+    memory = { clock, action: null, connectedPhase: null, lock: 0, last: {}, fade: {}, fadeStart: clock };
+    motionMemory.set(fighter, memory);
+  }
+  const step = clock - memory.clock;
+  memory.clock = clock;
+  const action = fighter.action;
+  if (action !== memory.action) {
+    // An action can end or be cut off mid-motion, so ease out whatever was showing.
+    memory.fade = memory.last;
+    memory.fadeStart = clock;
+    memory.action = action;
+    memory.connectedPhase = null;
+  }
+  const offsets = actionMotion(fighter, action, memory);
+  const fade = 1 - smooth((clock - memory.fadeStart) / .2);
+  if (fade > 0) for (const [key, value] of Object.entries(memory.fade)) offsets[key] = (offsets[key] || 0) + value * fade;
+  memory.last = offsets;
+  // While either blow can still land, show the body and weapon exactly where checkContact tests them.
+  const target = Math.max(liveContact(action), liveContact(otherFighter(fighter).action));
+  memory.lock = target >= memory.lock ? target : Math.max(target, memory.lock - step / .15);
+  const amount = 1 - memory.lock;
+  if (amount > 0 && Object.keys(offsets).length) applyMotion(fighter, pose, offsets, amount);
+  return pose;
+}
+
 const bronze = [172, 128, 76];
 const darkSteel = [72, 72, 65];
 const clothLining = [64, 48, 75];
@@ -1242,8 +1374,8 @@ function weaponSegments(fighter, pose) {
 function sampleTrails() {
   for (const fighter of fighters) {
     const action = fighter.action;
-    if (action?.style !== 'melee' || action.bash || action.phase < .48 || action.phase > action.hitAt + .14) continue;
-    const pose = fighterPose(fighter);
+    if (action?.style !== 'melee' || action.bash || action.phase < .48 || action.phase > action.hitAt + .22) continue;
+    const pose = displayPose(fighter);
     const hand = pose.joints.weaponHand;
     const reach = point => Math.hypot(point[0] - hand[0], point[1] - hand[1]);
     const tip = weaponSegments(fighter, pose).flatMap(([from, to]) => [from, to])
@@ -1275,7 +1407,7 @@ function sampleDust() {
     for (const [side, offset] of [['front', 0], ['rear', .5]]) {
       const step = stepFoot(fighter.stride, offset);
       if (!ArenaEffects.lands(fighter.name + side, step.y === 0) || fighter.gait < .45) continue;
-      const [x, , z] = worldPoint(fighter, fighterPose(fighter).joints[side + 'Ankle']);
+      const [x, , z] = worldPoint(fighter, displayPose(fighter).joints[side + 'Ankle']);
       ArenaEffects.dust(x, z + .1, scenery.dust, 3, .5 + fighter.gait * .45);
     }
   }
@@ -1369,7 +1501,8 @@ for (const side of ['weapon', 'shield']) {
 }
 
 function makeRagdoll(fighter, zone) {
-  const pose = fighterPose(fighter);
+  // The ragdoll only animates the fall, so it starts from what was on screen.
+  const pose = displayPose(fighter);
   const nodes = Object.fromEntries(Object.entries(pose.joints).map(([name, point]) => {
     const upperBody = point[1] / 2.4;
     const floor = name === 'head' ? .25 : name === 'hips' || name === 'chest' ? .22 : .075;
@@ -1603,7 +1736,7 @@ function drawMagic() {
 
 function drawCast({ attacker, defender, spell, hitAt, phase }) {
   if (phase < .30 || phase > 1.10) return;
-  const pose = fighterPose(attacker);
+  const pose = displayPose(attacker);
   const staffTip = weaponAxis(pose.joints.weaponHand, pose.angle)(1.40);
   const start = weapons[attacker.weapon].spellPower ? project(worldPoint(attacker, staffTip))
     : project([attacker.x + attacker.direction * .67, 1.64, attacker.z + .59]);
@@ -1658,7 +1791,7 @@ function drawBolts() {
 function drawBolt(action) {
   const { attacker, defender, missedShot, hitAt, phase } = action;
   if (phase > 1.02 || action.lodged) return;
-  const pose = fighterPose(attacker);
+  const pose = displayPose(attacker);
   const tip = weaponAxis(pose.joints.weaponHand, pose.angle)(.79, .05);
   const from = worldPoint(attacker, tip);
   const target = shifted(boltTarget(defender, isGuarding(action)), missedShot ? attacker.direction * .8 : 0, missedShot ? .48 : 0);
@@ -1703,7 +1836,7 @@ function draw() {
   }
   scenery.draw(width, height, sceneryClock);
   ArenaEffects.drawStains(ctx, project, scale);
-  const poses = fighters.map(fighter => fighter.ragdoll?.pose || fighterPose(fighter));
+  const poses = fighters.map(fighter => fighter.ragdoll?.pose || displayPose(fighter));
   fighters.forEach((fighter, index) => {
     const pose = poses[index];
     const hips = pose.joints.hips;
@@ -1725,7 +1858,8 @@ function draw() {
   faces.length = 0;
   ArenaEffects.drawDust(ctx, project, scale);
   ArenaEffects.drawTrails(ctx, project);
-  if (showHitboxes) fighters.forEach((fighter, index) => drawHitboxes(fighter, poses[index]));
+  // Hitboxes show the combat pose that checkContact actually tests.
+  if (showHitboxes) fighters.forEach(fighter => drawHitboxes(fighter, fighter.ragdoll?.pose || fighterPose(fighter)));
   drawMagic();
   drawBolts();
   for (const particle of particles) {
