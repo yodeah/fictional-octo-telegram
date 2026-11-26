@@ -640,4 +640,11 @@
     stroke(g, bolt, '#e8fbff', 1.3);
     stroke(g, 'M42,1.6 L48,6 L55,4.6 M64,2.4 L71,6.4 M58,-3 L62,-6.4', '#bfeaff', .9);
   });
+
+  special('snarecaster', 'crossbow', { steel: [118, 150, 104], wood: [86, 92, 48], iron: [92, 104, 64], grip: [58, 90, 44] }, g => {
+    // Cord wound round the stock, with a weighted loop hanging below.
+    for (const x of [-6, 4, 40]) for (let i = 0; i < 4; i++) stroke(g, `M${x + i * 2.4},-7 q4,6 0,13`, '#92c470', 1.3);
+    stroke(g, 'M44,5 C40,20 20,24 22,14 C24,8 36,12 34,22 L30,30', '#92c470', 1.5);
+    disc(g, 30, 31, 3, '#4f6a3a', 1);
+  });
 })();
