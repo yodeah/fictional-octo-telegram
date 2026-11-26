@@ -269,4 +269,23 @@
       for (const x of [-70, 20, 56]) band(g, c.brass, x, 4.8);
     }
   };
+
+  art.mace = {
+    box: [-36, -28, 108, 28],
+    draw(g, c) {
+      haft(g, c.wood, -30, 70, 3.5);
+      wrap(g, c.grip, -23, 10, 4.3);
+      for (const x of [18, 56]) band(g, c.iron, x, 4.6);
+      // Flanged head seen from the side.
+      for (const s of [-1, 1]) {
+        metal(g, `M62,${s * 7} L70,${s * 22} L78,${s * 17} L86,${s * 22} L96,${s * 7} Z`, 22, c.steel, 71);
+        stroke(g, `M78,${s * 7} L78,${s * 17}`, tone(c.iron, -.2), 1.2);
+      }
+      shape(g, 'M60,-8 C70,-11 88,-11 98,-8 L98,8 C88,11 70,11 60,8 Z', steelAcross(g, 11, c.iron), 1.3);
+      metal(g, 'M64,-3.6 L92,-3.6 L96,0 L92,3.6 L64,3.6 Z', 4, c.steel, 73);
+      shape(g, 'M97,-5 L106,0 L97,5 Z', steelAcross(g, 5, c.brass), 1.1);
+      band(g, c.brass, 61, 8.6, 4);
+      disc(g, -32, 0, 4.4, gradient(g, -36, -4, -28, 4, c.brass, [.6, -.4]), 1.1);
+    }
+  };
 })();
