@@ -1519,8 +1519,9 @@ const iced = (rgb, frost) => rgb.map((channel, axis) => Math.round(mix(channel, 
 
 // Hands the posed skeleton to the sprite painter. Returns how many 3D faces the fallback gear used.
 function drawGladiator2D(fighter, pose) {
-  // Each of the twelve kits uses its class's one 2D armor set for now.
-  const set = { melee: 'plate', ranged: 'leather', magic: 'robes' }[armors[fighter.gear.armor].style];
+  // A kit without its own 2D set uses its class's.
+  const own = fighter.gear.armor;
+  const set = ArenaArt2D.hasArmor(own) ? own : { melee: 'plate', ranged: 'leather', magic: 'robes' }[armors[own].style];
   const world = point => worldPoint(fighter, point);
   const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides, modelDetail);
   const frost = finisherFrost(fighter);
@@ -1529,10 +1530,18 @@ function drawGladiator2D(fighter, pose) {
     build();
     fallbackFaces += flushFaces(frost);
   };
-  // Specials recolor and extend their 3D model, so they stay on it for now.
-  const art = key => ArenaArt2D.has(key) && !specialOf(fighter, key) ? key : null;
+  // A special has art of its own, under its own key.
+  const art = key => {
+    const wanted = specialOf(fighter, key) ? fighter.gear.special : key;
+    return ArenaArt2D.has(wanted) ? wanted : null;
+  };
+  // The curves a flail's chains hang on, scaled toward the mount when it is stowed.
+  const chains = (key, hand, angle, windup, strike, mount, size = 1) => weaponFamily(key) !== 'flail' ? null
+    : flailTrails(key, weaponAxis(hand, angle)(.61), windup, strike, weaponClock())
+      .map(chain => fraction => mount ? pointBetween(mount, chain(fraction), size) : chain(fraction));
   const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
   const thrown = finishingSpear(fighter, pose);
+  const stowed = weapons[spare] ? stowedMount(pose, spare) : null;
   ArenaArt2D.draw({
     ctx,
     toScreen: point => {
@@ -1552,15 +1561,19 @@ function drawGladiator2D(fighter, pose) {
     owner: fighter,
     forward: fighter.x * fighter.direction + pose.joints.chest[0],
     weapon: {
-      key: thrown ? null : art(fighter.weapon),
+      key: art(thrown ? 'spear' : fighter.weapon),
+      chains: chains(fighter.weapon, pose.joints.weaponHand, pose.angle, pose.windup, pose.strike),
       twoHanded: weapons[fighter.weapon].twoHanded,
       thrown,
       draw: mesh(() => weaponModel(fighter, thrown?.hand || pose.joints.weaponHand, thrown?.angle ?? pose.angle,
         pose.windup, pose.strike, weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon))
     },
-    spare: weapons[spare] ? { key: art(spare), ...stowedMount(pose, spare), draw: mesh(() => stowedWeapon(fighter, pose, spare, limb, world)) } : null,
+    spare: stowed ? {
+      key: art(spare), ...stowed, draw: mesh(() => stowedWeapon(fighter, pose, spare, limb, world)),
+      chains: chains(spare, stowed.mount, stowed.angle, 0, 0, stowed.mount, stowed.scale)
+    } : null,
     shield: fighter.shieldHitsLeft === 0 ? null : {
-      sprite: fighter.gear.shield === 'round',
+      key: ArenaArt2D.hasShield(fighter.gear.shield) ? fighter.gear.shield : null,
       ...shieldPlacement(fighter, pose),
       bolts: ArenaEffects.stuckBolts(fighter.name),
       draw: mesh(() => stuckBolts(fighter, drawShieldModel(fighter, pose, world)))
