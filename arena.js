@@ -3,7 +3,7 @@
 const canvas = document.querySelector('#arena');
 const ctx = canvas.getContext('2d');
 const elements = Object.fromEntries(
-  ['bout', 'status', 'cast', 'hitboxes', 'result', 'winner', 'play', 'reset', 'speed', 'repeat', 'log', 'record']
+  ['bout', 'status', 'cast', 'hitboxes', 'result', 'winner', 'play', 'reset', 'generate', 'speed', 'repeat', 'log', 'record']
     .map(id => [id, document.getElementById(id)])
 );
 const weapons = {
@@ -167,7 +167,8 @@ function equipmentPicker(fighter, prefix, type, choices) {
   }
   select.value = 'auto';
   select.describe = () => {
-    const item = choices[select.value === 'auto' ? fighter.gear[type] : select.value];
+    const key = select.value === 'auto' ? fighter.gear[type] : select.value;
+    const item = choices[key];
     label.textContent = gearLabels[type] + (select.value === 'auto' ? ' · Auto' : '');
     automatic.text = choices[fighter.gear[type]].name + ' · Auto';
     if (type === 'armor') {
@@ -177,14 +178,13 @@ function equipmentPicker(fighter, prefix, type, choices) {
     const lines = [item.name];
     if (type === 'spellbook') {
       lines.push(item.focus, ...item.spells.map(key => spells[key].name + ' · ' + spells[key].cost + ' MP'));
-    } else if (type === 'reserve' && select.value === 'none') {
+    } else if (type === 'reserve' && key === 'none') {
       lines.push('Travel lighter with one weapon');
     } else if (type === 'weapon' || type === 'reserve') {
       lines.push('Base damage ' + item.damage + ' · Reach ' + item.range.toFixed(1),
         'Speed ' + Math.round(item.tempo * 100) + '% · ' + item.energy + ' energy per attack');
       if (item.spellPower) lines.push('+' + Math.round((item.spellPower - 1) * 100) + '% spell power · Free Staff Spark');
       if (item.style === 'ranged') lines.push('Ranged bolts · Strong against robes', 'Reduced damage and accuracy up close');
-      const key = select.value === 'auto' ? fighter.gear[type] : select.value;
       if (item.accuracy) lines.push('+' + item.accuracy + ' ' + bonusTypes[meleeType(key)] + ' attack');
       if (item.twoHanded) lines.push('Uses both hands · Shield is stowed');
       if (type === 'reserve') lines.push('Carrying a spare lowers speed by 4% · Swaps cost ' + switchCost + ' energy');
@@ -1763,6 +1763,7 @@ function updateControls() {
   };
   [elements.status.textContent, elements.play.textContent] = ui[state];
   elements.reset.disabled = state === 'ready';
+  elements.generate.disabled = state === 'running' || state === 'paused';
   fighters.forEach(updateGearNote);
 }
 
@@ -1849,17 +1850,22 @@ function nextExchange() {
   };
 }
 
-function startBout(reroll = false) {
+function startBout(reroll = false, generated = null) {
   elapsed = 0;
   fall = 0;
   hitPause = 0;
   particles.length = labels.length = stains.length = 0;
-  fighters.forEach(fighter => {
+  fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
     fighter.z = fighter.gait = 0;
     fighter.stride = .13 + (fighter.direction < 0 ? .50 : 0);
-    if (reroll) rollLevels(fighter);
-    applyGear(fighter, reroll);
+    if (generated) {
+      Object.assign(fighter, generated[index]);
+      Object.values(fighter.loadout).forEach(picker => { picker.value = 'auto'; });
+    } else if (reroll) {
+      rollLevels(fighter);
+    }
+    applyGear(fighter, reroll && !generated);
     fighter.hp = fighter.maxHP;
     fighter.mp = 60;
     fighter.energy = 100;
@@ -2073,10 +2079,19 @@ function updateEffects(dt) {
   }
 }
 
-function beginRematch() {
+function freshMatchup() {
+  return ArenaMatchups.generate(fighters, { weapons, armors, shields, spellbooks });
+}
+
+function nextBoutNumber() {
   bout++;
   scenery.nextBout();
-  startBout(true);
+}
+
+function beginRematch(automatic = false) {
+  const generated = automatic ? freshMatchup() : null;
+  nextBoutNumber();
+  startBout(true, generated);
   runBout();
 }
 
@@ -2098,7 +2113,7 @@ function update(dt, realTime) {
     phase += dt * exchange.tempo;
     if (phase > 1.14) elements.cast.hidden = true;
     if (elements.repeat.checked) rematchDelay -= realTime;
-    if (rematchDelay <= 0) beginRematch();
+    if (rematchDelay <= 0) beginRematch(true);
     return;
   }
   if (state !== 'running') return;
@@ -2160,12 +2175,18 @@ elements.play.addEventListener('click', () => {
 
 elements.reset.addEventListener('click', () => {
   const reroll = state === 'finished';
-  if (reroll) {
-    bout++;
-    scenery.nextBout();
-  }
+  if (reroll) nextBoutNumber();
   state = 'ready';
   startBout(reroll);
+  updateControls();
+});
+
+elements.generate.addEventListener('click', () => {
+  if (state === 'running' || state === 'paused') return;
+  const generated = freshMatchup();
+  if (state === 'finished') nextBoutNumber();
+  state = 'ready';
+  startBout(false, generated);
   updateControls();
 });
 

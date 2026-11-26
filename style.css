@@ -85,7 +85,7 @@ canvas{display:block;width:100%;height:clamp(310px,40vw,420px)}
 .result{position:absolute;left:50%;top:12px;transform:translateX(-50%);white-space:nowrap;padding:5px 12px;background:#231a13ee;border:1px solid #b78653}
 .result span{color:var(--gold)}
 .result strong{margin-left:8px;font:23px Georgia,serif}
-.controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px}
+.controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px}
 .triangle{padding:0 16px 12px;color:var(--muted);font-size:13px}
 .triangle b{margin-right:8px;color:var(--gold)}
 .actions,.options{display:flex;gap:8px;align-items:center}

@@ -33,6 +33,8 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed during a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
+**Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Every **Auto-rematch** uses the same generator. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. Use the manual **Rematch** button to retain pinned equipment.
+
 ## Armor geometry
 
 The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the plate torso and helmet submit 943 triangle equivalents, leather submits 694, and robes submit 431. They previously submitted 407, 310, and 171. The nine original weapons each submit at least twice as many triangle equivalents as before. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
