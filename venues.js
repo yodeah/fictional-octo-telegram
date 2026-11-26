@@ -266,6 +266,10 @@ const ArenaVenues = (() => {
     targets[0].title = venues[0].targets[0];
 
     return {
+      // Ground colour for dust kicked up in the current venue.
+      get dust() {
+        return ['#f4d6a4', '#bfad7e', '#b3bac8'][index];
+      },
       nextBout() {
         remaining--;
         if (remaining <= 0) select((index + 1) % venues.length);

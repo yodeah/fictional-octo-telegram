@@ -1238,6 +1238,32 @@ function sampleTrails() {
   }
 }
 
+function kickDust(fighter, strength, count) {
+  ArenaEffects.dust(fighter.x, fighter.z + .2, scenery.dust, count, strength);
+}
+
+function sampleDust() {
+  for (const fighter of fighters) {
+    if (fighter.ragdoll) {
+      for (const name of ['hips', 'chest', 'head']) {
+        const { point, floor } = fighter.ragdoll.nodes[name];
+        if (!ArenaEffects.lands(fighter.name + name, point[1] <= floor + .05)) continue;
+        const [x, , z] = worldPoint(fighter, point);
+        ArenaEffects.dust(x, z + .15, scenery.dust, 9, 1.5);
+        ArenaEffects.shake(.3);
+      }
+      continue;
+    }
+    if (state !== 'running') continue;
+    for (const [side, offset] of [['front', 0], ['rear', .5]]) {
+      const step = stepFoot(fighter.stride, offset);
+      if (!ArenaEffects.lands(fighter.name + side, step.y === 0) || fighter.gait < .45) continue;
+      const [x, , z] = worldPoint(fighter, fighterPose(fighter).joints[side + 'Ankle']);
+      ArenaEffects.dust(x, z + .1, scenery.dust, 3, .5 + fighter.gait * .45);
+    }
+  }
+}
+
 function bodyZones(fighter, { joints: j }, shielding) {
   const zones = [
     ['head', j.head, shifted(j.head, -.02, .13), .25],
@@ -1683,14 +1709,29 @@ function draw() {
   faces.sort((a, b) => a.depth - b.depth);
   faces.forEach(face => polygon(face.projected, face.fill));
   faces.length = 0;
+  ArenaEffects.drawDust(ctx, project, scale);
   ArenaEffects.drawTrails(ctx, project);
   if (showHitboxes) fighters.forEach((fighter, index) => drawHitboxes(fighter, poses[index]));
   drawMagic();
   drawBolts();
   for (const particle of particles) {
     const [x, y] = project([particle.x, particle.y, particle.z]);
-    ellipse(x, y, particle.size, particle.size * .82, particle.color);
+    if (particle.blood) {
+      ellipse(x, y, particle.size, particle.size * .82, particle.color);
+      continue;
+    }
+    // Magic and spark particles streak along their flight; blood stays as drops.
+    const [tailX, tailY] = project([particle.x - particle.vx * .035, particle.y - particle.vy * .035, particle.z - particle.vz * .035]);
+    ctx.strokeStyle = particle.color;
+    ctx.lineWidth = particle.size;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tailX, tailY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
   }
+  ArenaEffects.drawSparks(ctx, project, scale);
   ctx.restore();
   for (const label of labels) {
     const [x, y] = project([label.x, label.y + label.age * .53, label.z + .3]);
@@ -2109,6 +2150,7 @@ function breakStance(fighter, duration) {
   fighter.velocity = -fighter.direction * .55;
   updateStance(fighter);
   ArenaEffects.shake(.55);
+  kickDust(fighter, 1.35, 12);
   floatLabel(fighter, 'STAGGERED', '#f4c483', true, 2.34);
   logEvent(fighter.name + ' staggers and drops their guard.');
 }
@@ -2147,7 +2189,9 @@ function impact(action, contact) {
     hitPause = .035;
     ArenaEffects.shake(action.heavy ? .45 : .22);
     floatLabel(defender, 'BLOCKED', '#ffe2a0', true);
-    burst(defender, { point, offset: -attacker.direction * .56, y: 1.55, direction: -attacker.direction, colors: ['#ffe3a1', spell?.color || '#fff6dd'], count: 13, gravity: 9 });
+    ArenaEffects.strike(point || [defender.x - attacker.direction * .56, 1.55, defender.z + .55], -attacker.direction,
+      spell?.color || '#ffb63f', action.heavy ? 26 : 16, action.heavy ? 1.4 : 1);
+    if (action.heavy) kickDust(defender, 1.1, 8);
     logEvent(defender.name + ' blocks ' + attacker.name + '’s ' + name + '.');
     applyStanceDamage(action, .54);
     if (defender.energy < 2.5 && defender.stunnedUntil <= elapsed) breakStance(defender, 1.08);
@@ -2182,6 +2226,12 @@ function impact(action, contact) {
     blood,
     gravity: blood ? 12 : 5
   });
+  const flashPoint = point || [defender.x - attacker.direction * .29, 1.35, defender.z + .55];
+  // Plate throws sparks off bare steel; softer armor only flashes.
+  const clang = !spell && actualDamage && armors[defender.gear.armor].style === 'melee';
+  ArenaEffects.strike(flashPoint, attacker.direction, spell?.color || (clang ? '#ffb63f' : '#ffe0c2'),
+    clang ? 12 : 4, action.heavy || zone === 'head' ? 1.35 : .9);
+  if (action.heavy || actualDamage > defender.maxHP * .14) kickDust(defender, 1, 7);
   const hitText = zone !== 'body' && contact ? ' · ' + zone.toUpperCase() : matchup >= 1.2 ? ' · EDGE' : '';
   floatLabel(defender, actualDamage ? '−' + actualDamage + hitText : 'ABSORBED', color, !actualDamage || !!hitText);
   defender.reaction = { zone, time: elapsed };
@@ -2433,6 +2483,7 @@ function frame(now) {
       if (frozen) continue;
       ArenaEffects.tick(dt * speed / steps);
       sampleTrails();
+      sampleDust();
     }
   }
   draw();
