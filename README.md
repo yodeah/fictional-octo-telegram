@@ -49,6 +49,10 @@ Pause or change speed to control how you watch a bout. Auto-rematch runs back-to
 
 The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and lists improvement ideas. Its numbers are written by hand, so update it when combat values change.
 
+## Weapon specials
+
+Rare special weapons (`specials.js`) reuse an existing weapon's model with new colors and small details, and change the fight through a few hooks that `arena.js` calls (attack start, landed hit, every step, blocking, weapon choice and drawing). A generated fighter carries one 5% of the time; the **Special** picker sets one before a fight for testing. **Stormbrand** (sword) calls lightning once after three landed hits, **Snarecaster** (crossbow) roots the target for 3 seconds with its first bolt to land, and **Last Oath** (greatsword) gives +60% damage and lifesteal below 10% health but stops blocking. `?force=oath` makes Last Oath take hold at the first damage. The scoreboard shows each fighter's special and its state.
+
 ## Combat effects
 
 Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake on the finishing blow. The shake is off when the system asks for reduced motion. Melee swings leave a short trail behind the weapon head, warmer for heavy weapons. Blows flash at the contact point, blocks and hits on plate throw sparks, and footfalls, heavy blows, stance breaks, and falling bodies raise dust tinted to the venue. A blocked crossbow bolt stays stuck in the shield for the rest of the bout. Weapon wounds spray blood that stains the ground until the next bout, and a fighter felled by a weapon leaves a spreading pool. Damage numbers grow with the share of health lost, show the hit zone and armor weakness underneath, turn gold for head hits and green for healing, and stay readable at any playback speed. All effects live in `effects.js` and are cosmetic: they never change fight state or use the simulation's random rolls.

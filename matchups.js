@@ -50,7 +50,7 @@ const ArenaMatchups = (() => {
   }
 
   function generate(previous, catalog, random = Math.random) {
-    const { weapons, armors, shields, spellbooks } = catalog;
+    const { weapons, armors, shields, spellbooks, specials = {}, specialChance = 0 } = catalog;
     const nextLevels = levels(previous, random);
     const nextBooks = books(previous, spellbooks, random);
     const unavailable = new Set(previous.flatMap(fighter => [fighter.gear.weapon, fighter.gear.reserve]));
@@ -65,10 +65,17 @@ const ArenaMatchups = (() => {
       const buildKey = pick(fresh.length ? fresh : eligible, random);
       const build = builds[buildKey];
       usedBuilds.add(buildKey);
-      const weapon = pick(matching(available(), build.main), random);
+      // A rare special weapon replaces the main or backup weapon of the same style.
+      const specialOptions = Object.keys(specials).filter(key => !unavailable.has(specials[key].weapon)
+        && [build.main, build.backup].includes(style(weapons[specials[key].weapon])));
+      const special = random() < specialChance && specialOptions.length ? pick(specialOptions, random) : 'none';
+      const base = specials[special]?.weapon;
+      const mainSpecial = base && style(weapons[base]) === build.main;
+      const weapon = mainSpecial ? base : pick(matching(available(), build.main).filter(key => key !== base), random);
       unavailable.add(weapon);
-      let reserve = 'none';
-      if (build.backup) {
+      if (base) unavailable.add(base);
+      let reserve = base && !mainSpecial ? base : 'none';
+      if (build.backup && reserve === 'none') {
         const pool = available();
         const preferred = matching(pool, build.backup);
         reserve = pick(preferred.length ? preferred : pool, random);
@@ -83,7 +90,7 @@ const ArenaMatchups = (() => {
       return {
         build: buildKey,
         ...attributes(nextLevels[index], build, random),
-        gear: { weapon, reserve, shield, armor, spellbook: nextBooks[index] }
+        gear: { weapon, reserve, shield, armor, spellbook: nextBooks[index], special }
       };
     });
   }

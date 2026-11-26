@@ -15,6 +15,7 @@ const ArenaEffects = (() => {
   const sparks = [];
   const flashes = [];
   const puffs = [];
+  const bolts = [];
   const contacts = new Map();
   let seed = 90210;
   // A private generator, so effects never shift the simulation's random rolls.
@@ -163,6 +164,13 @@ const ArenaEffects = (() => {
         });
       }
     },
+    // A jagged lightning bolt from above the arena down to a point.
+    lightning(point, color) {
+      const path = [];
+      for (let i = 0; i <= 9; i++) path.push([point[0] + (i && i < 9 ? (random() - .5) * .55 : 0), point[1] + (9 - i) * .55, point[2]]);
+      bolts.push({ path, color, age: 0, life: .42 });
+      flashes.push({ point: point.slice(), color, size: 2.2, angle: random() * Math.PI, age: 0, life: .2 });
+    },
     dust(x, z, color, count, strength = 1) {
       for (let i = 0; i < count; i++) {
         const side = random() * 2 - 1;
@@ -187,7 +195,7 @@ const ArenaEffects = (() => {
     },
     // Simulation seconds, so trails freeze with hit pauses and follow playback speed.
     tick(dt) {
-      for (const list of [sparks, flashes, puffs]) {
+      for (const list of [sparks, flashes, puffs, bolts]) {
         for (let i = list.length - 1; i >= 0; i--) {
           list[i].age += dt;
           if (list[i].age >= list[i].life) list.splice(i, 1);
@@ -256,6 +264,17 @@ const ArenaEffects = (() => {
         line(tail, head, color, 3.2);
         line(pointOnLine(tail, head, .45), head, '#fffdf2', 1.4);
       }
+      for (const { path, color, age, life } of bolts) {
+        const points = path.map(project);
+        ctx.globalAlpha = 1 - (age / life) ** 1.5;
+        for (const [stroke, width] of [[color, 7], ['#ffffff', 2.4]]) {
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = width;
+          ctx.beginPath();
+          points.forEach(([x, y], index) => index ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+          ctx.stroke();
+        }
+      }
       for (const { point, color, size, angle, age, life } of flashes) {
         const progress = age / life;
         const [x, y] = project(point);
@@ -305,7 +324,7 @@ const ArenaEffects = (() => {
     },
     reset() {
       trauma = 0;
-      labels.length = trails.length = sparks.length = flashes.length = puffs.length = drops.length = stains.length = 0;
+      labels.length = trails.length = sparks.length = flashes.length = puffs.length = drops.length = stains.length = bolts.length = 0;
       contacts.clear();
       stuck.clear();
     }

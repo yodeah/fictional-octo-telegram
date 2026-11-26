@@ -46,7 +46,7 @@ const shields = {
   round: { name: 'Round shield', defense: 20, mobility: 1, energy: 15, bashTempo: 1, bashPower: 1, width: .34, height: .43, shape: 1 },
   tower: { name: 'Tower shield', defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
 };
-// Testing only: ?force=perfect,wall,sand makes those Stage 1 events trigger whenever they can.
+// Testing only: ?force=perfect,wall,sand,oath makes those events trigger whenever they can (oath: Last Oath at any health below full).
 const forced = new Set((new URLSearchParams(location.search).get('force') || '').split(',').filter(Boolean));
 const perfectColor = '#ffe9a8';
 const sandColors = ['#e2c98f', '#c9a96b', '#f1deb0'];
@@ -80,7 +80,7 @@ const armorVariants = {
   astral: ['robes', { name: 'Astral vestments', cut: 'astral', color: [66, 82, 119], edging: [180, 199, 246], defense: 5, mobility: 1.03, power: 1.14, attackBonus: [-5, -3, -1, 23, -7], defenseBonus: [7, 5, 6, 20, -7] }]
 };
 for (const [key, [base, stats]] of Object.entries(armorVariants)) armors[key] = { ...armors[base], ...stats };
-const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor', spellbook: 'Spellbook' };
+const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor', spellbook: 'Spellbook', special: 'Special' };
 const signed = value => value > 0 ? '+' + value : String(value);
 
 function armorDetails(detail, kit, automatic) {
@@ -127,13 +127,18 @@ const spellbooks = {
   glacial: { name: 'Glacial', focus: 'Slow, freeze, and hold opponents at range.', spells: ['frost', 'barrage', 'shell'] },
   storm: { name: 'Storm', focus: 'Burst damage and energy control for aggressive fighters.', spells: ['arc', 'thunder', 'tailwind'] }
 };
-const gearChoices = { weapon: weapons, reserve: { ...weapons, none: { name: 'None' } }, shield: shields, armor: armors, spellbook: spellbooks };
+const gearChoices = { weapon: weapons, reserve: { ...weapons, none: { name: 'None' } }, shield: shields, armor: armors, spellbook: spellbooks,
+  special: { none: { name: 'None' }, ...specials } };
+// The special a fighter owns, and the one that applies to a given weapon (the held one by default).
+const ownedSpecial = fighter => specials[fighter.gear.special] || null;
+const specialOf = (fighter, key = fighter.weapon) => ownedSpecial(fighter)?.weapon === key ? ownedSpecial(fighter) : null;
+const weaponName = (fighter, key) => specialOf(fighter, key)?.name || weapons[key].name;
 const manaRegen = 3.6;
 const energyRegen = 5;
 const switchCost = 7;
 const fighters = [
-  { name: 'Varro', gear: { weapon: 'sword', reserve: 'staff', shield: 'round', armor: 'plate', spellbook: 'general' }, level: 54, attack: 69, magic: 68, defense: 25, strength: 73, ranged: 54, maxHP: 108, direction: 1, color: [157, 62, 42], trim: [242, 143, 96], wins: 0 },
-  { name: 'Cassian', gear: { weapon: 'spear', reserve: 'crossbow', shield: 'round', armor: 'leather', spellbook: 'glacial' }, level: 57, attack: 64, magic: 80, defense: 28, strength: 63, ranged: 76, maxHP: 100, direction: -1, color: [49, 102, 110], trim: [143, 208, 202], wins: 0 }
+  { name: 'Varro', gear: { weapon: 'sword', reserve: 'staff', shield: 'round', armor: 'plate', spellbook: 'general', special: 'none' }, level: 54, attack: 69, magic: 68, defense: 25, strength: 73, ranged: 54, maxHP: 108, direction: 1, color: [157, 62, 42], trim: [242, 143, 96], wins: 0 },
+  { name: 'Cassian', gear: { weapon: 'spear', reserve: 'crossbow', shield: 'round', armor: 'leather', spellbook: 'glacial', special: 'none' }, level: 57, attack: 64, magic: 80, defense: 28, strength: 63, ranged: 76, maxHP: 100, direction: -1, color: [49, 102, 110], trim: [143, 208, 202], wins: 0 }
 ];
 
 function equipmentPicker(fighter, prefix, type, choices) {
@@ -182,6 +187,10 @@ function equipmentPicker(fighter, prefix, type, choices) {
     const lines = [item.name];
     if (type === 'spellbook') {
       lines.push(item.focus, ...item.spells.map(key => spells[key].name + ' · ' + spells[key].cost + ' MP'));
+    } else if (type === 'special') {
+      if (key === 'none') lines.push('No special weapon');
+      else lines.push(item.effect, 'A special ' + weapons[item.weapon].name + ' · Replaces the main weapon if neither slot holds one',
+        'Generated fighters carry one ' + Math.round(specialChance * 100) + '% of the time');
     } else if (type === 'reserve' && key === 'none') {
       lines.push('Travel lighter with one weapon');
     } else if (type === 'weapon' || type === 'reserve') {
@@ -208,6 +217,7 @@ function equipmentPicker(fighter, prefix, type, choices) {
     if (state === 'ready') {
       applyGear(fighter);
       updateStats(fighter);
+      updateSpecialHud(fighter);
     }
     Object.values(fighter.loadout).forEach(picker => picker.describe());
     updateGearNote(fighter);
@@ -219,7 +229,7 @@ function equipmentPicker(fighter, prefix, type, choices) {
 
 fighters.forEach((fighter, index) => {
   const prefix = index === 0 ? 'red-' : 'blue-';
-  fighter.hud = Object.fromEntries(['hp', 'meter', 'mp', 'mana', 'ep', 'energy', 'stance', 'balance', 'stats', 'loadout', 'book', 'queued', 'spells', 'level', 'active']
+  fighter.hud = Object.fromEntries(['hp', 'meter', 'mp', 'mana', 'ep', 'energy', 'stance', 'balance', 'stats', 'loadout', 'book', 'queued', 'spells', 'level', 'active', 'special']
     .map(key => [key, document.getElementById(prefix + key)]));
   fighter.loadout = Object.fromEntries(Object.entries(gearChoices)
     .map(([type, choices]) => [type, equipmentPicker(fighter, prefix, type, choices)]));
@@ -327,6 +337,10 @@ function applyGear(fighter) {
   gear.shield = assign('shield');
   gear.armor = assign('armor');
   gear.spellbook = assign('spellbook');
+  const specialPick = fighter.loadout.special.value;
+  gear.special = specialPick !== 'auto' ? specialPick : previous.special || 'none';
+  const base = specials[gear.special]?.weapon;
+  if (base && gear.weapon !== base && gear.reserve !== base) gear.weapon = base;
   fighter.gear = gear;
   fighter.weapon = gear.weapon;
   applySpellbook(fighter);
@@ -340,7 +354,7 @@ function updateStats(fighter) {
   for (const [name, value] of Object.entries(stats)) fighter.stats[name].textContent = value;
   fighter.hud.level.textContent = 'Lv ' + fighter.level;
   const stowed = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
-  fighter.hud.active.textContent = weapons[fighter.weapon].name + ' held' + (weapons[stowed] ? ' · ' + weapons[stowed].name + ' stowed' : ' · No spare')
+  fighter.hud.active.textContent = weaponName(fighter, fighter.weapon) + ' held' + (weapons[stowed] ? ' · ' + weaponName(fighter, stowed) + ' stowed' : ' · No spare')
     + (shieldReady(fighter) ? '' : ' · Shield on back');
   const power = (weapons[fighter.weapon].spellPower || 1) * armorPower(fighter, 'magic');
   for (const key of fighter.spells) {
@@ -617,9 +631,23 @@ function variantWeapon(key, along, limb, paint) {
   return false;
 }
 
+function specialTint(fighter, special) {
+  const names = { metal, leather, armor, bronze, darkSteel, trim: fighter.trim };
+  const swaps = new Map(Object.entries(special.palette).map(([name, color]) => [names[name], color]));
+  return color => swaps.get(color) || color;
+}
+
 function weaponModel(fighter, hand, angle, windup, strike, clock, limb, transform, key = fighter.weapon) {
   const along = weaponAxis(hand, angle);
-  const paint = (points, color, light) => surface(points, color, light, transform);
+  // A special reuses its base weapon's model with its own colors and a few extra parts.
+  const special = specialOf(fighter, key);
+  const tint = special ? specialTint(fighter, special) : color => color;
+  if (special) {
+    const plain = limb;
+    limb = (from, to, start, end, color, sides) => plain(from, to, start, end, tint(color), sides);
+  }
+  const paint = (points, color, light) => surface(points, tint(color), light, transform);
+  special?.details?.({ along, limb, paint, fighter, state: fighter.special });
   if (variants[key] && variantWeapon(key, along, limb, paint)) return;
   if (key === 'greatsword') {
     limb(along(-.53), along(.23), [.073, .077], [.066, .065], leather, 8);
@@ -628,7 +656,7 @@ function weaponModel(fighter, hand, angle, windup, strike, clock, limb, transfor
     limb(along(.21), along(1.29), [.185, .065], [.143, .052], metal, 6);
     limb(along(1.29), along(1.63), [.143, .052], [0, 0], metal, 6);
     const ridge = (distance, offset, depth) => shifted(along(distance, offset), 0, 0, depth);
-    surface([ridge(.30, -.026, .058), ridge(.30, .026, .058), ridge(1.42, 0, .047)], darkSteel, 1.05, transform);
+    paint([ridge(.30, -.026, .058), ridge(.30, .026, .058), ridge(1.42, 0, .047)], darkSteel, 1.05);
     return;
   }
   if (key === 'maul') {
@@ -1457,7 +1485,7 @@ function sampleTrails() {
     const tip = weaponSegments(fighter, pose).flatMap(([from, to]) => [from, to])
       .reduce((far, point) => reach(point) > reach(far) ? point : far);
     ArenaEffects.trail(action, worldPoint(fighter, pointBetween(hand, tip, .56)), worldPoint(fighter, tip),
-      action.heavy ? '#ffd493' : '#fff4da');
+      specialOf(fighter, action.key)?.trail || (action.heavy ? '#ffd493' : '#fff4da'));
   }
 }
 
@@ -1787,7 +1815,24 @@ function drawMagic() {
       ctx.lineWidth = 2;
       ctx.stroke();
     }
-    if (fighter.chilledUntil > elapsed || fighter.frozenUntil > elapsed) {
+    const aura = ownedSpecial(fighter)?.aura?.(fighter, fighter.special);
+    if (aura) {
+      const [x, y] = project([fighter.x, 1.2, fighter.z + .35]);
+      magicGlow(x, y, scale * (1.1 + Math.sin(visualClock * 7) * .06), aura);
+    }
+    if (fighter.rootedUntil > elapsed) {
+      // Snare cords wound around the legs, tightening and loosening a little.
+      const [x, y] = project([fighter.x, .05, fighter.z]);
+      ellipse(x, y, scale * .5, scale * .12, '#6d9a4f80');
+      ctx.strokeStyle = specials.snarecaster.color;
+      ctx.lineWidth = 2;
+      for (let loop = 0; loop < 3; loop++) {
+        const [, ly] = project([fighter.x, .14 + loop * .17, fighter.z]);
+        ctx.beginPath();
+        ctx.ellipse(x, ly, scale * (.27 + Math.sin(visualClock * 6 + loop) * .015), scale * .06, .12 * fighter.direction, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else if (fighter.chilledUntil > elapsed || fighter.frozenUntil > elapsed) {
       const [x, y] = project([fighter.x, .23, fighter.z]);
       ellipse(x, y, scale * .52, scale * .13, '#b4e2f27a');
       if (fighter.frozenUntil > elapsed) {
@@ -1875,7 +1920,7 @@ function drawBolt(action) {
   const point = pointBetween(from, target, travel);
   const [x, y] = project(point);
   const tail = project(shifted(point, -attacker.direction * .33, -.015));
-  ctx.strokeStyle = travel > 0 ? '#fae3ac' : '#cdb592';
+  ctx.strokeStyle = action.snare ? specials.snarecaster.color : travel > 0 ? '#fae3ac' : '#cdb592';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(...tail.slice(0, 2));
@@ -2051,6 +2096,8 @@ function supportPriority(fighter, spell) {
 }
 
 function pickAction(attacker, defender) {
+  const locked = ownedSpecial(attacker)?.lockWeapon?.(attacker, attacker.special);
+  if (locked) return { key: locked, style: weaponClass(locked) };
   const keys = weaponKeys(attacker).filter(key => key === attacker.weapon || attacker.energy >= switchCost);
   const targetArmor = armors[defender.gear.armor];
   const distance = Math.abs(attacker.x - defender.x);
@@ -2142,6 +2189,7 @@ function otherFighter(fighter) {
 
 function canGuard(fighter) {
   const own = fighter.action;
+  if (ownedSpecial(fighter)?.noGuard?.(fighter, fighter.special)) return false;
   return shieldReady(fighter) && fighter.stunnedUntil <= elapsed
     && (!own || (own.connected && own.phase > own.hitAt + .12 && !own.bash));
 }
@@ -2171,7 +2219,7 @@ function startAction(attacker, defender, bash = false) {
     spendEnergy(attacker, switchCost);
     attacker.weapon = key;
     updateStats(attacker);
-    logEvent(attacker.name + ' switches to ' + weapons[key].name + ' for ' + switchCost + ' energy.');
+    logEvent(attacker.name + ' switches to ' + weaponName(attacker, key) + ' for ' + switchCost + ' energy.');
   }
   const item = weapons[key];
   const spell = spells[spellKey];
@@ -2185,7 +2233,7 @@ function startAction(attacker, defender, bash = false) {
   const blockChance = (bash ? .12 : spell ? spell.block || 0 : item.block)
     + clamp((defense(defender) - 56) / (spell ? 350 : 150), -.10, .20);
   const guardCost = guard.energy + (handling.heavy ? 7 : 0);
-  const block = shieldReady(defender) && (!spell || spell.damage) && defender.energy >= guardCost
+  const block = shieldReady(defender) && !ownedSpecial(defender)?.noGuard?.(defender, defender.special) && (!spell || spell.damage) && defender.energy >= guardCost
     && (Math.random() < Math.max(.03, blockChance) || (forced.has('perfect') && style === 'melee' && !bash));
   // A well-timed block: easier against telegraphed heavy swings and for high Defense.
   const perfect = block && style === 'melee' && !bash
@@ -2217,6 +2265,7 @@ function startAction(attacker, defender, bash = false) {
     stanceDamage: bash ? 47 * ownShield.bashPower : spell ? 12 : ranged ? 16 : handling.heavy ? 49 : 24 + item.damage * .36,
     duration: hitAt + (bash ? .43 : handling.recovery) + (switched ? .13 : 0)
   };
+  if (!bash && !spell) specialOf(attacker, key)?.modifyAction?.(attacker, attacker.action, attacker.special);
   if (bash) {
     attacker.counterUntil = 0;
     attacker.riposte = false;
@@ -2233,11 +2282,12 @@ function showCurrentAction() {
     .sort((a, b) => b.created - a.created)[0];
   elements.cast.hidden = !current;
   if (!current) return;
-  const name = current.riposte ? 'Riposte bash' : current.bash ? 'Shield bash' : current.spell?.name ?? (current.crowded > .35 ? 'Crowded shot' : weapons[current.key].name);
+  const name = current.riposte ? 'Riposte bash' : current.bash ? 'Shield bash' : current.spell?.name
+    ?? (current.snare ? 'Snare bolt' : current.crowded > .35 ? 'Crowded shot' : weaponName(current.attacker, current.key));
   const label = current.attacker.name + ' · ' + name;
   if (elements.cast.textContent !== label) {
     elements.cast.textContent = label;
-    elements.cast.style.setProperty('--spell-color', current.spell?.color ?? '#e5cf8e');
+    elements.cast.style.setProperty('--spell-color', current.spell?.color ?? specialOf(current.attacker, current.key)?.color ?? '#e5cf8e');
   }
 }
 
@@ -2246,6 +2296,7 @@ function startBout(generated = null) {
   fall = 0;
   hitPause = 0;
   particles.length = 0;
+  scheduled.length = 0;
   ArenaEffects.reset();
   fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
@@ -2269,12 +2320,15 @@ function startBout(generated = null) {
     fighter.frozenUntil = fighter.hastedUntil = 0;
     fighter.shove = fighter.blindUntil = fighter.sandPuff = 0;
     fighter.riposte = fighter.sandUsed = fighter.sandReady = false;
+    fighter.rootedUntil = 0;
+    fighter.special = {};
     fighter.cooldowns = {};
     fighter.reaction = fighter.ragdoll = null;
     updateStats(fighter);
     updateEnergy(fighter);
     updateStance(fighter);
     updateGearNote(fighter);
+    updateSpecialHud(fighter);
   });
   elements.bout.textContent = String(bout).padStart(2, '0');
   const placeholder = document.createElement('li');
@@ -2290,6 +2344,10 @@ function startBout(generated = null) {
 function runBout() {
   state = 'running';
   logEvent('Varro and Cassian enter the arena.');
+  for (const fighter of fighters) {
+    const special = ownedSpecial(fighter);
+    if (special) logEvent(fighter.name + ' carries ' + special.name + ': ' + special.effect.charAt(0).toLowerCase() + special.effect.slice(1) + '.');
+  }
   updateControls();
 }
 
@@ -2437,16 +2495,18 @@ function impact(action, contact) {
     return;
   }
 
-  const name = bash ? 'shield bash' : spell?.name || weapons[action.key].name.toLowerCase();
+  const special = !bash && !spell ? specialOf(attacker, action.key) : null;
+  const name = bash ? 'shield bash' : spell?.name || (special ? special.name : weapons[action.key].name.toLowerCase());
+  const usedName = spell || special ? name : 'the ' + name;
   if (attacker.blindUntil > elapsed && Math.random() < .45) {
     if (style === 'ranged') action.missedShot = true;
     floatLabel(defender, 'MISS', '#d8cbb8', { tag: 'BLINDED' });
-    logEvent(attacker.name + ', blinded by sand, misses with the ' + name + '.');
+    logEvent(attacker.name + ', blinded by sand, misses with ' + usedName + '.');
     return;
   }
   if ((style === 'melee' && !contact) || action.missedShot) {
     floatLabel(defender, 'MISS', '#d8cbb8');
-    logEvent(attacker.name + (action.crowded > .35 ? ' misses a crowded crossbow shot.' : ' misses with the ' + name + '.'));
+    logEvent(attacker.name + (action.crowded > .35 ? ' misses a crowded crossbow shot.' : ' misses with ' + usedName + '.'));
     return;
   }
   const stopped = style === 'melee' ? contact.zone === 'shield' : isGuarding(action);
@@ -2518,12 +2578,12 @@ function impact(action, contact) {
   const weight = actualDamage / defender.maxHP * 2.4 + (zone === 'head' ? .15 : 0) + (action.heavy ? .1 : 0);
   ArenaEffects.shake(defender.hp <= 0 ? 1 : actualDamage ? Math.min(.85, .22 + weight) : .15);
   if (actualDamage) {
-    const weaponName = spell ? spell.name : 'the ' + name;
-    logEvent(attacker.name + ' hits ' + defender.name + (contact ? '’s ' + zone : '') + ' with ' + weaponName + ' for '
+    logEvent(attacker.name + ' hits ' + defender.name + (contact ? '’s ' + zone : '') + ' with ' + usedName + ' for '
       + actualDamage + ' damage.' + (matchup >= 1.2 ? ' Armor weakness.' : ''));
     if (spell) applySpellHit(attacker, defender, spell, actualDamage);
   }
   updateHealth();
+  special?.onLanded?.(attacker, defender, action, actualDamage, attacker.special);
   if (defender.hp > 0) {
     applyStanceDamage(action, (zone === 'head' ? 1.25 : 1) * (actualDamage ? 1 : .36), bash);
     if (action.riposte) {
@@ -2534,6 +2594,10 @@ function impact(action, contact) {
     }
     return;
   }
+  finishBout(attacker, defender, zone, blood);
+}
+
+function finishBout(attacker, defender, zone, blood) {
   defender.ragdoll = makeRagdoll(defender, zone);
   defender.ragdoll.bleeding = blood;
   attacker.wins++;
@@ -2549,6 +2613,47 @@ function impact(action, contact) {
   updateControls();
 }
 
+// Delayed special effects, run on the simulation clock and dropped when the bout ends.
+const scheduled = [];
+function schedule(delay, run) {
+  scheduled.push({ at: elapsed + delay, run });
+}
+
+function runScheduled() {
+  for (let i = 0; i < scheduled.length && state === 'running'; i++) {
+    if (scheduled[i].at > elapsed) continue;
+    const [{ run }] = scheduled.splice(i--, 1);
+    run();
+  }
+}
+
+// Damage from a special, outside the normal hit roll. It ignores blocks and wards but can end the bout.
+function specialHit(attacker, defender, amount, { special, tag, message }) {
+  if (state !== 'running' || defender.hp <= 0) return;
+  const damage = Math.min(defender.hp, Math.max(1, Math.round(amount)));
+  defender.hp -= damage;
+  defender.reaction = { zone: 'body', time: elapsed };
+  hitPause = .06;
+  floatLabel(defender, '−' + damage, special.color, { tag, power: damage / defender.maxHP });
+  ArenaEffects.shake(defender.hp <= 0 ? 1 : .6);
+  burst(defender, { colors: [special.color, '#ffffff'], count: 26 });
+  logEvent(attacker.name + ' ' + message + ' ' + defender.name + ' with ' + special.name + ' for ' + damage + ' damage.');
+  updateHealth();
+  if (defender.hp <= 0) finishBout(attacker, defender, 'body', false);
+  else applyStanceDamage({ defender, stanceDamage: 30 }, 1);
+}
+
+function updateSpecialHud(fighter) {
+  const special = ownedSpecial(fighter);
+  const element = fighter.hud.special;
+  element.hidden = !special;
+  if (!special) return;
+  const text = special.icon + ' ' + special.name + ' · ' + special.status(fighter, fighter.special);
+  if (element.textContent !== text) element.textContent = text;
+  element.style.setProperty('--special-color', special.color);
+  element.title = special.effect;
+}
+
 function updateEffects(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const particle = particles[i];
@@ -2562,7 +2667,7 @@ function updateEffects(dt) {
 }
 
 function freshMatchup() {
-  return ArenaMatchups.generate(fighters, { weapons, armors, shields, spellbooks });
+  return ArenaMatchups.generate(fighters, { weapons, armors, shields, spellbooks, specials, specialChance });
 }
 
 function nextBoutNumber() {
@@ -2722,9 +2827,13 @@ function update(dt, realTime) {
     if (fighter.wardUntil <= elapsed) fighter.ward = 0;
   }
   updateMana();
+  runScheduled();
+  if (state !== 'running') return;
   for (const fighter of fighters) {
     if (elapsed - fighter.lastStanceHit > 1.35) fighter.stance = Math.max(0, fighter.stance - dt * 13);
     updateStance(fighter);
+    ownedSpecial(fighter)?.onUpdate?.(fighter, fighter.special);
+    updateSpecialHud(fighter);
     const rival = otherFighter(fighter);
     if (fighter.sandReady) {
       const threat = rival.action && !rival.action.connected && rival.action.style === 'melee';

@@ -99,6 +99,18 @@
       </ul>
     </section>
 
+    <section class="record" id="specials">
+      <h2>Weapon specials</h2>
+      <p>A generated fighter has a 5% chance to carry a special weapon, which replaces a main or backup weapon of the same style (pure mages never roll one). The <b>Special</b> picker under <i>Show gear, stats &amp; spells</i> sets one before a fight for testing; it replaces the main weapon if neither slot holds the base weapon. Specials reuse their base weapon's model with new colors and small details, and their state shows under the fighter's stance bar.</p>
+      <table>
+        <tr><th>Special</th><th>Base</th><th>Effect</th></tr>
+        <tr><td>ϟ Stormbrand</td><td>Sword</td><td>Once per bout, on the third landed hit, lightning strikes the target for 14 + Magic ÷ 12 magic damage (times the armor's magic matchup) and drains 20 energy. Ignores blocks and wards.</td></tr>
+        <tr><td>⌇ Snarecaster</td><td>Crossbow</td><td>Bolts are snare bolts until one lands (not blocked or missed). That bolt roots the target in place for 3 seconds: no movement or dodges, attacks still allowed. Once per bout.</td></tr>
+        <tr><td>✠ Last Oath</td><td>Greatsword</td><td>When the holder falls below 10% health, the oath holds for the rest of the bout: the fighter uses only Last Oath, deals +60% damage, heals 40% of damage dealt, and cannot block.</td></tr>
+      </table>
+      <p>To test Last Oath without waiting for low health, open <code>index.html?force=oath</code>: the oath takes hold at the first damage.</p>
+    </section>
+
     <section class="record" id="gear">
       <h2>Gear</h2>
       <p>Each fighter carries a main weapon, an optional backup, a shield, armor and a spellbook. Variants shift their family’s numbers.</p>
