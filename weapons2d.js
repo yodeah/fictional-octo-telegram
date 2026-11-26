@@ -170,4 +170,19 @@
       shape(g, 'M-52,-7 L-64,-6 L-66,6 L-52,7 Z', steelAcross(g, 7, c.brass), 1.2);
     }
   };
+
+  art.spear = {
+    box: [-124, -26, 184, 26],
+    draw(g, c) {
+      haft(g, c.wood, -118, 128, 3);
+      wrap(g, c.grip, -16, 16, 3.8);
+      shape(g, 'M-122,0 L-116,-3.4 L-108,-3.6 L-108,3.6 L-116,3.4 Z', steelAcross(g, 4, c.iron), 1.1);
+      // Tassel under the head.
+      for (let i = 0; i < 7; i++) stroke(g, `M122,${i < 4 ? 3 : -3} q-${6 + i},${(i % 4) * 3 * (i < 4 ? 1 : -1)} -${12 + i * 1.4},${(8 + i % 3 * 4) * (i < 4 ? 1 : -1)}`, tone(c.team, (i % 3) * .14 - .1), 1.5);
+      shape(g, 'M118,-4.4 L134,-3.4 L134,3.4 L118,4.4 Z', steelAcross(g, 4.4, c.brass), 1.1);
+      metal(g, 'M132,-3.4 C140,-12 150,-11 158,-9 L179,0 L158,9 C150,11 140,12 132,3.4 Z', 11, c.steel, 29);
+      stroke(g, 'M134,0 L176,0', tone(c.iron, -.15), 1.4);
+      stroke(g, 'M134,-1 L170,-1', 'rgba(255,255,255,.7)', .6);
+    }
+  };
 })();
