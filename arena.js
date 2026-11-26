@@ -46,9 +46,9 @@ const shields = {
   round: { name: 'Round shield', defense: 20, mobility: 1, energy: 15, bashTempo: 1, bashPower: 1, width: .34, height: .43, shape: 1 },
   tower: { name: 'Tower shield', defense: 34, mobility: .76, energy: 22, bashTempo: .82, bashPower: 1.4, width: .40, height: .61, shape: .66 }
 };
-// Testing only: ?force=perfect,wall,sand,oath,mender,pull makes those events trigger whenever they can,
+// Testing only: ?force=perfect,wall,sand,oath,mender,pull,verdict makes those events trigger whenever they can,
 // and ?force=behead (impale, launch, shatter, pin) picks that finisher for every kill
-// (oath and mender: at any health below full; pull: at a shorter distance).
+// (oath, mender and verdict: at any health below full; pull: at a shorter distance).
 const forced = new Set((new URLSearchParams(location.search).get('force') || '').split(',').filter(Boolean));
 const perfectColor = '#ffe9a8';
 const sandColors = ['#e2c98f', '#c9a96b', '#f1deb0'];
@@ -2638,7 +2638,7 @@ function impact(action, contact) {
   defender.reaction = { zone, time: elapsed };
   hitPause = zone === 'head' ? .066 : .045;
   defender.hp -= actualDamage;
-  hurt(defender, actualDamage);
+  hurt(defender, actualDamage, attacker, style);
   const weight = actualDamage / defender.maxHP * 2.4 + (zone === 'head' ? .15 : 0) + (action.heavy ? .1 : 0);
   ArenaEffects.shake(defender.hp <= 0 ? 1 : actualDamage ? Math.min(.85, .22 + weight) : .15);
   if (actualDamage) {
@@ -2648,6 +2648,8 @@ function impact(action, contact) {
   }
   updateHealth();
   special?.onLanded?.(attacker, defender, action, actualDamage, attacker.special);
+  // A special can end the bout itself (an execution), and then there is nothing left to resolve.
+  if (state !== 'running') return;
   if (defender.hp > 0) {
     applyStanceDamage(action, (zone === 'head' ? 1.25 : 1) * (actualDamage ? 1 : .36), bash);
     if (action.riposte) {
@@ -2699,7 +2701,7 @@ function specialHit(attacker, defender, amount, { special, tag, message }) {
   if (state !== 'running' || defender.hp <= 0) return;
   const damage = survivable(defender, attacker, Math.min(defender.hp, Math.max(1, Math.round(amount))));
   defender.hp -= damage;
-  hurt(defender, damage);
+  hurt(defender, damage, attacker, 'special');
   defender.reaction = { zone: 'body', time: elapsed };
   hitPause = .06;
   floatLabel(defender, '−' + damage, special.color, { tag, power: damage / defender.maxHP });
@@ -2717,8 +2719,22 @@ function survivable(defender, attacker, damage) {
   return defender.hp - 1;
 }
 
-function hurt(fighter, damage) {
-  if (damage > 0) ownedSpecial(fighter)?.onHurt?.(fighter, damage, fighter.special);
+// Kind is the attack style ('melee', 'ranged', 'magic') or 'special', 'burn' or 'thorns' for other damage.
+function hurt(fighter, damage, source, kind) {
+  if (damage > 0) ownedSpecial(fighter)?.onHurt?.(fighter, damage, fighter.special, source, kind);
+}
+
+// Small damage from a special or status, outside the hit roll. It can end the bout, and passing the
+// action lets a finisher react to it.
+function chipDamage(source, target, amount, { color, tag, kind, action = null, zone = 'body' }) {
+  if (state !== 'running' || target.hp <= 0) return 0;
+  const damage = survivable(target, source, Math.min(target.hp, Math.max(1, Math.round(amount))));
+  target.hp -= damage;
+  hurt(target, damage, source, kind);
+  floatLabel(target, '−' + damage, color, { tag, power: damage / target.maxHP });
+  updateHealth();
+  if (target.hp <= 0) finishBout(source, target, zone, false, action);
+  return damage;
 }
 
 const fireColors = ['#ff8a3d', '#ffc15a', '#ff5a2a'];
@@ -2739,16 +2755,8 @@ function burnStep(fighter, dt) {
   if (Math.random() < dt * 14) burst(fighter, { y: .5 + Math.random() * 1.2, colors: fireColors, count: 2, gravity: -1.5 });
   if ((fighter.burnTick -= dt) > 0) return;
   fighter.burnTick = .5;
-  const source = fighter.burnSource;
-  const damage = survivable(fighter, source, Math.min(2, fighter.hp));
-  fighter.hp -= damage;
-  hurt(fighter, damage);
-  floatLabel(fighter, '−' + damage, fireColors[0], { tag: 'BURN' });
-  updateHealth();
-  if (fighter.hp <= 0) {
-    logEvent(fighter.name + ' burns down.');
-    finishBout(source, fighter, 'body', false);
-  }
+  if (fighter.hp <= 2) logEvent(fighter.name + ' is burning down.');
+  chipDamage(fighter.burnSource, fighter, 2, { color: fireColors[0], tag: 'BURN', kind: 'burn' });
 }
 
 function updateSpecialHud(fighter) {

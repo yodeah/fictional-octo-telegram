@@ -17,14 +17,15 @@ Fights stay fully idle (see README): ideas must not add in-fight input.
 | 5 | **Headless balance runner** | 4 | 35k | 1.1 | `?balance` steps `update()` without drawing for a few thousand generated bouts and prints win rates by weapon, special, armor and spellbook. Agents already do this by hand from the console. |
 | 6 | **Status icons over fighters** | 3 | 30k | 1.0 | Small icons above the health bar for burning, rooted, blinded, frozen and staggered, so effects read at a glance. |
 | 7 | **Attack stat matters** | 2 | 20k | 1.0 | Attack currently does almost nothing. Give it a small accuracy or block-penetration effect. |
-| 8 | **Slow motion on the killing blow** | 4 | 45k | 0.9 | Drop to 0.3× for half a second with a slight camera push. Pairs with Stage 4 finishers. |
-| 9 | **Synthesized sound** | 5 | 80k | 0.6 | WebAudio clangs, thuds, bolt twangs, spell whooshes and crowd roars, generated in code with no assets, plus a mute toggle. The game is silent today. |
-| 10 | **Bout summary card** | 3 | 50k | 0.6 | After the bout: damage dealt, blocks, perfect blocks, specials used and the turning point. |
-| 11 | **Wall hazards per venue** | 3 | 55k | 0.5 | Build on wall slams: spikes in the Sand Pit, thorns in Fernwood, crumbling stone in the Ruins, each adding a small effect. |
-| 12 | **Seeded replays** | 3 | 70k | 0.4 | Route every simulation roll through one seeded generator so a bout can be replayed exactly. Needed later for offline results. |
-| 13 | **Crowd hype meter** | 3 | 90k | 0.3 | Rises with perfect blocks, specials, staggers and comebacks; a full meter makes the crowd roar and drops a small cosmetic reward. |
-| 14 | **Fighter personalities** | 4 | 120k | 0.3 | Traits such as reckless, patient or showman that shift AI choices (aggression, blocking, sand throws). |
-| 15 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
+| 8 | **Check the special roll rate** | 1 | 10k | 1.0 | Generated fighters got a special 3–4% of the time in tests, below the 5% target, because the previous bout's weapons and pure mages are excluded. Retry the roll on another eligible special or accept the lower rate. |
+| 9 | **Slow motion on the killing blow** | 4 | 45k | 0.9 | Drop to 0.3× for half a second with a slight camera push. Pairs with Stage 4 finishers. |
+| 10 | **Synthesized sound** | 5 | 80k | 0.6 | WebAudio clangs, thuds, bolt twangs, spell whooshes and crowd roars, generated in code with no assets, plus a mute toggle. The game is silent today. |
+| 11 | **Bout summary card** | 3 | 50k | 0.6 | After the bout: damage dealt, blocks, perfect blocks, specials used and the turning point. |
+| 12 | **Wall hazards per venue** | 3 | 55k | 0.5 | Build on wall slams: spikes in the Sand Pit, thorns in Fernwood, crumbling stone in the Ruins, each adding a small effect. |
+| 13 | **Seeded replays** | 3 | 70k | 0.4 | Route every simulation roll through one seeded generator so a bout can be replayed exactly. Needed later for offline results. |
+| 14 | **Crowd hype meter** | 3 | 90k | 0.3 | Rises with perfect blocks, specials, staggers and comebacks; a full meter makes the crowd roar and drops a small cosmetic reward. |
+| 15 | **Fighter personalities** | 4 | 120k | 0.3 | Traits such as reckless, patient or showman that shift AI choices (aggression, blocking, sand throws). |
+| 16 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
 
 ## Adding ideas
 

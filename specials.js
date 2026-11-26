@@ -6,7 +6,7 @@
 //   onLanded(fighter, target, action, damage, state)  after an attack with this weapon lands (not blocked or missed)
 //   onMissed / onBlocked(fighter, target, action, state)  after an attack with this weapon misses or is blocked
 //   onResolved(fighter, target, action, state)  after an attack with this weapon resolves, whatever the outcome
-//   onHurt(fighter, damage, state)          when the owner loses health
+//   onHurt(fighter, damage, state, source, kind)  when the owner loses health (kind: attack style, special, burn or thorns)
 //   onLethal(fighter, attacker, state)      when a blow would kill the owner; true leaves them at 1 HP
 //   onUpdate(fighter, state)                every simulation step while the fighter owns the special
 //   noGuard(fighter, state)                 true stops the fighter from blocking
@@ -319,5 +319,143 @@ const specials = {
     },
     aura: (fighter, state) => state.blazeUntil > elapsed ? '#ff9a3a' : null,
     status: (fighter, state) => state.spent ? 'reborn' : 'rebirth ready'
+  },
+
+  tidecaller: {
+    name: 'Tidecaller', weapon: 'trident', icon: '≈', color: '#6fd3e8', trail: '#b8ecf6',
+    effect: 'Every third landed hit crashes a wave into the target: pushed back 2.2 units (a wall slam if they reach the edge) and attacks slowed for 2 seconds',
+    palette: { metal: [104, 198, 214], bronze: [226, 214, 182], leather: [32, 74, 92] },
+    onLanded(fighter, target, action, damage, state) {
+      state.hits = (state.hits || 0) + 1;
+      if (state.hits % 3 || target.hp <= 0) return;
+      target.shove = Math.max(target.shove, 2.2);
+      target.chilledUntil = Math.max(target.chilledUntil, elapsed + 2);
+      burst(target, { y: .3, direction: fighter.direction, colors: [this.color, '#e8fbff', '#3a9cc0'], count: 36, gravity: 4 });
+      ArenaEffects.dust(target.x, target.z + .2, '#8fd8ea', 20, 1.7);
+      ArenaEffects.shake(.45);
+      floatLabel(target, 'TIDAL WAVE', this.color, { tag: 'PUSHED · SLOWED 2S' });
+      logEvent(fighter.name + '’s Tidecaller crashes a wave into ' + target.name + '.');
+    },
+    details({ along, limb }) {
+      // A spiral shell lashed below the prongs.
+      limb(along(1.30, .07), along(1.20, .13), [.07, .06], [.02, .02], [246, 224, 206], 6);
+    },
+    status: (fighter, state) => ((state.hits || 0) % 3) + '/3 to wave'
+  },
+
+  gamblersClub: {
+    name: 'Gambler’s Club', weapon: 'club', icon: '⚄', color: '#f2d36b', trail: '#f8e6a8',
+    effect: 'Each swing rolls a die: a 6 triples the damage, a 1 deals half and fumbles away 12 energy',
+    palette: { bronze: [214, 46, 52], leather: [40, 70, 48], darkSteel: [236, 230, 214] },
+    modifyAction(fighter, action, state) {
+      action.die = 1 + Math.floor(Math.random() * 6);
+      if (action.die === 6) action.damage *= 3;
+      if (action.die === 1) action.damage *= .5;
+      action.label = 'Gambler’s Club · rolled ' + action.die;
+      state.last = action.die;
+    },
+    roll(fighter, action) {
+      if (action.die === 6) {
+        floatLabel(fighter, 'JACKPOT', this.color, { tag: 'ROLLED 6 · TRIPLE DAMAGE', power: .15 });
+        ArenaEffects.shake(.5);
+        logEvent(fighter.name + ' rolls a 6 with the Gambler’s Club.');
+      } else if (action.die === 1) {
+        spendEnergy(fighter, 12);
+        floatLabel(fighter, 'FUMBLE', '#d8a070', { tag: 'ROLLED 1 · −12 ENERGY' });
+        logEvent(fighter.name + ' rolls a 1 and fumbles.');
+      }
+    },
+    onLanded(fighter, target, action) {
+      this.roll(fighter, action);
+    },
+    onBlocked(fighter, target, action) {
+      if (action.die === 1) this.roll(fighter, action);
+    },
+    onMissed(fighter, target, action) {
+      if (action.die === 1) this.roll(fighter, action);
+    },
+    details({ along, limb }) {
+      // A pair of dice pips studded into the head.
+      for (const t of [.78, .92]) limb(shifted(along(t, .08), 0, 0, .09), shifted(along(t, .08), 0, 0, .12), [.03, .03], [.03, .03], [250, 246, 236], 6);
+    },
+    status: (fighter, state) => state.last ? 'last roll ' + state.last : 'roll the die'
+  },
+
+  briarBlade: {
+    name: 'Briar Blade', weapon: 'falchion', icon: '❦', color: '#8fcf6a', trail: '#c4eaa8',
+    effect: 'Thorns: whoever lands a weapon or bolt on its wielder takes 30% of that damage back (at least 1)',
+    palette: { metal: [118, 148, 96], bronze: [96, 62, 40], leather: [52, 78, 40], darkSteel: [60, 92, 44] },
+    onHurt(fighter, damage, state, source, kind) {
+      if (!source || source === fighter || (kind !== 'melee' && kind !== 'ranged')) return;
+      // Applied a moment later, after the blow that caused it has finished resolving.
+      schedule(.12, () => {
+        const dealt = chipDamage(fighter, source, damage * .3, { color: this.color, tag: 'THORNS', kind: 'thorns' });
+        if (!dealt) return;
+        state.returned = (state.returned || 0) + dealt;
+        burst(source, { colors: [this.color, '#4f7a34'], count: 10, gravity: 3 });
+        logEvent(source.name + ' is cut by the Briar Blade’s thorns for ' + dealt + '.');
+      });
+    },
+    details({ along, limb }) {
+      // Thorns along the back of the blade.
+      for (const t of [.45, .70, .95]) limb(along(t, -.06), along(t + .05, -.15), [.03, .03], [0, 0], [176, 214, 140], 5);
+    },
+    status: (fighter, state) => (state.returned || 0) + ' returned'
+  },
+
+  pendulum: {
+    name: 'Pendulum', weapon: 'twinFlail', icon: '∞', color: '#c79cff', trail: '#e2ccff',
+    effect: 'Momentum: each landed hit in a row makes its swings 12% faster, up to +48%; a miss or block resets it',
+    palette: { metal: [176, 150, 222], armor: [92, 70, 132], leather: [48, 36, 66] },
+    modifyAction(fighter, action, state) {
+      action.tempo *= 1 + .12 * (state.stacks || 0);
+    },
+    onLanded(fighter, target, action, damage, state) {
+      state.stacks = Math.min(4, (state.stacks || 0) + 1);
+      if (state.stacks > 1) floatLabel(fighter, 'MOMENTUM ×' + state.stacks, this.color, { tag: '+' + state.stacks * 12 + '% SPEED' });
+    },
+    reset(fighter, state) {
+      if ((state.stacks || 0) > 1) floatLabel(fighter, 'MOMENTUM LOST', '#a99cc0');
+      state.stacks = 0;
+    },
+    onMissed(fighter, target, action, state) {
+      this.reset(fighter, state);
+    },
+    onBlocked(fighter, target, action, state) {
+      this.reset(fighter, state);
+    },
+    aura: (fighter, state) => state.stacks >= 4 ? '#c79cff' : null,
+    status: (fighter, state) => '×' + (state.stacks || 0) + ' · +' + (state.stacks || 0) * 12 + '% speed'
+  },
+
+  headsmansVerdict: {
+    name: 'Headsman’s Verdict', weapon: 'executioner', icon: '⚖', color: '#d9d2c0', trail: '#f0ead8',
+    effect: 'Once per bout, when the target is below 25% health, the next swing is an unblockable execution that kills if it lands, with a beheading',
+    palette: { metal: [200, 196, 188], leather: [24, 22, 26], bronze: [70, 64, 60], darkSteel: [36, 34, 38] },
+    modifyAction(fighter, action, state) {
+      const target = action.defender;
+      if (state.spent || target.hp >= target.maxHP * (forced.has('verdict') ? 1 : .25)) return;
+      state.spent = true;
+      action.execute = true;
+      action.block = action.perfect = false;
+      action.label = 'Execution';
+      floatLabel(target, 'CONDEMNED', this.color, { tag: 'HEADSMAN’S VERDICT' });
+      logEvent(fighter.name + ' raises the Headsman’s Verdict over ' + target.name + '.');
+    },
+    onLanded(fighter, target, action) {
+      if (!action.execute || target.hp <= 0) return;
+      ArenaEffects.shake(1);
+      logEvent(fighter.name + ' carries out the verdict.');
+      chipDamage(fighter, target, target.hp, { color: this.color, tag: 'EXECUTED', kind: 'special', action, zone: 'head' });
+    },
+    onMissed(fighter, target, action) {
+      if (action.execute) floatLabel(target, 'SPARED', '#d8cbb8', { tag: 'THE VERDICT MISSED' });
+    },
+    details({ along, limb }) {
+      // A hole near the tip and a black tassel on the pommel.
+      limb(shifted(along(1.20, .03), 0, 0, .05), shifted(along(1.20, .03), 0, 0, .07), [.04, .04], [.04, .04], [20, 18, 20], 8);
+      limb(along(-.62), along(-.80, .04), [.03, .03], [.06, .05], [40, 30, 34], 6);
+    },
+    status: (fighter, state) => state.spent ? 'spent' : 'target below 25% HP'
   }
 };

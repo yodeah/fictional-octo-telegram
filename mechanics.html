@@ -114,9 +114,14 @@
         <tr><td>⛰ Earthshaker</td><td>War maul</td><td>Once per bout, after the first 2 seconds, a slam that breaks the target’s stance (1.4 second stagger) whether it hits or is blocked. A missed slam tries again on the next swing.</td></tr>
         <tr><td>⛓ Jailer’s Chain</td><td>Flail</td><td>Once per bout, while holding it with the target more than 3.1 units away, the chain pulls the target to about 1.85 units and cancels the attack they were winding up. Costs 10 energy.</td></tr>
         <tr><td>♆ Phoenix Spear</td><td>Spear</td><td>Once per bout, a killing blow leaves the fighter at 1 HP instead, and the attacker burns for 4 seconds. Works whichever weapon is held.</td></tr>
+        <tr><td>≈ Tidecaller</td><td>Trident</td><td>Every third landed hit crashes a wave: the target is pushed back 2.2 units (a wall slam if they reach the edge) and attacks 24% slower for 2 seconds.</td></tr>
+        <tr><td>⚄ Gambler’s Club</td><td>Bronzewood club</td><td>Each swing rolls a die, shown in the action banner. A 6 triples the damage (JACKPOT). A 1 halves it and costs 12 energy (FUMBLE).</td></tr>
+        <tr><td>❦ Briar Blade</td><td>Falchion</td><td>Thorns: 0.12 seconds after a weapon or bolt hit on the wielder, the attacker takes 30% of that damage (at least 1). Spells, burning and other specials don’t trigger it.</td></tr>
+        <tr><td>∞ Pendulum</td><td>Twin flail</td><td>Each landed hit in a row adds 12% swing speed, up to +48% at ×4 (the fighter glows). A miss or a block resets it.</td></tr>
+        <tr><td>⚖ Headsman’s Verdict</td><td>Executioner blade</td><td>Once per bout, when the target is below 25% health, the next swing is an execution: it can’t be blocked, and if it lands the target dies and is beheaded. A missed execution is spent.</td></tr>
       </table>
       <p><b>Burning</b> deals 2 damage every half second and can finish a bout. Burning again only extends it. Dawn Mender, Last Oath and Phoenix Spear work from either weapon slot; the others need their weapon in hand.</p>
-      <p>To test without waiting, open <code>index.html?force=oath,mender,pull</code> (any subset): Last Oath and Dawn Mender take hold at the first damage, and Jailer’s Chain pulls from 2.4 units.</p>
+      <p>To test without waiting, open <code>index.html?force=oath,mender,pull,verdict</code> (any subset): Last Oath, Dawn Mender and the Headsman’s Verdict take hold at the first damage, and Jailer’s Chain pulls from 2.4 units.</p>
     </section>
 
     <section class="record" id="finishers">
@@ -124,6 +129,7 @@
       <p>The killing blow can end in a finisher. It starts after the winner is decided and only changes how the loser falls and what is drawn, so it never changes who wins. The first match in this list is used:</p>
       <table>
         <tr><th>Finisher</th><th>When</th><th>What you see</th></tr>
+        <tr><td>Beheaded (execution)</td><td>A Headsman’s Verdict execution</td><td>Always a beheading, before any other finisher.</td></tr>
         <tr><td>Shattered</td><td>A frost spell kill, a Winter’s Bite kill, or any kill on a frozen (not rooted) target</td><td>The body turns to ice where it stands, then breaks into shards.</td></tr>
         <tr><td>Pinned</td><td>A crossbow bolt kill</td><td>The body is knocked back and pinned to the ground with the bolt standing out of it.</td></tr>
         <tr><td>Beheaded</td><td>A slashing weapon’s head hit (swords, greatswords, axes, halberd)</td><td>The head flies off and tumbles; the neck sprays blood.</td></tr>

@@ -17,6 +17,7 @@ const finisherTypes = {
 function chooseFinisher(attacker, defender, zone, action) {
   const pick = Object.keys(finisherTypes).find(type => forced.has(type));
   if (pick) return pick;
+  if (action?.execute) return 'behead';
   const key = action?.key;
   const iced = action?.spell?.ice || (key && specialOf(attacker, key) === specials.wintersBite)
     || (defender.frozenUntil > elapsed && defender.rootedUntil <= elapsed);
