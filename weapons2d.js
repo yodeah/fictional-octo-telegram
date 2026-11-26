@@ -284,13 +284,14 @@
       haft(g, c.wood, -30, 70, 3.5);
       wrap(g, c.grip, -23, 10, 4.3);
       for (const x of [18, 56]) band(g, c.iron, x, 4.6);
-      // Flanged head seen from the side.
+      // Flanged head: two flanges in profile and one facing the viewer.
       for (const s of [-1, 1]) {
-        metal(g, `M62,${s * 7} L70,${s * 22} L78,${s * 17} L86,${s * 22} L96,${s * 7} Z`, 22, c.steel, 71);
-        stroke(g, `M78,${s * 7} L78,${s * 17}`, tone(c.iron, -.2), 1.2);
+        metal(g, `M62,${s * 7} C66,${s * 14} 68,${s * 20} 72,${s * 24} L79,${s * 16} L90,${s * 22} C94,${s * 16} 96,${s * 11} 98,${s * 7} Z`, 24, c.steel, 71);
+        shape(g, `M66,${s * 9} L73,${s * 19} L79,${s * 12} L89,${s * 18} L94,${s * 8} Z`, 'rgba(20,20,35,.28)', 0);
       }
-      shape(g, 'M60,-8 C70,-11 88,-11 98,-8 L98,8 C88,11 70,11 60,8 Z', steelAcross(g, 11, c.iron), 1.3);
-      metal(g, 'M64,-3.6 L92,-3.6 L96,0 L92,3.6 L64,3.6 Z', 4, c.steel, 73);
+      shape(g, 'M61,-8 C72,-10 88,-10 98,-7 L98,7 C88,10 72,10 61,8 Z', steelAcross(g, 10, c.iron), 1.3);
+      metal(g, 'M64,-2.8 L75,-6 L84,-3.4 L95,-4 L99,0 L95,4 L84,3.4 L75,6 L64,2.8 Z', 6, c.steel, 73);
+      stroke(g, 'M66,0 L96,0', 'rgba(255,255,255,.75)', .9);
       shape(g, 'M97,-5 L106,0 L97,5 Z', steelAcross(g, 5, c.brass), 1.1);
       band(g, c.brass, 61, 8.6, 4);
       disc(g, -32, 0, 4.4, gradient(g, -36, -4, -28, 4, c.brass, [.6, -.4]), 1.1);
