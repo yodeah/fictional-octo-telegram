@@ -201,4 +201,22 @@
       shape(g, 'M-119,0 L-112,-4 L-108,0 L-112,4 Z', tone(c.brass, 0), 1);
     }
   };
+
+  art.halberd = {
+    box: [-120, -28, 192, 38],
+    draw(g, c) {
+      haft(g, c.wood, -115, 148, 3.3);
+      wrap(g, c.grip, -16, 16, 4);
+      for (const x of [-112, -19, 17]) band(g, c.brass, x, 4.6);
+      // Axe blade on one side (+y), hook on the other, spike on top.
+      metal(g, 'M124,2 L129,31 C141,34 154,32 160,27 C168,22 173,15 177,9 L157,-1 L120,0 Z', 33, c.steel, 41);
+      stroke(g, 'M129,28 C142,31 156,29 171,13', 'rgba(255,255,255,.8)', 1.2);
+      disc(g, 146, 15, 3.4, tone(c.iron, -.4), .9);
+      metal(g, 'M134,-3 C138,-12 142,-20 132,-25 C146,-24 152,-14 152,-3 Z', 24, c.steel, 43);
+      metal(g, 'M148,-5 L166,-3.4 L189,0 L166,3.4 L148,5 Z', 6, c.steel, 47);
+      shape(g, 'M116,-4.6 L154,-4.6 L154,4.6 L116,4.6 Z', steelAcross(g, 4.6, c.iron), 1.1);
+      for (const x of [122, 134, 146]) rivet(g, x, 0, 1.4, c.brass);
+      shape(g, 'M-119,0 L-112,-4 L-108,0 L-112,4 Z', tone(c.iron, 0), 1);
+    }
+  };
 })();
