@@ -743,4 +743,9 @@
     }
     for (const [x, y] of [[40, -3], [92, -17]]) disc(g, x, y, 2.4, '#c4445a', .8);
   });
+
+  special('pendulum', 'twinFlail', { steel: [188, 164, 230], iron: [98, 76, 140], brass: [214, 196, 244], grip: [60, 44, 84], wood: [76, 58, 100], teamCss: '#d8b4ff' }, g => {
+    stroke(g, 'M26,0 a8,5 0 1 1 8,0 a8,5 0 1 0 8,0', '#eadcff', 1.5);
+    disc(g, 57, 0, 3.6, '#c79cff', 1);
+  }, { glow: { x: 58, color: 'blue' } });
 })();
