@@ -49,6 +49,10 @@ Pause or change speed to control how you watch a bout. Auto-rematch runs back-to
 
 The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and lists improvement ideas. Its numbers are written by hand, so update it when combat values change.
 
+## Combat effects
+
+Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake on the finishing blow. The shake is off when the system asks for reduced motion. All effects live in `effects.js` and are cosmetic: they never change fight state or use the simulation's random rolls.
+
 ## Armor geometry
 
 The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents, leather submits 853, and robes submit 695. The nine original weapons each submit at least twice as many triangle equivalents as before the armory expansion. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.

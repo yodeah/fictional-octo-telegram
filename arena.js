@@ -1636,7 +1636,14 @@ function resize() {
 }
 
 function draw() {
+  // The still backdrop underneath fills the edges that a shake uncovers.
   ctx.drawImage(backdrop, 0, 0, width, height);
+  const [shakeX, shakeY] = ArenaEffects.offset();
+  ctx.save();
+  if (shakeX || shakeY) {
+    ctx.translate(shakeX * scale, shakeY * scale);
+    ctx.drawImage(backdrop, 0, 0, width, height);
+  }
   scenery.draw(width, height, sceneryClock);
   for (const stain of stains) {
     const [x, y] = project([stain.x, 0, stain.z]);
@@ -1669,6 +1676,7 @@ function draw() {
     const [x, y] = project([particle.x, particle.y, particle.z]);
     ellipse(x, y, particle.size, particle.size * .82, particle.color);
   }
+  ctx.restore();
   for (const label of labels) {
     const [x, y] = project([label.x, label.y + label.age * .53, label.z + .3]);
     ctx.globalAlpha = clamp((label.life - label.age) * 3, 0, 1);
@@ -1932,6 +1940,7 @@ function startBout(generated = null) {
   fall = 0;
   hitPause = 0;
   particles.length = labels.length = stains.length = 0;
+  ArenaEffects.reset();
   fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
     fighter.z = fighter.gait = fighter.velocity = 0;
@@ -2084,6 +2093,7 @@ function breakStance(fighter, duration) {
   fighter.action = null;
   fighter.velocity = -fighter.direction * .55;
   updateStance(fighter);
+  ArenaEffects.shake(.55);
   floatLabel(fighter, 'STAGGERED', '#f4c483', true, 2.34);
   logEvent(fighter.name + ' staggers and drops their guard.');
 }
@@ -2120,6 +2130,7 @@ function impact(action, contact) {
     defender.counterUntil = elapsed + (action.heavy ? .95 : .56);
     defender.reaction = { zone: 'arm', time: elapsed };
     hitPause = .035;
+    ArenaEffects.shake(action.heavy ? .45 : .22);
     floatLabel(defender, 'BLOCKED', '#ffe2a0', true);
     burst(defender, { point, offset: -attacker.direction * .56, y: 1.55, direction: -attacker.direction, colors: ['#ffe3a1', spell?.color || '#fff6dd'], count: 13, gravity: 9 });
     logEvent(defender.name + ' blocks ' + attacker.name + '’s ' + name + '.');
@@ -2161,6 +2172,8 @@ function impact(action, contact) {
   defender.reaction = { zone, time: elapsed };
   hitPause = zone === 'head' ? .066 : .045;
   defender.hp -= actualDamage;
+  const weight = actualDamage / defender.maxHP * 2.4 + (zone === 'head' ? .15 : 0) + (action.heavy ? .1 : 0);
+  ArenaEffects.shake(defender.hp <= 0 ? 1 : actualDamage ? Math.min(.85, .22 + weight) : .15);
   if (actualDamage) {
     const weaponName = spell ? spell.name : 'the ' + name;
     logEvent(attacker.name + ' hits ' + defender.name + (contact ? '’s ' + zone : '') + ' with ' + weaponName + ' for '
@@ -2393,7 +2406,10 @@ function frame(now) {
   lastFrame = now;
   const speed = speeds[speedIndex];
   sceneryClock += dt;
-  if (state !== 'paused') visualClock += dt;
+  if (state !== 'paused') {
+    visualClock += dt;
+    ArenaEffects.frame(dt);
+  }
   if (dt > 0) {
     const steps = Math.max(speed, Math.ceil(dt * speed * 60));
     for (let step = 0; step < steps; step++) update(dt * speed / steps, dt / steps);
