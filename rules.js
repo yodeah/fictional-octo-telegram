@@ -26,6 +26,7 @@ const Rules = (() => {
   const woundBelow = .2;
   const tacticKeys = ['balanced', 'aggressive', 'defensive'];
   const aimKeys = ['any', 'head', 'body', 'arm', 'leg'];
+  const triggerKeys = ['auto', 'ready', 'hurt', 'finish', 'tired'];
   const catalog = {
     club: { slot: 'weapon', price: 20, act: 0 },
     sword: { slot: 'weapon', price: 60, act: 0 },
@@ -69,7 +70,7 @@ const Rules = (() => {
       config: { level: 40, strength: 66, attack: 64, ranged: 50, magic: 60, defense: 22, maxHP: 270, gear: { weapon: 'executioner', reserve: 'none', shield: 'none', armor: 'fortress', special: 'headsmansVerdict' }, spellList: ['arc'] } }
   ];
   const renownNeeded = [4, 6, 6, 8];
-  const spellPool = ['ember', 'ward', 'heal', 'drain', 'frost', 'arc', 'shell', 'tailwind', 'surge', 'thunder'];
+  const spellPool = ['ember', 'ward', 'heal', 'drain', 'frost', 'arc', 'shell', 'tailwind', 'surge', 'thunder', 'barrage', 'pact'];
   const opponentGear = [
     { weapon: ['club', 'spear', 'sword', 'axe'], armor: ['rags', 'rags', 'leather'], shield: ['none', 'none', 'buckler'] },
     { weapon: ['sword', 'spear', 'axe', 'mace', 'flail', 'rapier', 'falchion', 'crossbow'], armor: ['leather', 'bronze', 'scout'], shield: ['buckler', 'round', 'none'] },
@@ -110,6 +111,25 @@ const Rules = (() => {
     return total * races[run.race].training;
   }
 
+  // Saves from before triggers existed have none.
+  const triggerFor = (run, spell) => run.triggers?.[spell] || 'auto';
+
+  function setTrigger(run, spell, key) {
+    if (run.learned.includes(spell) && triggerKeys.includes(key)) run.triggers = { ...run.triggers, [spell]: key };
+  }
+
+  // From the second act the market sells one torn page per act.
+  const pageCost = run => 50 + 30 * run.learned.length;
+  const pageOnSale = run => run.act >= 1 && run.pageAct !== run.act && spellPool.some(key => !run.learned.includes(key));
+
+  function buyPage(run) {
+    if (run.over || run.pending || run.spellChoices || !pageOnSale(run) || run.gold < pageCost(run)) return false;
+    run.gold -= pageCost(run);
+    run.pageAct = run.act;
+    offerSpells(run);
+    return true;
+  }
+
   function heroConfig(run) {
     const weaponKey = key => trophies[key] || key;
     const { weapon, reserve, shield, armor } = run.equipped;
@@ -131,6 +151,7 @@ const Rules = (() => {
       trim: [242, 143, 96],
       lifesteal: races[run.race].lifesteal,
       spellList: run.spells.slice(),
+      triggers: Object.fromEntries(run.spells.filter(key => triggerFor(run, key) !== 'auto').map(key => [key, triggerFor(run, key)])),
       health: run.health,
       gear: { weapon: weaponKey(weapon), reserve: reserve === 'none' ? 'none' : weaponKey(reserve), shield, armor, spellbook: 'none', special }
     };
@@ -183,7 +204,7 @@ const Rules = (() => {
       gold: 40 + startAct * 120, day: 1, act: startAct, renown: 0, health: 1, mercy: true, debtMisses: 0,
       inventory: ['club'], equipped: { weapon: 'club', reserve: 'none', shield: 'none', armor: 'rags' },
       tactic: 'balanced', aimAt: 'any', wounds: [],
-      spells: [], learned: [], spellChoices: null, spellsOwed: startAct, wins: 0, fights: 0, pending: null, over: null
+      spells: [], triggers: {}, learned: [], spellChoices: null, spellsOwed: startAct, wins: 0, fights: 0, pending: null, over: null
     };
     if (startAct > 0) {
       run.inventory.push(champions[startAct - 1].trophy);
@@ -382,7 +403,7 @@ const Rules = (() => {
   }
 
   return {
-    races, statNames, wounds, woundDays, woundBelow, tacticKeys, aimKeys, woundsOf, surgeonCost, treat, setTactic, setAim, drills, catalog, trophies, champions, renownNeeded,
+    races, statNames, triggerKeys, spellPool, triggerFor, setTrigger, pageCost, pageOnSale, buyPage, wounds, woundDays, woundBelow, tacticKeys, aimKeys, woundsOf, surgeonCost, treat, setTactic, setAim, drills, catalog, trophies, champions, renownNeeded,
     rollStats, stat, newRun, heroConfig, championConfig, price, sellPrice, shopStock, slotOf, trainingCost, purse, wage,
     debtDue, daysToDebt, championReady, buy, sell, equip, equipped, train, rest, work, startFight, finishFight, learnSpell, toggleSpell
   };

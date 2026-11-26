@@ -29,7 +29,7 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - [x] **1. Playable run** (suggestions 1–3, 4, 5–9, part of 10, 12, 17, 21). Dice and race creation, shipwreck intro, days and debt, market, gear, training, rest, sparring and blood bouts, four champions, one mercy per act, spell pages from champions, autosave, save code, Legacy checkpoints, 50% more health, sudden death, headless tests.
 - [ ] **2. Phone hosting.** Public repository and GitHub Pages from the work branch are live (checked 2026-11-26): https://yodeah.github.io/fictional-octo-telegram/. Home-screen icon and manifest added (2026-11-26). Nothing is left for an agent: the box stays open until you have played from the link on your phone, and the next agent starts stage 3. *Done when the link plays on your phone.*
 - [x] **3. Tactics and injuries** (10, 11). Stance and target on the bout screen; wounds with a surgeon (2026-11-26). Each stance has a matchup only it wins, in `tests/tactics.test.mjs`.
-- [ ] **4. Spellbook rework** (13). More pages, three slots, a trigger per spell. *Done when triggers change outcomes in tests.*
+- [x] **4. Spellbook rework** (13). Market pages, three slots, a trigger per spell chosen on the bout screen (2026-11-26). `tests/spells.test.mjs` shows triggers changing win rates.
 - [ ] **5. Strangers and bargains** (14). Five visitors, each with a shown price. *Done when no bargain is always right or always wrong for the test bot.*
 - [ ] **6. Spectate and bet** (15). Watch champions and others; watching reveals their gear.
 - [ ] **7. Crowd and Charm** (16). Crowd favour changes pay and mercy; Charm changes prices.
@@ -61,6 +61,15 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - Any new energy check in the engine must use the cost after the stance multiplier.
 - Wounds made the sensible bot finish 17 of 30 runs instead of 19 (`node tests/report.mjs`). It pays the surgeon only before a champion; paying every time starves it of debt money.
 - Stance matchups are sensitive to combat changes. If one of those tests fails after a combat edit, check the new rates on a few hundred seeds before picking another matchup.
+
+**Spells and triggers (stage 4)**
+- `spellTriggers` in `arena.js` holds the conditions; `Rules.triggerKeys` mirrors its keys (a test checks it). `mechanics.html` repeats them by hand.
+- A fighter's choice is `fighter.triggers` (`{ spellKey: triggerKey }`, default `null` in `duel.js`). `auto` or missing must change nothing and add no random rolls. Checked against 720 fights from before the change.
+- A due trigger skips the weapon scoring in `pickAction` and casts in slot order (`hero.spellList` order). A held spell is invisible to the old scoring, support spells included.
+- `run.triggers` and `run.pageAct` may be missing in old saves. Use `Rules.triggerFor(run, key)`.
+- All 12 spells can now turn up on pages. The market sells one page per act from act 2 (`Rules.buyPage`). The test bot buys none and sets no triggers.
+- Opponents and champions always cast on their own judgement.
+- Trigger matchups, like stance matchups, are sensitive to combat edits: recheck rates on 100 seeds before changing one.
 
 **2D art (merged 2026-11-26)**
 - 2D is the default; the **Art** button on the fight screen (or `?style=3d`) brings back the 3D meshes. The choice is kept in `localStorage` under `arena-art`.

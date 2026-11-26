@@ -172,6 +172,16 @@ const aimZones = {
   leg: { name: 'Legs', aim: -1.5, swing: 1, dodge: 0, hobble: 2.5, text: 'Leg blows deal less but slow the foe. Axes and mauls rarely reach that low.' }
 };
 const tacticOf = fighter => tactics[fighter.tactic] || tactics.balanced;
+// When to cast each readied spell, chosen before a bout. A trigger holds its spell until the moment comes,
+// then casts it ahead of any weapon. 'auto' changes nothing, so fights saved without triggers replay as before.
+const spellTriggers = {
+  auto: { name: 'Their call' },
+  ready: { name: 'As soon as ready', when: () => true },
+  hurt: { name: 'Below 40% health', when: fighter => fighter.hp < fighter.maxHP * .4 },
+  finish: { name: 'Foe below 40% health', when: (fighter, rival) => rival.hp < rival.maxHP * .4 },
+  tired: { name: 'Below 40 energy', when: fighter => fighter.energy < 40 }
+};
+const triggerOf = (fighter, key) => spellTriggers[fighter.triggers?.[key]]?.when;
 const manaRegen = 3.6;
 const energyRegen = 5;
 const switchCost = 7;
@@ -2516,6 +2526,15 @@ function supportPriority(fighter, spell) {
   return 0;
 }
 
+// A triggered spell is not thrown away on something it cannot do.
+function worthCasting(fighter, spell) {
+  if (spell.heal) return fighter.maxHP - fighter.hp >= spell.heal / 2;
+  if (spell.absorb) return !fighter.ward;
+  if (spell.manaRestore) return fighter.mp <= 100 - spell.manaRestore && fighter.hp > spell.hpCost;
+  if (spell.energyRestore) return fighter.energy <= 75 && fighter.hastedUntil <= elapsed;
+  return true;
+}
+
 function pickAction(attacker, defender) {
   const locked = ownedSpecial(attacker)?.lockWeapon?.(attacker, attacker.special);
   if (locked) return { key: locked, style: weaponClass(locked) };
@@ -2524,7 +2543,15 @@ function pickAction(attacker, defender) {
   const distance = Math.abs(attacker.x - defender.x);
   const crowding = closeRange(distance);
   const opposingCrossbow = weapons[defender.weapon].style === 'ranged';
-  const available = attacker.spells.filter(key => canCast(attacker, key));
+  // A triggered spell whose moment has come goes first, in slot order. A staff carries it if that strengthens it;
+  // Tailwind and Blood Pact gain nothing from one, so they are not worth the cost of switching.
+  const due = attacker.spells.find(key => canCast(attacker, key) && triggerOf(attacker, key)?.(attacker, defender)
+    && worthCasting(attacker, spells[key]));
+  if (due) {
+    const boosted = spells[due].damage || spells[due].heal || spells[due].absorb;
+    return { key: (boosted && keys.find(key => weapons[key].spellPower)) || attacker.weapon, style: 'magic', spellKey: due };
+  }
+  const available = attacker.spells.filter(key => canCast(attacker, key) && !triggerOf(attacker, key));
   const needsSupport = available.some(key => supportPriority(attacker, spells[key]) > 0);
   if (opposingCrossbow && keys.includes('sword') && attacker.energy >= 12 && distance > 1.95 && !needsSupport) {
     return { key: 'sword', style: 'melee' };
@@ -2800,6 +2827,9 @@ function runBout() {
   for (const fighter of fighters) {
     const special = ownedSpecial(fighter);
     if (fighter.tactic && fighter.tactic !== 'balanced') logEvent(fighter.name + ' fights ' + tacticOf(fighter).name.toLowerCase() + 'ly.');
+    for (const key of fighter.spells) {
+      if (triggerOf(fighter, key)) logEvent(fighter.name + ' readies ' + spells[key].name + ': ' + spellTriggers[fighter.triggers[key]].name.toLowerCase() + '.');
+    }
     if (special) logEvent(fighter.name + ' carries ' + special.name + ': ' + special.effect.charAt(0).toLowerCase() + special.effect.slice(1) + '.');
   }
   updateControls();
@@ -2857,13 +2887,15 @@ function applySupportSpell(fighter, spell, power) {
     message = 'wards against ' + fighter.ward + ' damage';
   } else if (spell.manaRestore) {
     const amount = Math.min(spell.manaRestore, 100 - fighter.mp);
+    // Blows taken during the cast must not let the price kill the caster.
+    const price = Math.min(spell.hpCost, fighter.hp - 1);
     fighter.mp += amount;
-    fighter.hp -= spell.hpCost;
+    fighter.hp -= price;
     updateMana();
     updateHealth();
     label = '+' + Math.round(amount) + ' MP';
-    tag = '−' + spell.hpCost + ' HP';
-    message = 'trades ' + spell.hpCost + ' HP for ' + Math.round(amount) + ' MP';
+    tag = '−' + price + ' HP';
+    message = 'trades ' + price + ' HP for ' + Math.round(amount) + ' MP';
   } else {
     const amount = Math.min(spell.energyRestore, 100 - fighter.energy);
     fighter.energy += amount;

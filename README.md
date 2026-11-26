@@ -9,7 +9,8 @@ A gory gladiator autobattler with permanent death, for phone and laptop. Static 
 - Sparring is safe from death; blood bouts and champions are not, apart from one mercy per champion.
 - Before each bout pick a stance (aggressive, balanced, defensive) and where to aim.
 - Ending a bout under a fifth of your health leaves a wound on the part that took the most damage: −10% to one thing for four days, unless you pay the surgeon.
-- Champions give a trophy weapon and a spell page. Mana appears with your first spell.
+- Champions give a trophy weapon and a spell page, and from the second act the market sells one page per act. Mana appears with your first spell.
+- Three spell slots. Before each bout give every spell a trigger (such as below 40% health) or leave it to your gladiator.
 - The game saves itself. A saved fight replays identically after a reload. A save code backs it up.
 - A new gladiator may start at the furthest champion reached (a Legacy).
 

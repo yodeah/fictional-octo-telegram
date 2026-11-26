@@ -80,6 +80,7 @@
       <p>When free, a fighter scores each option and takes the best one. The score weighs damage, the target’s armor, skill, speed, reach, energy, and a penalty for repeating the same weapon.</p>
       <ul>
         <li>Support spells come first when needed: heal at 61% HP or less, ward at 77% or less, Blood Pact at 24 mana or less (with at least 41% HP), Tailwind at 40 energy or less.</li>
+        <li>Those thresholds apply to a spell left to “Their call”. In the game you may give a readied spell a trigger instead (see <a href="#spells">Spells</a>).</li>
         <li>Without a staff in hand, attack spells are only considered some of the time. A staff can always cast, with a free Staff Spark as a fallback. Staves never swing in melee.</li>
         <li>Fighters press crossbow users at close range. A crowded shot loses up to 20% damage and some accuracy.</li>
         <li>Fighters move and act independently, so attacks can overlap. They hold back while the opponent’s shield is raised against them.</li>
@@ -189,6 +190,16 @@
 
     <section class="record" id="spells">
       <h2>Spells</h2>
+      <p>In the game you ready up to three learned spells and pick when each is cast before the bout. Champions drop a spell page, and from the second act the market sells one page per act.</p>
+      <table>
+        <tr><th>Trigger</th><th>When the spell is cast</th></tr>
+        <tr><td>Their call</td><td>The fighter judges, as above</td></tr>
+        <tr><td>As soon as ready</td><td>Whenever mana and cooldown allow</td></tr>
+        <tr><td>Below 40% health</td><td>Only once you are that hurt</td></tr>
+        <tr><td>Foe below 40% health</td><td>Only once the foe is that hurt</td></tr>
+        <tr><td>Below 40 energy</td><td>Only when you are tired</td></tr>
+      </table>
+      <p>A triggered spell is cast at the next free moment, ahead of any weapon, with a staff if you carry one. If several are due, the first slot goes first. It is not wasted: a heal waits until half of it would count, a ward until the last one is gone, Blood Pact until the mana fits and Tailwind until energy is 75 or less. A spell still waiting for its trigger is never cast.</p>
       <table>
         <tr><th>Book</th><th>Spell (mana, cooldown)</th><th>Effect</th></tr>
         <tr><td rowspan="3">General</td><td>Ember Bolt (26, 4.5s)</td><td>19 base damage</td></tr>

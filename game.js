@@ -45,7 +45,8 @@ const Game = (() => {
     wounds: ['Lost health', 'You carry lost health into the next fight. A day heals some; resting heals all.'],
     injury: ['Injuries', 'A wound costs you something until it heals. Resting heals it twice as fast, or pay the surgeon.'],
     tactics: ['Tactics', 'Pick a stance and a target before the bell. The trainer judges the fight with your choice.'],
-    spells: ['Spells', 'Your first spell wakes your mana. You can ready up to three; your gladiator decides when to cast.']
+    spells: ['Spells', 'Your first spell wakes your mana. You can ready up to three. Before each bout you choose when each one is cast.'],
+    triggers: ['Triggers', '“Their call” leaves the moment to your gladiator. Any other trigger holds the spell until it comes true, then casts it at once. If two come true together, the lower-numbered slot goes first.']
   };
   const tip = key => save.seen[key] ? '' : '<aside class="tip"><b>' + tips[key][0] + '</b><p>' + tips[key][1] + '</p>' + button('tip', 'Got it', 'data-key="' + key + '"') + '</aside>';
 
@@ -107,6 +108,15 @@ const Game = (() => {
     return '<h2>Stance</h2>' + pickers('tactic', Rules.tacticKeys, tactics, tactic) + '<p class="small">' + tactics[tactic].text + '</p>'
       + '<h2>Aim at</h2>' + pickers('aim', Rules.aimKeys, aimZones, aim) + '<p class="small">' + aimZones[aim].text
       + (melee ? '' : ' Targets only guide melee blows, and you carry no melee weapon.') + '</p>';
+  }
+
+  // The three spell slots and when each fires.
+  function triggerPanel() {
+    const run = save.run;
+    if (!run.spells.length) return '';
+    return tip('triggers') + '<h2>Spell slots</h2>' + run.spells.map((key, index) => '<label class="field">' + (index + 1) + ' · ' + spells[key].name + ' · ' + spells[key].cost + ' mana'
+      + '<select data-trigger="' + key + '">' + Rules.triggerKeys.map(trigger => '<option value="' + trigger + '"' + (Rules.triggerFor(run, key) === trigger ? ' selected' : '') + '>'
+        + spellTriggers[trigger].name + '</option>').join('') + '</select></label>').join('');
   }
 
   function woundList(run, treatable) {
@@ -185,7 +195,7 @@ const Game = (() => {
       return scene('arena') + '<h2>' + { spar: 'Sparring', blood: 'Blood bout', champion: 'Champion' }[kind] + ' · purse about ' + Rules.purse(run, kind) + ' gold</h2>'
         + card({ ...Rules.heroConfig(run) }, '<p class="small">You, at ' + Math.round(run.health * 100) + '% health</p>') + woundList(run)
         + card(foe, '<p class="weak">' + weakness(foe) + '</p>' + (kind === 'champion' ? '<p class="small">' + Rules.champions[run.act].hint + '</p>' : ''))
-        + tip('tactics') + tacticsPanel()
+        + tip('tactics') + tacticsPanel() + triggerPanel()
         + '<p class="read ' + (read?.[0] || '') + '">Trainer: ' + (read ? read[1] : 'Let me watch you both…') + '</p><p class="small ' + (kind === 'spar' ? '' : 'warn') + '">' + risk + (kind === 'spar' ? '' : ' Win with under a fifth of your health and you carry a wound.') + '</p>'
         + button('fight', 'Walk onto the sand', 'class="primary"') + button('back', 'Not today');
     },
@@ -212,7 +222,8 @@ const Game = (() => {
   };
 
   function spellText(spell) {
-    if (spell.heal) return 'Heals you when badly hurt. ' + spell.cost + ' mana.';
+    if (spell.heal) return 'Heals ' + spell.heal + ' or more. ' + spell.cost + ' mana.';
+    if (spell.manaRestore) return spell.effect + '. ' + spell.cost + ' mana.';
     if (spell.absorb) return 'A shield that soaks damage. ' + spell.cost + ' mana.';
     if (spell.energyRestore) return 'Restores energy and speed. ' + spell.cost + ' mana.';
     return (spell.effect || 'A damaging bolt.') + ' · ' + spell.damage + ' damage · ' + spell.cost + ' mana.';
@@ -239,7 +250,9 @@ const Game = (() => {
 
   function marketPanel(run) {
     const stock = Rules.shopStock(run);
-    return scene('market') + tip('market') + ['weapon', 'shield', 'armor'].map(slot => '<h2>' + { weapon: 'Weapons', shield: 'Shields', armor: 'Armor' }[slot] + '</h2><div class="stack">'
+    const page = Rules.pageOnSale(run) ? '<h2>Spell pages</h2><div class="stack">' + button('page', '<b>A torn spell page — ' + Rules.pageCost(run) + ' gold</b><span>Choose one of three spells. One page for sale in each act.</span>',
+      'class="item"' + (run.gold < Rules.pageCost(run) ? ' disabled' : '')) + '</div>' : '';
+    return scene('market') + tip('market') + page + ['weapon', 'shield', 'armor'].map(slot => '<h2>' + { weapon: 'Weapons', shield: 'Shields', armor: 'Armor' }[slot] + '</h2><div class="stack">'
       + stock.filter(key => Rules.slotOf(key) === slot).map(key => {
         const owned = run.inventory.includes(key);
         return button('buy', '<b>' + itemName(key) + ' — ' + (owned ? 'owned' : Rules.price(run, key) + ' gold') + '</b><span>' + itemText(key) + '</span>', 'class="item" data-key="' + key + '"' + (owned || run.gold < Rules.price(run, key) ? ' disabled' : ''));
@@ -255,7 +268,7 @@ const Game = (() => {
     const spare = run.inventory.filter(key => !Rules.equipped(run, key) && Rules.catalog[key]);
     return '<h2>What you carry</h2>' + select('weapon', 'Main weapon') + '<p class="small">' + weaponText(run.equipped.weapon) + '</p>' + select('reserve', 'Backup weapon', 'none') + select('shield', 'Shield', 'none') + select('armor', 'Armor', 'rags')
       + '<p class="small">A backup lets your gladiator switch as the fight changes, but slows them a little.</p>'
-      + (run.learned.length ? '<h2>Spells (ready up to 3)</h2><div class="stack">' + run.learned.map(key => button('spell', '<b>' + (run.spells.includes(key) ? '✔ ' : '') + spells[key].name + '</b><span>' + spellText(spells[key]) + '</span>', 'class="item" data-key="' + key + '" aria-pressed="' + run.spells.includes(key) + '"')).join('') + '</div>' : '')
+      + (run.learned.length ? '<h2>Spells (3 slots)</h2><div class="stack">' + run.learned.map(key => button('spell', '<b>' + (run.spells.includes(key) ? 'Slot ' + (run.spells.indexOf(key) + 1) + ' · ' : '') + spells[key].name + '</b><span>' + spellText(spells[key]) + '</span>', 'class="item" data-key="' + key + '" aria-pressed="' + run.spells.includes(key) + '"')).join('') + '</div>' : '')
       + (spare.length ? '<h2>Sell</h2><div class="stack">' + spare.map(key => button('sell', itemName(key) + ' for ' + Rules.sellPrice(key) + ' gold', 'data-key="' + key + '"')).join('') + '</div>' : '');
   }
 
@@ -332,8 +345,8 @@ const Game = (() => {
     return { name: '', race: 'human', stats: Rules.rollStats(), rerolls: 3, startAct: 0 };
   }
 
-  function retune(choose, key) {
-    choose(save.run, key);
+  function retune(choose, ...picked) {
+    choose(save.run, ...picked);
     store();
     // A fresh object, so a trainer's answer still on its way for the old choice is dropped.
     preview = { ...preview };
@@ -383,6 +396,7 @@ const Game = (() => {
     },
     tactic: key => retune(Rules.setTactic, key),
     aim: key => retune(Rules.setAim, key),
+    page: () => { if (Rules.buyPage(save.run)) { store(); resume(); } },
     treat: part => { Rules.treat(save.run, part); store(); render(true); },
     back: () => go('hub'),
     fight: () => {
@@ -436,6 +450,7 @@ const Game = (() => {
   app.addEventListener('input', event => {
     if (event.target.id === 'name') { save.draft.name = event.target.value; store(); }
     if (event.target.id === 'start') { save.draft.startAct = Number(event.target.value); store(); }
+    if (event.target.dataset.trigger) retune(Rules.setTrigger, event.target.dataset.trigger, event.target.value);
     if (event.target.dataset.slot) {
       Rules.equip(save.run, event.target.dataset.slot, event.target.value);
       store();
