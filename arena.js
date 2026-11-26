@@ -367,6 +367,9 @@ function polygon(points, color) {
   ctx.fill();
 }
 
+// Every fighter, armor and weapon part ends up here. A face costs build, sort and paint time
+// whether or not it ends up visible, so skip faces that can never be seen (as prism() does for
+// back-facing sides). Measured costs per face are in docs/rendering-performance.md.
 function surface(points, color, light, transform) {
   const projected = points.map(point => project(transform(point)));
   const depth = projected.reduce((sum, point) => sum + point[2], 0) / projected.length;
@@ -1893,6 +1896,9 @@ function resize() {
   draw();
 }
 
+// Paints the depth-sorted faces. Canvas 2D fills one path per face; WebGL (gl-renderer.js)
+// batches them and is about 4× cheaper on the main thread at phone size (1.8 ms vs 0.4 ms
+// for 2,347 faces). Build and sort cost the same for both. See docs/rendering-performance.md.
 let glRenderer;
 function paintFaces() {
   if (ArenaBench.renderer === 'webgl' && glRenderer === undefined) glRenderer = ArenaGL.create();
@@ -1904,6 +1910,9 @@ function paintFaces() {
     canvas.width + '×' + canvas.height + ' px');
 }
 
+// Frame order: cached still backdrop, animated scenery, stains and shadows, fighter faces
+// (build → sort → paintFaces), then effects and labels on top. Keep fighter faces in one
+// contiguous paintFaces() call so either renderer can paint them without breaking layering.
 function draw() {
   // The still backdrop underneath fills the edges that a shake uncovers.
   ctx.drawImage(backdrop, 0, 0, width, height);
