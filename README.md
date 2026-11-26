@@ -75,6 +75,10 @@ The second row of buttons finds what limits the frame rate on a device. **Res fu
 
 Measured at phone size on a Mac (60 Hz), both renderers held 60 FPS with no drops at 1× and 3×. WebGL cut main-thread draw time from 3.2 to 2.3 ms at 1× and from 9.2 to 5.0 ms at 3×, and painting alone from 1.8 to 0.4 ms. The first test on a phone reported about 24 FPS on Canvas and 22 FPS on WebGL. The follow-up phone profiling steps and full measurements are in [docs/rendering-performance.md](docs/rendering-performance.md). The plan for doubling geometric detail with a Quality setting is in [docs/detail-rework-plan.md](docs/detail-rework-plan.md).
 
+## 2D art proof of concept
+
+**Art 3D / Art 2D** switches the fighters between the 3D meshes (the default) and detailed 2D cut-out art (`fighter2d.js`). `?style=2d` or `?style=3d` sets it from the address bar, and `?cast=1` or `?cast=2` pins gear that already has 2D art. One armor set per class, the sword, crossbow, staff and round shield are drawn in 2D; other gear keeps its 3D mesh. It changes only the picture. Findings, measurements and the plan are in [docs/2d-art-poc.md](docs/2d-art-poc.md).
+
 ## Armor geometry
 
 The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents on Low and 1,980 on High. Leather goes from 853 to 1,569 and robes go from 695 to 1,281. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.

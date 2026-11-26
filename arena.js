@@ -1442,6 +1442,131 @@ function recordGeometry(parts, name, start) {
   return end;
 }
 
+const torsoLean = ({ joints: j }) => Math.atan2(j.chest[1] - j.hips[1], j.chest[0] - j.hips[0]) - Math.PI / 2;
+
+// Maps a point on the torso (up from the hips) onto the posed spine.
+function torsoTransform(pose) {
+  const j = pose.joints;
+  const angle = torsoLean(pose);
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  return ([x, y, z]) => {
+    const swept = x + z * pose.twist;
+    return [
+      j.hips[0] + swept * cosine - y * sine,
+      j.hips[1] + swept * sine + y * cosine,
+      j.hips[2] + z - x * pose.twist + y * (j.chest[2] - j.hips[2]) / .625
+    ];
+  };
+}
+
+// Where an unused weapon rides on the back or hip, and how much smaller it is drawn there.
+function stowedMount(pose, spare) {
+  const long = ['staff', 'spear', 'crossbow'].includes(weaponFamily(spare)) || weapons[spare].twoHanded;
+  return {
+    mount: torsoTransform(pose)(long ? [-.43, .39, -.51] : [-.39, .03, -.43]),
+    angle: torsoLean(pose) + (long ? 2.0 : -2.34),
+    scale: long ? .80 : .69
+  };
+}
+
+function stowedWeapon(fighter, pose, spare, limb, world) {
+  const { mount, angle, scale: size } = stowedMount(pose, spare);
+  const stow = point => pointBetween(mount, point, size);
+  const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * size), r2.map(r => r * size), color, sides);
+  weaponModel(fighter, mount, angle, 0, 0, 0, holder, point => world(stow(point)), spare);
+}
+
+// A worn shield sits on the hand; a stowed one hangs on the back, a little smaller.
+function shieldPlacement(fighter, pose) {
+  const worn = shieldReady(fighter);
+  return {
+    at: worn ? pose.joints.shieldHand : torsoTransform(pose)([-.36, .34, -.42]),
+    tilt: worn ? pose.shieldTilt : torsoLean(pose) - .29,
+    size: worn ? 1 : .88,
+    stowed: !worn
+  };
+}
+
+function drawShieldModel(fighter, pose, world) {
+  const { at: [sx, sy, sz], tilt, size } = shieldPlacement(fighter, pose);
+  const transform = ([x, y, z]) => world([
+    sx + (x * Math.cos(tilt) - y * Math.sin(tilt)) * size,
+    sy + (x * Math.sin(tilt) + y * Math.cos(tilt)) * size,
+    sz + z
+  ]);
+  shield(0, 0, .11, fighter, transform);
+  return transform;
+}
+
+// Which fighter painter is on: the 3D meshes, or the 2D art proof of concept (fighter2d.js).
+const artStyle = (() => {
+  const query = new URLSearchParams(location.search).get('style');
+  if (query === '2d' || query === '3d') return { flat: query === '2d' };
+  try { return { flat: localStorage.getItem('arena-art') === '2d' }; } catch { return { flat: false }; }
+})();
+
+// Gear without 2D art yet keeps its 3D mesh, painted in place between the sprites.
+function flushFaces(frost) {
+  faces.sort((a, b) => a.depth - b.depth);
+  for (const face of faces) polygon(face.projected, 'rgb(' + (frost ? iced(face.rgb, frost) : face.rgb).join(',') + ')');
+  const count = faces.length;
+  faces.length = 0;
+  return count;
+}
+
+const iced = (rgb, frost) => rgb.map((channel, axis) => Math.round(mix(channel, [196, 232, 250][axis] * (.55 + channel / 560), frost)));
+
+// Hands the posed skeleton to the sprite painter. Returns how many 3D faces the fallback gear used.
+function drawGladiator2D(fighter, pose) {
+  // Each of the twelve kits uses its class's one 2D armor set for now.
+  const set = { melee: 'plate', ranged: 'leather', magic: 'robes' }[armors[fighter.gear.armor].style];
+  const world = point => worldPoint(fighter, point);
+  const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides, modelDetail);
+  const frost = finisherFrost(fighter);
+  let fallbackFaces = 0;
+  const mesh = build => () => {
+    build();
+    fallbackFaces += flushFaces(frost);
+  };
+  // Specials recolor and extend their 3D model, so they stay on it for now.
+  const art = key => ArenaArt2D.has(key) && !specialOf(fighter, key) ? key : null;
+  const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
+  const thrown = finishingSpear(fighter, pose);
+  ArenaArt2D.draw({
+    ctx,
+    toScreen: point => {
+      const [x, y, depth] = project(world(point));
+      return [x, y, scale * 12 / (12 - depth)];
+    },
+    direction: fighter.direction,
+    pixelsPerMetre: scale * canvas.width / width,
+    color: fighter.color,
+    trim: fighter.trim,
+    style: set,
+    base: armors[set].color,
+    pose,
+    torsoPoint: torsoTransform(pose),
+    frost,
+    clock: weaponClock(),
+    weapon: {
+      key: thrown ? null : art(fighter.weapon),
+      twoHanded: weapons[fighter.weapon].twoHanded,
+      thrown,
+      draw: mesh(() => weaponModel(fighter, thrown?.hand || pose.joints.weaponHand, thrown?.angle ?? pose.angle,
+        pose.windup, pose.strike, weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon))
+    },
+    spare: weapons[spare] ? { key: art(spare), ...stowedMount(pose, spare), draw: mesh(() => stowedWeapon(fighter, pose, spare, limb, world)) } : null,
+    shield: fighter.shieldHitsLeft === 0 ? null : {
+      sprite: fighter.gear.shield === 'round',
+      ...shieldPlacement(fighter, pose),
+      bolts: ArenaEffects.stuckBolts(fighter.name),
+      draw: mesh(() => stuckBolts(fighter, drawShieldModel(fighter, pose, world)))
+    }
+  });
+  return fallbackFaces;
+}
+
 function drawGladiator(fighter, pose, parts) {
   const { joints: j } = pose;
   const kit = armors[fighter.gear.armor];
@@ -1482,30 +1607,14 @@ function drawGladiator(fighter, pose, parts) {
     }
   }
 
-  const torsoAngle = Math.atan2(j.chest[1] - j.hips[1], j.chest[0] - j.hips[0]) - Math.PI / 2;
-  const cosine = Math.cos(torsoAngle);
-  const sine = Math.sin(torsoAngle);
-  const torso = ([x, y, z]) => {
-    const swept = x + z * pose.twist;
-    return [
-      j.hips[0] + swept * cosine - y * sine,
-      j.hips[1] + swept * sine + y * cosine,
-      j.hips[2] + z - x * pose.twist + y * (j.chest[2] - j.hips[2]) / .625
-    ];
-  };
+  const torsoAngle = torsoLean(pose);
+  const torso = torsoTransform(pose);
   partStart = recordGeometry(parts, 'body', partStart);
   armorTorso(fighter, pose, point => world(torso(point)));
   partStart = recordGeometry(parts, 'armor', partStart);
 
   const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
-  if (weapons[spare]) {
-    const long = ['staff', 'spear', 'crossbow'].includes(weaponFamily(spare)) || weapons[spare].twoHanded;
-    const mount = torso(long ? [-.43, .39, -.51] : [-.39, .03, -.43]);
-    const scaleStowed = long ? .80 : .69;
-    const stow = point => pointBetween(mount, point, scaleStowed);
-    const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
-    weaponModel(fighter, mount, torsoAngle + (long ? 2.0 : -2.34), 0, 0, 0, holder, point => world(stow(point)), spare);
-  }
+  if (weapons[spare]) stowedWeapon(fighter, pose, spare, limb, world);
   partStart = recordGeometry(parts, 'stowed', partStart);
 
   if (pose.severed) {
@@ -1568,16 +1677,7 @@ function drawGladiator(fighter, pose, parts) {
     weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon);
   partStart = recordGeometry(parts, 'held', partStart);
   if (fighter.shieldHitsLeft === 0) return;
-  const wieldingShield = shieldReady(fighter);
-  const [sx, sy, sz] = wieldingShield ? j.shieldHand : torso([-.36, .34, -.42]);
-  const tilt = wieldingShield ? pose.shieldTilt : torsoAngle - .29;
-  const shieldSize = wieldingShield ? 1 : .88;
-  const shieldTransform = ([x, y, z]) => world([
-    sx + (x * Math.cos(tilt) - y * Math.sin(tilt)) * shieldSize,
-    sy + (x * Math.sin(tilt) + y * Math.cos(tilt)) * shieldSize,
-    sz + z
-  ]);
-  shield(0, 0, .11, fighter, shieldTransform);
+  const shieldTransform = drawShieldModel(fighter, pose, world);
   partStart = recordGeometry(parts, 'shield', partStart);
   stuckBolts(fighter, shieldTransform);
   recordGeometry(parts, 'bolts', partStart);
@@ -2230,7 +2330,15 @@ function draw() {
   const stainsDone = performance.now();
   const poses = fighters.map(fighter => fighter.ragdoll?.pose || finisherPose(fighter) || displayPose(fighter));
   const geometry = ArenaBench.measureGeometry ? [] : null;
-  if (ArenaBench.drawFighters) fighters.forEach((fighter, index) => {
+  let meshFaces = 0;
+  // Sprites paint immediately, so the attacker and then the victor's finisher go last to stay on top.
+  const order = [0, 1];
+  if (artStyle.flat) {
+    const rank = fighter => (fighter.ragdoll ? 0 : fighter.action?.style === 'melee' ? 2 : 1);
+    order.sort((a, b) => rank(fighters[a]) - rank(fighters[b]));
+  }
+  if (ArenaBench.drawFighters) order.forEach(index => {
+    const fighter = fighters[index];
     if (fighter.shattered) return;
     const pose = poses[index];
     const hips = pose.joints.hips;
@@ -2245,6 +2353,7 @@ function draw() {
         ctx.globalAlpha = 1;
       }
     }
+    if (artStyle.flat) return;
     // The benchmark's polygon multiplier rebuilds each fighter in place: same picture, more polygons.
     const firstFace = faces.length;
     const parts = geometry ? {} : null;
@@ -2253,11 +2362,20 @@ function draw() {
     // A frost-shatter finisher turns the body to ice before it breaks.
     const frost = finisherFrost(fighter);
     if (frost) for (let i = firstFace; i < faces.length; i++) {
-      faces[i].rgb = faces[i].rgb.map((channel, axis) => Math.round(mix(channel, [196, 232, 250][axis] * (.55 + channel / 560), frost)));
+      faces[i].rgb = iced(faces[i].rgb, frost);
     }
   });
-  faces.sort((a, b) => a.depth - b.depth);
-  paintFaces(geometry);
+  if (artStyle.flat) {
+    // Shadows were all laid down above, so no shadow lands on top of the other fighter.
+    if (ArenaBench.drawFighters) for (const index of order) {
+      if (!fighters[index].shattered) meshFaces += drawGladiator2D(fighters[index], poses[index]);
+    }
+    ArenaBench.report('canvas', meshFaces, 0, canvas.width + '×' + canvas.height + ' px · 2D art, '
+      + ArenaArt2D.stats.sprites + ' sprites', null);
+  } else {
+    faces.sort((a, b) => a.depth - b.depth);
+    paintFaces(geometry);
+  }
   faces.length = 0;
   const fightersDone = performance.now();
   const effects = ArenaBench.drawEffects;
@@ -3271,6 +3389,29 @@ qualitySelect.addEventListener('change', () => {
   try { localStorage.setItem('arena-quality', qualitySelect.value); } catch { /* private mode */ }
   resize();
   ArenaBench.reset();
+});
+
+const artButton = document.getElementById('art');
+function showArtStyle() {
+  artButton.textContent = artStyle.flat ? 'Art 2D' : 'Art 3D';
+  artButton.setAttribute('aria-pressed', String(artStyle.flat));
+}
+artButton.addEventListener('click', () => {
+  artStyle.flat = !artStyle.flat;
+  try { localStorage.setItem('arena-art', artStyle.flat ? '2d' : '3d'); } catch { /* private mode */ }
+  showArtStyle();
+  draw();
+  ArenaBench.reset();
+});
+showArtStyle();
+
+// ?cast=1 or ?cast=2 pins gear that has 2D art, so the proof of concept can be seen at a glance.
+const cast = {
+  1: [{ weapon: 'sword', reserve: 'staff', shield: 'round', armor: 'plate' }, { weapon: 'crossbow', reserve: 'sword', shield: 'round', armor: 'leather' }],
+  2: [{ weapon: 'staff', reserve: 'none', shield: 'round', armor: 'robes' }, { weapon: 'sword', reserve: 'crossbow', shield: 'round', armor: 'plate' }]
+}[new URLSearchParams(location.search).get('cast')];
+cast?.forEach((gear, index) => {
+  for (const [slot, key] of Object.entries(gear)) fighters[index].loadout[slot].value = key;
 });
 
 // Showing gear and stats only changes the page layout, so it stays available during a fight.
