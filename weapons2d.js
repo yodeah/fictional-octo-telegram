@@ -152,4 +152,22 @@
       disc(g, -57, 0, 2.4, c.teamCss, .7);
     }
   };
+
+  art.executioner = {
+    box: [-68, -36, 162, 36],
+    draw(g, c) {
+      // Broad, parallel and blunt-tipped, made for one heavy cut.
+      const blade = 'M19,-9 L34,-13 L146,-14 L156,-5 L156,7 L148,13 L34,13 L19,9 Z';
+      metal(g, blade, 14, [153, 151, 139].map((v, i) => Math.round(v * c.steel[i] / STEEL_REF[i])), 23);
+      shape(g, 'M36,-3.4 L134,-3.4 L134,3.4 L36,3.4 Z', across(g, 3.4, c.iron, [-.4, .2]), .6);
+      for (const x of [141, 148]) disc(g, x, -1, 2.4, tone(c.iron, -.55), .8);
+      // Engraved scales of justice.
+      stroke(g, 'M60,-9 L60,9 M60,-9 L70,-9 M70,-9 L66,-5 L74,-5 Z M60,9 L70,9 M70,9 L66,5 L74,5 Z', tone(c.brass, .25), .8);
+      wrap(g, c.grip, -52, 14, 4.6);
+      shape(g, 'M12,-27 L21,-29 L22,-8 L25,0 L22,8 L21,29 L12,27 L14,0 Z', steelAcross(g, 29, c.brass), 1.3);
+      for (const y of [-21, 21]) disc(g, 17, y, 2.2, tone(c.iron, -.3), .7);
+      disc(g, 18, 0, 3.4, c.teamCss, .8);
+      shape(g, 'M-52,-7 L-64,-6 L-66,6 L-52,7 Z', steelAcross(g, 7, c.brass), 1.2);
+    }
+  };
 })();
