@@ -45,7 +45,7 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
-The **Quality** menu saves your choice for the next visit. Low is the default. Switch to Medium or High to see the round shield's raised rim and more faceted boss.
+The **Quality** menu saves your choice for the next visit. Low is the default. Switch to Medium or High for more facets on the fighters, armor, helmets and shields.
 
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
 
@@ -77,7 +77,7 @@ Measured at phone size on a Mac (60 Hz), both renderers held 60 FPS with no drop
 
 ## Armor geometry
 
-The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents, leather submits 853, and robes submit 695. The nine original weapons each submit at least twice as many triangle equivalents as before the armory expansion. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
+The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents on Low and 1,980 on High. Leather goes from 853 to 1,569 and robes go from 695 to 1,281. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
 
 ## Development plan
 

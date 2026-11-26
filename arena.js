@@ -431,13 +431,51 @@ function circleProfile(sides, roll = 0) {
   return ringAngles.get(key);
 }
 
-function prism(from, to, base, tip, color, transform, sides = 4, roll = Math.PI / 4) {
+const prismProfiles = new Map();
+function prismProfile(sides, detail) {
+  const key = sides * qualityLevels.length + detail;
+  if (prismProfiles.has(key)) return prismProfiles.get(key);
+  const roll = Math.PI / 4;
+  const original = circleProfile(sides, roll);
+  const count = sides === 4 ? sides : sides + detail * 2;
+  const refined = count === sides ? original : circleProfile(count);
+  let angles = original;
+  if (count !== sides) {
+    const max = (ring, axis) => Math.max(...ring.map(vertex => Math.abs(vertex[axis])));
+    // Retain the original cross-section's maximum width and depth.
+    const width = max(original, 'cosine') / max(refined, 'cosine');
+    const depth = max(original, 'sine') / max(refined, 'sine');
+    angles = refined.map(({ cosine, sine }) => ({ cosine: cosine * width, sine: sine * depth }));
+  }
+  const visible = [];
+  for (let index = 0; index < count; index++) {
+    const next = (index + 1) % count;
+    if (refined[index].sine + refined[next].sine < -.01) continue;
+    const angle = refined[index].angle + Math.PI / count;
+    const light = .84 + .26 * Math.cos(angle - .26) + .15 * Math.sin(angle);
+    visible.push({ index, next, light });
+  }
+  const profile = { angles, visible };
+  prismProfiles.set(key, profile);
+  return profile;
+}
+
+function prism(from, to, base, tip, color, transform, sides = 4, detail = 0) {
   const dx = to[0] - from[0];
   const dy = to[1] - from[1];
   const length = Math.hypot(dx, dy) || 1;
-  const angles = circleProfile(sides, roll);
+  const { angles, visible } = prismProfile(sides, detail);
   const bevel = Math.min(.23, Math.max(...base, ...tip) * .65 / length);
-  const sections = [[0, .74], [bevel, 1.04], [1 - bevel, 1], [1, .76]];
+  const squareBevels = detail === 2 && sides === 4;
+  const sections = [
+    [0, .74],
+    ...(squareBevels ? [[bevel * .45, .91, .85]] : []),
+    [bevel, 1.04, squareBevels ? .94 : .85],
+    ...(detail ? [[.46, detail === 2 ? 1.013 : 1.016, 1.025]] : []),
+    [1 - bevel, 1, detail ? .965 : 1],
+    ...(squareBevels ? [[1 - bevel * .42, .93, 1.08]] : []),
+    [1, .76, 1.18]
+  ];
   const profiles = sections.map(([t, bevelScale]) => {
     const [x, y, z] = pointBetween(from, to, t);
     const radialWidth = mix(base[0], tip[0], t) * bevelScale;
@@ -448,24 +486,22 @@ function prism(from, to, base, tip, color, transform, sides = 4, roll = Math.PI 
       z + sine * radialDepth
     ]);
   });
-  for (let i = 0; i < sides; i++) {
-    const j = (i + 1) % sides;
-    if (angles[i].sine + angles[j].sine < -.01) continue;
-    const direction = angles[i].angle + Math.PI / sides;
-    const light = .84 + .26 * Math.cos(direction - .26) + .15 * Math.sin(direction);
+  const last = profiles.length - 1;
+  const pointed = tip[0] === 0 && tip[1] === 0;
+  for (const { index: i, next: j, light } of visible) {
     for (let row = 1; row < profiles.length; row++) {
       const a = profiles[row - 1];
       const b = profiles[row];
-      const face = row === 3 && tip[0] === 0 && tip[1] === 0 ? [a[i], a[j], b[i]] : [a[i], a[j], b[j], b[i]];
-      surface(face, color, light * (row === 1 ? .85 : row === 3 ? 1.18 : 1), transform);
+      const face = row === last && pointed ? [a[i], a[j], b[i]] : [a[i], a[j], b[j], b[i]];
+      surface(face, color, light * sections[row][2], transform);
     }
   }
-  if (tip[0] > 0 || tip[1] > 0) surface(profiles[3], color, 1.16, transform);
+  if (tip[0] > 0 || tip[1] > 0) surface(profiles[last], color, 1.16, transform);
 }
 
 function shield(cx, cy, z, fighter, transform) {
   const gear = shields[fighter.gear.shield];
-  const detail = fighter.gear.shield === 'round' ? modelDetail : 0;
+  const detail = modelDetail;
   const contour = value => Math.sign(value) * Math.pow(Math.abs(value), gear.shape);
   const sides = gear.shape < .9 ? 16 : 20;
   const ring = (radius, depth) => circleProfile(sides, Math.PI / sides).map(({ cosine, sine }) =>
@@ -1085,17 +1121,25 @@ const darkSteel = [72, 72, 65];
 const clothLining = [64, 48, 75];
 const soleColor = [49, 36, 29];
 
-function loft(rings, color, transform, sides = 24) {
-  const profile = circleProfile(sides).slice(0, sides / 2 + 1);
-  const vertices = rings.map(([y, width, depth]) => profile.map(({ cosine, sine }) => [cosine * width, y, sine * depth]));
+const loftProfiles = new Map();
+function loft(rings, color, transform) {
+  const sides = 24 + modelDetail * 12;
+  if (!loftProfiles.has(sides)) {
+    const angles = circleProfile(sides).slice(0, sides / 2 + 1);
+    const light = angles.slice(1).map((_, i) => {
+      const angle = (i + .5) * Math.PI * 2 / sides;
+      return .64 + Math.sin(angle) * .32 + Math.cos(angle - .42) * .22
+        + Math.max(0, Math.cos(angle - 1.11)) ** 13 * .08;
+    });
+    loftProfiles.set(sides, { angles, light });
+  }
+  const { angles, light } = loftProfiles.get(sides);
+  const vertices = rings.map(([y, width, depth]) => angles.map(({ cosine, sine }) => [cosine * width, y, sine * depth]));
   for (let row = 1; row < vertices.length; row++) {
     for (let i = 0; i < sides / 2; i++) {
       const a = vertices[row - 1];
       const b = vertices[row];
-      const angle = (i + .5) * Math.PI * 2 / sides;
-      const light = .64 + Math.sin(angle) * .32 + Math.cos(angle - .42) * .22
-        + Math.max(0, Math.cos(angle - 1.11)) ** 13 * .08;
-      surface([a[i], a[i + 1], b[i + 1], b[i]], color, light, transform);
+      surface([a[i], a[i + 1], b[i + 1], b[i]], color, light[i], transform);
     }
   }
 }
@@ -1104,7 +1148,7 @@ function armorTorso(fighter, pose, transform) {
   const kit = armors[fighter.gear.armor];
   const shell = kit.shell || metal;
   const edging = kit.edging || bronze;
-  const piece = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, transform, sides);
+  const piece = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, transform, sides, modelDetail);
   const panel = (points, color, light = 1) => surface(points, color, light, transform);
   const stud = (x, y, z, color = bronze) =>
     panel([[x - .020, y, z], [x, y + .025, z], [x + .022, y, z], [x, y - .024, z]], color, 1.14);
@@ -1256,7 +1300,7 @@ function armorSignature(kit, pose, panel, piece) {
 }
 
 function armorHelmet(fighter, kit, transform) {
-  const piece = (a, b, r1, r2, color, sides = 8) => prism(a, b, r1, r2, color, transform, sides);
+  const piece = (a, b, r1, r2, color, sides = 8) => prism(a, b, r1, r2, color, transform, sides, modelDetail);
   const panel = (points, color, light = 1) => surface(points, color, light, transform);
   const face = fighter.direction > 0 ? [190, 128, 88] : [155, 106, 81];
   const shadow = [45, 33, 28];
@@ -1364,7 +1408,8 @@ function drawGladiator(fighter, pose, parts) {
   const plated = kit.style === 'melee';
   const robed = kit.style === 'magic';
   const world = point => worldPoint(fighter, point);
-  const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides);
+  const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides, modelDetail);
+  const weaponLimb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides);
   let partStart = faces.length;
 
   for (const side of ['rear', 'front']) {
@@ -1419,7 +1464,7 @@ function drawGladiator(fighter, pose, parts) {
     const mount = torso(long ? [-.43, .39, -.51] : [-.39, .03, -.43]);
     const scaleStowed = long ? .80 : .69;
     const stow = point => pointBetween(mount, point, scaleStowed);
-    const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
+    const holder = (a, b, r1, r2, color, sides) => weaponLimb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
     weaponModel(fighter, mount, torsoAngle + (long ? 2.0 : -2.34), 0, 0, 0, holder, point => world(stow(point)), spare);
   }
   partStart = recordGeometry(parts, 'stowed', partStart);
@@ -1466,10 +1511,20 @@ function drawGladiator(fighter, pose, parts) {
       limb(shifted(finger, -.008, -.036), shifted(finger, .009, .023), [.014, .012], [.017, .014],
         plated ? armor : robed ? skin : leather, 6);
     }
+    if (modelDetail) {
+      const thumb = shifted(pointBetween(elbow, hand, .98), 0, 0, .077);
+      const a = shifted(thumb, -.032, .026);
+      const b = shifted(thumb, .030, .018, .014);
+      const c = shifted(thumb, .038, -.011);
+      const d = shifted(thumb, -.022, -.019, -.008);
+      const color = plated ? armor : robed ? skin : leather;
+      surface([a, b, d], color, 1.20, world);
+      surface([b, c, d], color, .94, world);
+    }
   }
 
   partStart = recordGeometry(parts, 'body', partStart);
-  weaponModel(fighter, j.weaponHand, pose.angle, pose.windup, pose.strike, weaponClock(), limb, world);
+  weaponModel(fighter, j.weaponHand, pose.angle, pose.windup, pose.strike, weaponClock(), weaponLimb, world);
   partStart = recordGeometry(parts, 'held', partStart);
   const wieldingShield = shieldReady(fighter);
   const [sx, sy, sz] = wieldingShield ? j.shieldHand : torso([-.36, .34, -.42]);
