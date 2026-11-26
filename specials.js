@@ -12,7 +12,7 @@
 //   aura(fighter, state)                    a color to glow around the fighter, or nothing
 // `state` is a fresh object per fighter per bout. Hooks run in arena.js's scope, so they can use its
 // helpers (floatLabel, burst, schedule, specialHit, logEvent and so on) at call time.
-// A generated fighter has a 5% chance to carry one (see matchups.js), and the Special picker sets one for testing.
+// A generated fighter has a 5% chance to carry one (see matchups.js), and the Main and Backup pickers list them under ★ Special weapons.
 const specialChance = .05;
 
 const specials = {

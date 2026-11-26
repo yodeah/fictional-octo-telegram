@@ -51,7 +51,7 @@ The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and
 
 ## Weapon specials
 
-Rare special weapons (`specials.js`) reuse an existing weapon's model with new colors and small details, and change the fight through a few hooks that `arena.js` calls (attack start, landed hit, every step, blocking, weapon choice and drawing). A generated fighter carries one 5% of the time; the **Special** picker sets one before a fight for testing. **Stormbrand** (sword) calls lightning once after three landed hits, **Snarecaster** (crossbow) roots the target for 3 seconds with its first bolt to land, and **Last Oath** (greatsword) gives +60% damage and lifesteal below 10% health but stops blocking. `?force=oath` makes Last Oath take hold at the first damage. The scoreboard shows each fighter's special and its state.
+Rare special weapons (`specials.js`) reuse an existing weapon's model with new colors and small details, and change the fight through a few hooks that `arena.js` calls (attack start, landed hit, every step, blocking, weapon choice and drawing). A generated fighter carries one 5% of the time; the **Main** and **Backup** pickers list them, marked ★, under *Special weapons*, so you can equip one before a fight. A fighter carries at most one special. **Stormbrand** (sword) calls lightning once after three landed hits, **Snarecaster** (crossbow) roots the target for 3 seconds with its first bolt to land, and **Last Oath** (greatsword) gives +60% damage and lifesteal below 10% health but stops blocking. `?force=oath` makes Last Oath take hold at the first damage. The scoreboard shows each fighter's special and its state.
 
 ## Combat effects
 

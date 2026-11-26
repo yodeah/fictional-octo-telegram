@@ -80,7 +80,7 @@ const armorVariants = {
   astral: ['robes', { name: 'Astral vestments', cut: 'astral', color: [66, 82, 119], edging: [180, 199, 246], defense: 5, mobility: 1.03, power: 1.14, attackBonus: [-5, -3, -1, 23, -7], defenseBonus: [7, 5, 6, 20, -7] }]
 };
 for (const [key, [base, stats]] of Object.entries(armorVariants)) armors[key] = { ...armors[base], ...stats };
-const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor', spellbook: 'Spellbook', special: 'Special' };
+const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor', spellbook: 'Spellbook' };
 const signed = value => value > 0 ? '+' + value : String(value);
 
 function armorDetails(detail, kit, automatic) {
@@ -127,12 +127,14 @@ const spellbooks = {
   glacial: { name: 'Glacial', focus: 'Slow, freeze, and hold opponents at range.', spells: ['frost', 'barrage', 'shell'] },
   storm: { name: 'Storm', focus: 'Burst damage and energy control for aggressive fighters.', spells: ['arc', 'thunder', 'tailwind'] }
 };
-const gearChoices = { weapon: weapons, reserve: { ...weapons, none: { name: 'None' } }, shield: shields, armor: armors, spellbook: spellbooks,
-  special: { none: { name: 'None' }, ...specials } };
+const gearChoices = { weapon: weapons, reserve: { ...weapons, none: { name: 'None' } }, shield: shields, armor: armors, spellbook: spellbooks };
+const specialMark = '★ ';
 // The special a fighter owns, and the one that applies to a given weapon (the held one by default).
 const ownedSpecial = fighter => specials[fighter.gear.special] || null;
 const specialOf = (fighter, key = fighter.weapon) => ownedSpecial(fighter)?.weapon === key ? ownedSpecial(fighter) : null;
 const weaponName = (fighter, key) => specialOf(fighter, key)?.name || weapons[key].name;
+// Weapon pickers list specials by their own key; this resolves a picker value to the weapon it uses.
+const pickedWeapon = value => specials[value]?.weapon || value;
 const manaRegen = 3.6;
 const energyRegen = 5;
 const switchCost = 7;
@@ -174,23 +176,29 @@ function equipmentPicker(fighter, prefix, type, choices) {
     }
     groups.get(group).append(option);
   }
+  if (type === 'weapon' || type === 'reserve') {
+    const container = document.createElement('optgroup');
+    container.label = specialMark + 'Special weapons';
+    for (const [key, special] of Object.entries(specials)) container.append(new Option(specialMark + special.name, key));
+    select.append(container);
+  }
   select.value = 'auto';
   select.describe = () => {
-    const key = select.value === 'auto' ? fighter.gear[type] : select.value;
+    const held = weapons[fighter.gear[type]] && specialOf(fighter, fighter.gear[type]) ? fighter.gear.special : fighter.gear[type];
+    const special = specials[select.value === 'auto' ? held : select.value];
+    const key = special ? special.weapon : select.value === 'auto' ? fighter.gear[type] : select.value;
     const item = choices[key];
     label.textContent = gearLabels[type] + (select.value === 'auto' ? ' · Auto' : '');
-    automatic.text = choices[fighter.gear[type]].name + ' · Auto';
+    automatic.text = (specials[held] ? specialMark + specials[held].name : choices[fighter.gear[type]].name) + ' · Auto';
     if (type === 'armor') {
       armorDetails(detail, item, select.value === 'auto');
       return;
     }
-    const lines = [item.name];
+    const lines = [special ? specialMark + special.name : item.name];
+    if (special) lines.push('Special ' + item.name + ' · ' + special.effect,
+      'Generated fighters carry a special ' + Math.round(specialChance * 100) + '% of the time · One per fighter');
     if (type === 'spellbook') {
       lines.push(item.focus, ...item.spells.map(key => spells[key].name + ' · ' + spells[key].cost + ' MP'));
-    } else if (type === 'special') {
-      if (key === 'none') lines.push('No special weapon');
-      else lines.push(item.effect, 'A special ' + weapons[item.weapon].name + ' · Replaces the main weapon if neither slot holds one',
-        'Generated fighters carry one ' + Math.round(specialChance * 100) + '% of the time');
     } else if (type === 'reserve' && key === 'none') {
       lines.push('Travel lighter with one weapon');
     } else if (type === 'weapon' || type === 'reserve') {
@@ -213,7 +221,9 @@ function equipmentPicker(fighter, prefix, type, choices) {
   };
   select.addEventListener('change', () => {
     const other = type === 'weapon' ? fighter.loadout.reserve : type === 'reserve' ? fighter.loadout.weapon : null;
-    if (other && select.value !== 'auto' && other.value === select.value) other.value = 'auto';
+    // One weapon per slot and one special per fighter.
+    if (other && select.value !== 'auto' && other.value !== 'auto' && (pickedWeapon(other.value) === pickedWeapon(select.value)
+      || (specials[other.value] && specials[select.value]))) other.value = 'auto';
     if (state === 'ready') {
       applyGear(fighter);
       updateStats(fighter);
@@ -322,8 +332,8 @@ function applyGear(fighter) {
   const gear = {};
   const { reserve } = fighter.loadout;
   const assign = (type, excluded, differentStyle) => {
-    const picker = fighter.loadout[type];
-    if (picker.value !== 'auto' && picker.value !== excluded) return picker.value;
+    const picked = pickedWeapon(fighter.loadout[type].value);
+    if (picked !== 'auto' && picked !== excluded) return picked;
     if (previous[type] !== excluded) return previous[type];
     const available = Object.keys(gearChoices[type]).filter(key => key !== excluded && key !== 'none');
     if (differentStyle && excluded && weapons[excluded]) {
@@ -332,15 +342,17 @@ function applyGear(fighter) {
     }
     return choose(available);
   };
-  gear.weapon = assign('weapon', weapons[reserve.value] ? reserve.value : null, true);
+  gear.weapon = assign('weapon', weapons[pickedWeapon(reserve.value)] ? pickedWeapon(reserve.value) : null, true);
   gear.reserve = assign('reserve', gear.weapon, true);
   gear.shield = assign('shield');
   gear.armor = assign('armor');
   gear.spellbook = assign('spellbook');
-  const specialPick = fighter.loadout.special.value;
-  gear.special = specialPick !== 'auto' ? specialPick : previous.special || 'none';
-  const base = specials[gear.special]?.weapon;
-  if (base && gear.weapon !== base && gear.reserve !== base) gear.weapon = base;
+  // A special picked in either weapon slot wins. Otherwise the fighter keeps their special while its
+  // weapon stays equipped, unless a slot is pinned to the plain version of that weapon.
+  const slots = [fighter.loadout.weapon.value, reserve.value];
+  const kept = specials[previous.special];
+  const keep = kept && [gear.weapon, gear.reserve].includes(kept.weapon) && !slots.includes(kept.weapon);
+  gear.special = slots.find(value => specials[value]) || (keep ? previous.special : 'none');
   fighter.gear = gear;
   fighter.weapon = gear.weapon;
   applySpellbook(fighter);
@@ -354,7 +366,8 @@ function updateStats(fighter) {
   for (const [name, value] of Object.entries(stats)) fighter.stats[name].textContent = value;
   fighter.hud.level.textContent = 'Lv ' + fighter.level;
   const stowed = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
-  fighter.hud.active.textContent = weaponName(fighter, fighter.weapon) + ' held' + (weapons[stowed] ? ' · ' + weaponName(fighter, stowed) + ' stowed' : ' · No spare')
+  const marked = key => (specialOf(fighter, key) ? specialMark : '') + weaponName(fighter, key);
+  fighter.hud.active.textContent = marked(fighter.weapon) + ' held' + (weapons[stowed] ? ' · ' + marked(stowed) + ' stowed' : ' · No spare')
     + (shieldReady(fighter) ? '' : ' · Shield on back');
   const power = (weapons[fighter.weapon].spellPower || 1) * armorPower(fighter, 'magic');
   for (const key of fighter.spells) {
@@ -369,7 +382,8 @@ function updateStats(fighter) {
 
 function updateGearNote(fighter) {
   fighter.hud.queued.hidden = Object.entries(fighter.loadout)
-    .every(([type, picker]) => picker.value === 'auto' || picker.value === fighter.gear[type]);
+    .every(([type, picker]) => picker.value === 'auto' || (specials[picker.value]
+      ? fighter.gear.special === picker.value && pickedWeapon(picker.value) === fighter.gear[type] : picker.value === fighter.gear[type]));
 }
 
 function project([x, y, z]) {
