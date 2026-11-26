@@ -1,6 +1,6 @@
 # Rendering performance notes
 
-Measured 2026-11-26 on a Mac in the Claude desktop app's built-in browser (Chromium) at a phone-size viewport (375×812 CSS px, device pixel ratio 2, arena canvas 706×620 px) on a 60 Hz screen. Same matchup for every run: Varro Lv 54 (sword, staff, plate, round shield) vs Cassian Lv 57 (crossbow, spear, leather, round shield). **Nothing here was measured on a real phone.**
+Measured 2026-11-26 on a Mac in the Claude desktop app's built-in browser (Chromium) at a phone-size viewport (375×812 CSS px, device pixel ratio 2, arena canvas 706×620 px) on a 60 Hz screen. Same matchup for every run: Varro Lv 54 (sword, staff, plate, round shield) vs Cassian Lv 57 (crossbow, spear, leather, round shield). The phone result is in its own section below.
 
 ## How a frame is drawn
 
@@ -37,6 +37,16 @@ Three times the polygons (**Polys 3×**, 7,041 faces):
 All four setups held 60.0 FPS average, 60 minimum and zero drops on this machine, so the 60 Hz limit hid the difference in FPS. The draw-time columns are where the renderers differ. Times cover main-thread work only; the graphics chip's work for either renderer is not included, so on a phone the FPS and drop counts are the real test.
 
 With the browser pane hidden (background-throttled) the same build took about 3.7 ms. Hidden-tab numbers are not comparable.
+
+## First phone test
+
+2026-11-26, the user's own phone over local Wi-Fi with `?bench`, same matchup. Reported by the user: about **24 FPS on Canvas 2D and 22 FPS on WebGL**. Not yet recorded: phone model, browser, Polys setting, estimated refresh rate, drops and draw times.
+
+What it suggests, to be confirmed:
+
+- Canvas 2D was slightly ahead, and the gap is within run-to-run noise. On this phone WebGL gives no advantage and may cost a little, perhaps from the extra full-canvas copy.
+- WebGL cut painting about fourfold on the Mac yet did not help here, so painting the fighter polygons is probably not this phone's main cost. Candidates to test next: canvas resolution (fill rate at device pixel ratio 2), the full-canvas backdrop copies, animated scenery and effects, and building and sorting on a slower processor.
+- With both renderers far below 60 FPS, 3× detail is out of reach on this phone. The rework plan now targets 2× with a Quality setting.
 
 ## What this means for adding detail
 
