@@ -55,7 +55,7 @@ Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake 
 
 ## Animation
 
-Fighters coil before they swing and carry the weapon through after it lands, then settle back to guard. Heavy two-handed weapons coil deepest, spears draw back for a thrust, crossbows steady the aim and kick on release, and staves gather power before pushing a spell out. This motion is drawing only: `fighterPose` stays the combat pose that hit detection, guarding and movement use, and `displayPose` adds the animation on top for rendering. While a blow can still connect, both fighters are drawn exactly in their combat pose, so **Hitboxes** match what you see when it matters.
+Fighters coil before they swing and carry the weapon through after it lands, then settle back to guard. Heavy two-handed weapons coil deepest, spears draw back for a thrust, crossbows steady the aim and kick on release, and staves gather power before pushing a spell out. Blows knock the defender back by more for heavier hits and a larger share of health lost, and big hits force a stumble step. Head hits snap the head back, body blows double the fighter over, arm hits fling the arm, and leg hits buckle the knee. A blocked weapon rebounds off the shield while the defender braces, and a miss overreaches. This motion is drawing only: `fighterPose` stays the combat pose that hit detection, guarding and movement use, and `displayPose` adds the animation on top for rendering. While a blow can still connect, both fighters are drawn exactly in their combat pose, so **Hitboxes** match what you see when it matters.
 
 ## Armor geometry
 

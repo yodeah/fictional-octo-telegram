@@ -826,7 +826,13 @@ function actionMotion(fighter, action, memory) {
   const at = action.phase;
   const weapon = weapons[action.key];
   if (action.style === 'melee') {
-    if (action.connected && memory.connectedPhase === null) memory.connectedPhase = at;
+    if (action.connected && memory.connectedPhase === null) {
+      memory.connectedPhase = at;
+      // Read how the blow resolved: impact sets a reaction on a hit or block, and counterUntil only on a block.
+      const { defender } = action;
+      const struck = (defender.reaction?.time ?? -10) >= action.created;
+      memory.outcome = !struck ? 'miss' : defender.counterUntil > elapsed ? 'blocked' : 'hit';
+    }
     const heft = action.bash ? .9 : weapon.twoHanded || action.heavy ? 1.18 : action.key === 'rapier' ? .7 : 1;
     const thrust = weaponFamily(action.key) === 'spear' && !action.bash;
     // Coil before the swing, then let go before the contact window so the drawn weapon matches its hitbox.
@@ -840,11 +846,17 @@ function actionMotion(fighter, action, memory) {
       add(coil, { hipX: -.05, drop: .08, leanX: -.13, leanY: -.01, headX: -.03, handX: -.12, handY: .11, angle: .40,
         offX: .10, offY: .04, frontX: -.05, frontY: .045, twist: -.15, cloth: .05 });
     }
-    if (memory.connectedPhase !== null) {
-      // Carry the weapon past the target, then settle back to guard by the end of recovery.
+    if (memory.connectedPhase !== null && memory.outcome === 'blocked' && !action.bash) {
+      // A blocked weapon rebounds off the shield instead of carrying through.
+      const t = at - memory.connectedPhase;
+      add(heft * ease(t / .05) * (1 - smooth((t - .07) / .40)), { hipX: -.04, leanX: -.07, headX: -.02, handX: -.07, handY: .11,
+        angle: .30, offX: -.03, frontX: -.03, twist: -.07 });
+    } else if (memory.connectedPhase !== null) {
+      // Carry the weapon past the target, then settle back to guard by the end of recovery. A miss overreaches.
       const from = Math.max(action.hitAt, memory.connectedPhase);
       const t = at - from;
-      const carry = heft * ease(t / .09) * (1 - smooth((t - .09) / Math.max(.12, action.duration - from - .11)));
+      const carry = heft * (memory.outcome === 'miss' ? 1.25 : 1) * ease(t / .09)
+        * (1 - smooth((t - .09) / Math.max(.12, action.duration - from - .11)));
       if (action.bash) {
         add(carry, { hipX: .05, drop: .03, leanX: .07, offX: .10, offY: -.02, frontX: .06, rearX: .04, rearY: .03, twist: .06 });
       } else if (thrust) {
@@ -872,6 +884,58 @@ function actionMotion(fighter, action, memory) {
     add(gather, { drop: .04, leanX: -.07, headX: -.02, [handX]: -.13, [handY]: .09, angle: staff ? .22 : 0, frontY: .025, twist: -.06 });
     add(push, { hipX: .03, drop: .04, leanX: .08, headX: .02, [handX]: .12, [handY]: -.03, angle: staff ? -.16 : 0,
       frontX: .05, rearY: .03, twist: .07 });
+  }
+  return offsets;
+}
+
+function reactionMotion(fighter, memory, clock) {
+  const reaction = fighter.reaction;
+  if (reaction !== memory.reaction) {
+    // A new reaction means impact just landed a hit or a block. Size it from the health it cost.
+    memory.reaction = reaction;
+    const blow = otherFighter(fighter).action;
+    const share = Math.max(0, memory.hp - fighter.hp) / fighter.maxHP;
+    const blocked = share === 0;
+    const force = (blow?.heavy ? 1.3 : 1) * (blow?.bash ? 1.2 : 1) * (blow?.style === 'ranged' ? .75 : blow?.spell ? .85 : 1);
+    memory.hit = reaction && {
+      blocked, force,
+      push: Math.min(.48, force * (blocked ? .06 : clamp(.10 + share * 1.4, .10, .36))),
+      weight: Math.min(1.4, blocked ? .7 * force : clamp(.6 + share * 3.2, .6, 1.5) * force)
+    };
+  }
+  memory.hp = fighter.hp;
+  const offsets = {};
+  const hit = memory.hit;
+  const age = clock - (reaction?.time ?? -10);
+  if (!hit || age > 1.2) return offsets;
+  const add = (amount, values) => {
+    for (const [key, value] of Object.entries(values)) offsets[key] = (offsets[key] || 0) + value * amount;
+  };
+  // The body is thrown back and slides to a stop, then walks back to where the fight has it.
+  const shove = ease(age / .08) * (1 - smooth((age - .14) / .55));
+  add(shove * hit.push, { rootX: -1 });
+  if (hit.push > .2) {
+    const stumble = Math.sin(Math.PI * clamp((age - .04) / .30, 0, 1));
+    add(stumble * hit.push, { rearX: -.35, rearY: .22, frontY: .08 });
+  }
+  const snap = hit.weight * ease(age / .06) * (1 - smooth((age - .10) / .42));
+  if (hit.blocked) {
+    add(snap, { hipX: -.02, drop: .04, leanX: -.05, offX: -.13, offY: .04, tilt: -.20, frontX: -.03, handY: .03, twist: -.05 });
+    return offsets;
+  }
+  switch (reaction.zone) {
+    case 'head':
+      add(snap, { leanX: -.08, headX: -.11, handY: .07, offY: .06, angle: .16, frontY: .03, twist: -.06, cloth: .05 });
+      break;
+    case 'leg':
+      add(snap, { drop: .12, frontX: -.08, frontY: .05, leanX: .05, headX: .03, handY: -.04, offY: -.03 });
+      break;
+    case 'arm':
+      add(snap, { leanX: -.04, handX: -.08, handY: .05, angle: .28, offX: -.10, offY: .06, tilt: -.16, twist: -.08 });
+      break;
+    default:
+      // A body blow doubles the fighter over around it.
+      add(snap, { hipX: -.07, drop: .06, leanX: -.01, headX: .06, handY: -.07, offY: -.06, twist: .08, cloth: .06 });
   }
   return offsets;
 }
@@ -906,6 +970,8 @@ function applyMotion(fighter, pose, offsets, amount) {
   pose.twist += value('twist');
   pose.cloth += value('cloth');
   pose.shieldTilt += value('tilt');
+  const rootX = value('rootX');
+  if (rootX) move(Object.keys(j), rootX, 0);
 }
 
 function displayPose(fighter) {
@@ -914,7 +980,8 @@ function displayPose(fighter) {
   const clock = elapsed + fall;
   let memory = motionMemory.get(fighter);
   if (!memory || clock < memory.clock) {
-    memory = { clock, action: null, connectedPhase: null, lock: 0, last: {}, fade: {}, fadeStart: clock };
+    memory = { clock, action: null, connectedPhase: null, outcome: null, lock: 0, last: {}, fade: {}, fadeStart: clock,
+      reaction: fighter.reaction, hp: fighter.hp, hit: null };
     motionMemory.set(fighter, memory);
   }
   const step = clock - memory.clock;
@@ -930,7 +997,8 @@ function displayPose(fighter) {
   const offsets = actionMotion(fighter, action, memory);
   const fade = 1 - smooth((clock - memory.fadeStart) / .2);
   if (fade > 0) for (const [key, value] of Object.entries(memory.fade)) offsets[key] = (offsets[key] || 0) + value * fade;
-  memory.last = offsets;
+  memory.last = { ...offsets };
+  for (const [key, value] of Object.entries(reactionMotion(fighter, memory, clock))) offsets[key] = (offsets[key] || 0) + value;
   // While either blow can still land, show the body and weapon exactly where checkContact tests them.
   const target = Math.max(liveContact(action), liveContact(otherFighter(fighter).action));
   memory.lock = target >= memory.lock ? target : Math.max(target, memory.lock - step / .15);
