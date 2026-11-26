@@ -185,4 +185,20 @@
       stroke(g, 'M134,-1 L170,-1', 'rgba(255,255,255,.7)', .6);
     }
   };
+
+  art.trident = {
+    box: [-120, -30, 192, 30],
+    draw(g, c) {
+      haft(g, c.wood, -115, 142, 3.1);
+      wrap(g, c.grip, -16, 16, 3.9);
+      for (const x of [-112, -24, 24, 128]) band(g, c.brass, x, 4.4);
+      for (const s of [-1, 1]) {
+        metal(g, `M134,${s * 2} C140,${s * 12} 140,${s * 22} 152,${s * 23} L170,${s * 22} L168,${s * 27} L182,${s * 19} L170,${s * 16} L153,${s * 15.6} C147,${s * 14} 147,${s * 7} 146,${s * 3} Z`, 27, c.steel, 31);
+      }
+      metal(g, 'M136,-3.4 L166,-3 L164,-7 L187,0 L164,7 L166,3 L136,3.4 Z', 7, c.steel, 37);
+      shape(g, 'M126,-5 L142,-7 L146,0 L142,7 L126,5 Z', steelAcross(g, 7, c.brass), 1.2);
+      disc(g, 137, 0, 2.4, c.teamCss, .6);
+      shape(g, 'M-119,0 L-112,-4 L-108,0 L-112,4 Z', tone(c.brass, 0), 1);
+    }
+  };
 })();
