@@ -8,6 +8,9 @@ const ArenaEffects = (() => {
   const labelLife = 1.3;
   const labels = [];
   const trails = [];
+  const drops = [];
+  const stains = [];
+  const bloodColors = ['#8e1f1c', '#b0281f', '#c93a2a'];
   const sparks = [];
   const flashes = [];
   const puffs = [];
@@ -92,6 +95,52 @@ const ArenaEffects = (() => {
       }
       trauma = Math.max(0, trauma - dt * 2.6);
     },
+    // Severity runs from 0 to 1 and sets how much sprays from the wound.
+    bleed(point, direction, severity) {
+      const count = Math.round(24 + severity * 46);
+      for (let i = 0; i < count; i++) {
+        // One drop in four spatters back toward the attacker.
+        const way = i % 4 === 0 ? -direction * .5 : direction;
+        drops.push({
+          point: point.slice(), size: .012 + random() ** 2 * (.03 + severity * .022), color: bloodColors[i % 3],
+          speed: [way * (.2 + random() * (2 + severity * 1.8)), .2 + random() * (2.5 + severity), (random() - .5) * 2.2]
+        });
+      }
+    },
+    // A pool that spreads under a fallen fighter.
+    pool(x, z) {
+      stains.push({ x, z, size: .1, limit: .92, color: '#6e1512' });
+      for (let i = 0; i < 14; i++) {
+        stains.push({ x: x + (random() - .5) * 1.3, z: z + (random() - .5) * .5, size: .02 + random() * .06, color: '#74201b' });
+      }
+    },
+    drawStains(ctx, project, scale) {
+      ctx.save();
+      ctx.globalAlpha = .76;
+      for (const { x, z, size, color } of stains) {
+        const [px, py] = project([x, 0, z]);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.ellipse(px, py, scale * size, scale * size * .31, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    },
+    drawBlood(ctx, project, scale) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      for (const { point, speed, size, color } of drops) {
+        const [x, y] = project(point);
+        const [tailX, tailY] = project(point.map((value, axis) => value - speed[axis] * .022));
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1.4, size * scale);
+        ctx.beginPath();
+        ctx.moveTo(tailX, tailY);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    },
     // A flash at the contact point and sparks thrown mostly in the blow's direction.
     strike(point, direction, color, count, size = 1) {
       flashes.push({ point: point.slice(), color, size, angle: random() * Math.PI, age: 0, life: .13 });
@@ -131,6 +180,19 @@ const ArenaEffects = (() => {
           list[i].age += dt;
           if (list[i].age >= list[i].life) list.splice(i, 1);
         }
+      }
+      // Each drop leaves a stain where it lands, and pools spread to their limit.
+      for (let i = drops.length - 1; i >= 0; i--) {
+        const { point, speed, size, color } = drops[i];
+        speed[1] -= dt * 11;
+        for (let axis = 0; axis < 3; axis++) point[axis] += speed[axis] * dt;
+        if (point[1] > 0) continue;
+        stains.push({ x: point[0], z: point[2], size: size * (1 + random()), color });
+        drops.splice(i, 1);
+      }
+      if (stains.length > 700) stains.splice(0, stains.length - 700);
+      for (const stain of stains) {
+        if (stain.limit) stain.size = Math.min(stain.limit, stain.size + dt * .24);
       }
       for (const { point, speed } of sparks) {
         speed[1] -= dt * 11;
@@ -231,7 +293,7 @@ const ArenaEffects = (() => {
     },
     reset() {
       trauma = 0;
-      labels.length = trails.length = sparks.length = flashes.length = puffs.length = 0;
+      labels.length = trails.length = sparks.length = flashes.length = puffs.length = drops.length = stains.length = 0;
       contacts.clear();
     }
   };

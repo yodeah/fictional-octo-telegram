@@ -250,7 +250,6 @@ function applySpellbook(fighter) {
   }));
 }
 const particles = [];
-const stains = [];
 const faces = [];
 const armor = [135, 125, 108];
 const metal = [192, 194, 182];
@@ -1250,6 +1249,8 @@ function sampleDust() {
         const [x, , z] = worldPoint(fighter, point);
         ArenaEffects.dust(x, z + .15, scenery.dust, 9, 1.5);
         ArenaEffects.shake(.3);
+        // A body can fall past the edge of view, so keep its pool where it can be seen.
+        if (name === 'chest' && fighter.ragdoll.bleeding) ArenaEffects.pool(clamp(x, -3.4, 3.4), z + .5);
       }
       continue;
     }
@@ -1684,10 +1685,7 @@ function draw() {
     ctx.drawImage(backdrop, 0, 0, width, height);
   }
   scenery.draw(width, height, sceneryClock);
-  for (const stain of stains) {
-    const [x, y] = project([stain.x, 0, stain.z]);
-    ellipse(x, y, scale * stain.size, scale * stain.size * .31, '#69302bb5');
-  }
+  ArenaEffects.drawStains(ctx, project, scale);
   const poses = fighters.map(fighter => fighter.ragdoll?.pose || fighterPose(fighter));
   fighters.forEach((fighter, index) => {
     const pose = poses[index];
@@ -1715,11 +1713,7 @@ function draw() {
   drawBolts();
   for (const particle of particles) {
     const [x, y] = project([particle.x, particle.y, particle.z]);
-    if (particle.blood) {
-      ellipse(x, y, particle.size, particle.size * .82, particle.color);
-      continue;
-    }
-    // Magic and spark particles streak along their flight; blood stays as drops.
+    // Magic particles streak along their flight.
     const [tailX, tailY] = project([particle.x - particle.vx * .035, particle.y - particle.vy * .035, particle.z - particle.vz * .035]);
     ctx.strokeStyle = particle.color;
     ctx.lineWidth = particle.size;
@@ -1730,6 +1724,7 @@ function draw() {
     ctx.stroke();
     ctx.lineCap = 'butt';
   }
+  ArenaEffects.drawBlood(ctx, project, scale);
   ArenaEffects.drawSparks(ctx, project, scale);
   ctx.restore();
   ArenaEffects.drawLabels(ctx, project, width, height);
@@ -1982,7 +1977,7 @@ function startBout(generated = null) {
   elapsed = 0;
   fall = 0;
   hitPause = 0;
-  particles.length = stains.length = 0;
+  particles.length = 0;
   ArenaEffects.reset();
   fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
@@ -2034,7 +2029,7 @@ function floatLabel(fighter, text, color, options) {
   ArenaEffects.label([fighter.x, 2.52, fighter.z + .3], text, color, options);
 }
 
-function burst(fighter, { offset = 0, y = 1.35, point, direction, colors, count, blood = false, gravity = 5 }) {
+function burst(fighter, { offset = 0, y = 1.35, point, direction, colors, count, gravity = 5 }) {
   for (let i = 0; i < count; i++) {
     particles.push({
       x: point?.[0] ?? fighter.x + offset, y: point?.[1] ?? y, z: point?.[2] ?? fighter.z + .55,
@@ -2043,8 +2038,8 @@ function burst(fighter, { offset = 0, y = 1.35, point, direction, colors, count,
       vz: (Math.random() - .5) * 2.8,
       size: 1 + Math.random() * 3.2,
       color: colors[i % colors.length],
-      life: blood ? .83 : .45 + Math.random() * .27,
-      blood, gravity
+      life: .45 + Math.random() * .27,
+      gravity
     });
   }
 }
@@ -2213,17 +2208,15 @@ function impact(action, contact) {
   if (absorbed) logEvent(defender.name + '’s ' + defender.wardName + ' absorbs ' + absorbed + ' damage.');
   const blood = actualDamage > 0 && !spell && !bash;
   const color = absorbed && !actualDamage ? defender.wardColor : spell?.color || '#ffd0ba';
-  burst(defender, {
-    point,
-    offset: -attacker.direction * .29,
-    direction: attacker.direction,
-    colors: blood ? ['#9f302a', '#ca4835'] : [color, '#fff3d3'],
-    count: 22,
-    blood,
-    gravity: blood ? 12 : 5
-  });
+  if (!blood) {
+    burst(defender, { point, offset: -attacker.direction * .29, direction: attacker.direction, colors: [color, '#fff3d3'], count: 22 });
+  }
   const flashPoint = point || [defender.x - attacker.direction * .29, 1.35, defender.z + .55];
   // Plate throws sparks off bare steel; softer armor only flashes.
+  if (blood) {
+    ArenaEffects.bleed(flashPoint, attacker.direction,
+      Math.min(1, actualDamage / defender.maxHP * 3.5 + (zone === 'head' ? .25 : 0) + (actualDamage >= defender.hp ? .5 : 0)));
+  }
   const clang = !spell && actualDamage && armors[defender.gear.armor].style === 'melee';
   ArenaEffects.strike(flashPoint, attacker.direction, spell?.color || (clang ? '#ffb63f' : '#ffe0c2'),
     clang ? 12 : 4, action.heavy || zone === 'head' ? 1.35 : .9);
@@ -2251,6 +2244,7 @@ function impact(action, contact) {
     return;
   }
   defender.ragdoll = makeRagdoll(defender, zone);
+  defender.ragdoll.bleeding = blood;
   attacker.wins++;
   state = 'finished';
   for (const fighter of fighters) fighter.action = null;
@@ -2272,9 +2266,6 @@ function updateEffects(dt) {
     particle.y += particle.vy * dt;
     particle.z += particle.vz * dt;
     particle.vy -= dt * particle.gravity;
-    if (particle.y <= 0 && particle.blood) {
-      stains.push({ x: particle.x, z: particle.z, size: .025 + Math.random() * .055 });
-    }
     if (particle.life <= 0 || particle.y <= 0) particles.splice(i, 1);
   }
 }
