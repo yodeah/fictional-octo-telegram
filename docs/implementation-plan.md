@@ -26,7 +26,7 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 ## Stages
 
 - [x] **1. Playable run** (suggestions 1–3, 4, 5–9, part of 10, 12, 17, 21). Dice and race creation, shipwreck intro, days and debt, market, gear, training, rest, sparring and blood bouts, four champions, one mercy per act, spell pages from champions, autosave, save code, Legacy checkpoints, 50% more health, sudden death, headless tests.
-- [ ] **2. Phone hosting.** Public repository, GitHub Pages from the work branch, home-screen icon and manifest. *Done when the link plays on your phone.*
+- [ ] **2. Phone hosting.** Public repository and GitHub Pages from the work branch are live (checked 2026-11-26): https://yodeah.github.io/fictional-octo-telegram/. Still to do: home-screen icon and manifest. *Done when the link plays on your phone.*
 - [ ] **3. Tactics and injuries** (10, 11). Stance and target before each bout; wounds with lasting costs. *Done when each stance wins some matchup the others lose, in tests.*
 - [ ] **4. Spellbook rework** (13). More pages, three slots, a trigger per spell. *Done when triggers change outcomes in tests.*
 - [ ] **5. Strangers and bargains** (14). Five visitors, each with a shown price. *Done when no bargain is always right or always wrong for the test bot.*

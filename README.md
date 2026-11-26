@@ -2,7 +2,7 @@
 
 A gory gladiator autobattler with permanent death, for phone and laptop. Static files only: no backend, no build step.
 
-**Play:** open `index.html`. You wash ashore, owe the lanista, and must kill four champions. The old sparring page is `sandbox.html`.
+**Play:** https://yodeah.github.io/fictional-octo-telegram/ (GitHub Pages, from the `swords-and-sandals` branch), or open `index.html`. You wash ashore, owe the lanista, and must kill four champions. The old sparring page is `sandbox.html`.
 
 - Dice-rolled stats and a race (human, elf or demon, each with a drawback).
 - Each day: fight, train, rest or work. The debt falls due every fifth day.
