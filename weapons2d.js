@@ -357,4 +357,22 @@
       band(g, c.brass, -59, 5.6, 5);
     }
   };
+
+  art.pickhammer = {
+    box: [-66, -54, 108, 38],
+    draw(g, c) {
+      haft(g, c.wood, -61, 88, 3.4);
+      wrap(g, c.grip, -52, -20, 4.4);
+      wrap(g, c.grip, -8, 22, 4.4);
+      for (const x of [50, 68]) band(g, c.iron, x, 5);
+      // Curved beak on one side (-y), crested hammer face on the other.
+      metal(g, 'M78,-8 C84,-22 88,-36 96,-50 C100,-36 101,-20 98,-8 Z', 50, c.steel, 103);
+      metal(g, 'M78,8 L80,22 L72,24 L74,34 L84,30 L88,35 L92,30 L102,34 L102,23 L95,22 L96,8 Z', 36, c.steel, 107);
+      shape(g, 'M74,-10 L100,-10 L100,10 L74,10 Z', steelAcross(g, 10, c.iron), 1.3);
+      metal(g, 'M100,-3.4 L106,0 L100,3.4 Z', 4, c.steel, 109);
+      disc(g, 87, 0, 4, tone(c.brass, .1), .9);
+      for (const x of [78, 96]) rivet(g, x, 0, 1.4, c.brass);
+      band(g, c.brass, -60, 5, 4);
+    }
+  };
 })();
