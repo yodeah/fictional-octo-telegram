@@ -18,9 +18,12 @@ Detailed 2D fighters look far better than the current meshes and draw faster, as
 
 ## Try it
 
-- `open "index.html?style=2d&cast=1"`: plate with sword and staff against leather with crossbow and sword.
-- `open "index.html?style=2d&cast=2"`: robes with staff against plate with sword and crossbow.
-- The **Art** button switches painters at any time, also mid-bout, and remembers the choice. 3D stays the default.
+`open index.html`, then press **Art 3D** so it reads **Art 2D**. The button switches painters at any time, also mid-bout, and remembers the choice. 3D stays the default. In the first matchup only Cassian's spear is still a 3D mesh.
+
+To see only gear that has 2D art, run `python3 -m http.server 8000` in the project folder and open one of these (`open` cannot pass address options to a local file):
+
+- <http://localhost:8000/?style=2d&cast=1>: plate with sword and staff against leather with crossbow and sword.
+- <http://localhost:8000/?style=2d&cast=2>: robes with staff against plate with sword and crossbow.
 
 ## What is in the proof of concept
 
@@ -70,7 +73,7 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 - 3D at Quality High costs about twice Low on the main thread, and 2D already shows far more detail than High.
 - Sprite memory for the first matchup: about 2.6 MB on desktop and 0.5 MB at phone size. Baking took 7–60 ms, once, and repeats after a resize or a new look.
 - A forced-readback timing in the app's hidden browser pane showed 2D as slower. Neither real frame measurement above reproduced that, so it is not counted.
-- **Not measured on a real phone.** Open `?style=2d&cast=1&bench` and compare with `?style=3d&cast=1&bench`. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
+- **Not measured on a real phone.** Add `?style=2d&cast=1&bench` to the served address and compare with `?style=3d&cast=1&bench`. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
 
 ## Options considered
 
