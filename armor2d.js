@@ -30,11 +30,13 @@
       // Rows of overlapping scales over the breastplate.
       const chest = 'M-15,-62 C-4,-66 9,-65 15,-58 C22,-46 21,-32 15,-18 L12,-12 C2,-8 -8,-9 -14,-13 C-17,-30 -18,-47 -15,-62 Z';
       clipped(g, chest, () => {
-        for (let row = 0; row < 9; row++) {
+        // Drawn from the waist up, so each row hangs over the one below it.
+        for (let row = 11; row >= 0; row--) {
           for (let i = -4; i < 5; i++) {
-            const x = i * 6.4 + (row % 2) * 3.2;
-            const y = -66 + row * 6.4;
-            shape(g, `M${x - 3.2},${y} h6.4 v5 q-3.2,4.4 -6.4,0 Z`, gradient(g, x - 3.2, y, x + 3.2, y + 8, c.steel, [.55, .05, -.35]), .8);
+            const x = i * 6.6 + (row % 2) * 3.3;
+            const y = -68 + row * 5;
+            shape(g, `M${x - 3.8},${y} C${x - 3.8},${y + 5.4} ${x - 2},${y + 8.6} ${x},${y + 8.6} C${x + 2},${y + 8.6} ${x + 3.8},${y + 5.4} ${x + 3.8},${y} Z`,
+              gradient(g, x - 3.8, y, x + 3.8, y + 9, c.steel, [.6, .1, -.3]), .8);
           }
         }
       });
