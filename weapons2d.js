@@ -219,4 +219,20 @@
       shape(g, 'M-119,0 L-112,-4 L-108,0 L-112,4 Z', tone(c.iron, 0), 1);
     }
   };
+
+  art.axe = {
+    box: [-34, -52, 112, 20],
+    draw(g, c) {
+      haft(g, c.wood, -29, 79, 3.4);
+      wrap(g, c.grip, -24, 8, 4.2);
+      // The cutting edge sits on the positive side of the haft (-y).
+      metal(g, 'M55,6 L77,6 L79,-14 C84,-30 92,-38 98,-43 C86,-50 70,-52 62,-49 C52,-47 45,-43 40,-39 C50,-34 56,-24 56,-14 Z', 50, c.steel, 53);
+      stroke(g, 'M44,-40 C56,-46 78,-49 95,-43', 'rgba(255,255,255,.85)', 1.6);
+      stroke(g, 'M58,-14 C60,-24 56,-32 52,-37 M76,-14 C78,-24 84,-32 88,-37', 'rgba(30,30,45,.5)', 1);
+      shape(g, 'M54,-8 L78,-8 L78,7 L54,7 Z', steelAcross(g, 8, c.iron), 1.2);
+      for (const x of [60, 72]) rivet(g, x, 0, 1.5, c.brass);
+      shape(g, 'M66,-16 l6,-7 l-6,-7 l-6,7 Z', tone(c.brass, .1), .8);
+      band(g, c.brass, -28, 4.8);
+    }
+  };
 })();
