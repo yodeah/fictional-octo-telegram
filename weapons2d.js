@@ -165,8 +165,11 @@
       metal(g, blade, 14, [153, 151, 139].map((v, i) => Math.round(v * c.steel[i] / STEEL_REF[i])), 23);
       shape(g, 'M36,-3.4 L134,-3.4 L134,3.4 L36,3.4 Z', across(g, 3.4, c.iron, [-.4, .2]), .6);
       for (const x of [141, 148]) disc(g, x, -1, 2.4, tone(c.iron, -.55), .8);
-      // Engraved scales of justice.
-      stroke(g, 'M60,-9 L60,9 M60,-9 L70,-9 M70,-9 L66,-5 L74,-5 Z M60,9 L70,9 M70,9 L66,5 L74,5 Z', tone(c.brass, .25), .8);
+      // Engraved scales of justice, cut dark with a lit edge.
+      const scales = 'M62,-11 V11 M62,-10 H78 M78,-10 L73,-5 H83 Z M62,10 H78 M78,10 L73,5 H83 Z';
+      stroke(g, scales, 'rgba(255,245,215,.8)', 2.6);
+      stroke(g, scales, tone(c.brass, -.45), 1.4);
+      disc(g, 62, 0, 2.6, tone(c.brass, .1), .8);
       wrap(g, c.grip, -52, 14, 4.6);
       shape(g, 'M12,-27 L21,-29 L22,-8 L25,0 L22,8 L21,29 L12,27 L14,0 Z', steelAcross(g, 29, c.brass), 1.3);
       for (const y of [-21, 21]) disc(g, 17, y, 2.2, tone(c.iron, -.3), .7);
