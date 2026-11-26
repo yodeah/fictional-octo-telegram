@@ -158,4 +158,36 @@
     },
     cape: null
   });
+
+  sets.brigandine = derive('leather', {}, {
+    box: { head: [-32, -34, 32, 30] },
+    torso(g, c, base) {
+      base(g, c);
+      // Cloth over riveted plates, row upon row.
+      const coat = 'M-14,-62 C-4,-66 9,-65 15,-58 C21,-46 20,-32 15,-18 L15,2 Q0,7 -15,2 L-15,-18 C-19,-34 -18,-50 -14,-62 Z';
+      shape(g, coat, clothFill(g, -19, 21, c.main), 1.3);
+      clipped(g, coat, () => {
+        for (let row = 0; row < 7; row++) {
+          const y = -62 + row * 9.4;
+          stroke(g, `M-22,${y + 6} Q0,${y + 10} 22,${y + 4}`, 'rgba(25,4,4,.55)', 1.2);
+          for (let i = -3; i < 4; i++) rivet(g, i * 6 + (row % 2) * 3, y + 2.6, 1.35, [226, 186, 112]);
+        }
+      });
+      stroke(g, 'M3,-66 L2,5', tone([194, 144, 92], .05), 2.4);
+      for (let i = 0; i < 5; i++) buckle(g, 2.6, -55 + i * 12, 5.6, 4.6);
+      strap(g, 'M-18,0 Q0,7 18,-1', 5);
+      buckle(g, 10, 3, 7, 7);
+    },
+    head(g, c) {
+      face(g, null);
+      // Kettle helmet with a wide brim over a mail coif.
+      mail(g, 'M-6,-14 C-16,-6 -17,10 -14,22 L2,22 C-2,14 -6,6 -4,-6 Z', [-17, -14, 2, 22]);
+      const bowl = 'M-17,-9 C-17,-24 -8,-30 2,-30 C12,-30 18,-23 18,-10 Z';
+      plate(g, bowl, gradient(g, -17, -8, 14, -28, c.steel, [-.5, -.1, .2, .7, -.05]));
+      stroke(g, 'M1,-30 L2,-10', tone(c.iron, -.1), 2);
+      plate(g, 'M-28,-9 C-14,-15 14,-15 30,-8 C28,-4 22,-3 17,-5 C4,-8 -10,-8 -17,-5 C-23,-3 -28,-5 -28,-9 Z', gradient(g, -28, -4, 30, -14, c.steel, [-.45, 0, .6, -.15]));
+      for (let i = 0; i < 6; i++) rivet(g, -13 + i * 5.4, -12.6, 1, c.brass);
+      stroke(g, 'M-4,-6 C-3,4 2,10 8,13', tone(c.main, -.35), 2.2);
+    }
+  });
 })();
