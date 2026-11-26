@@ -491,6 +491,151 @@ const ArenaVenues2D = (() => {
     }
   };
 
+  // ---------------------------------------------------------------- Moonlit Ruins
+  function column(ctx, random, x, top, broken) {
+    const stone = [130, 116, 118];
+    const shaft = broken
+      ? `M${x},211 L${x},${top + 6} L${x + 8},${top - 6} L${x + 15},${top + 4} L${x + 24},${top - 10} L${x + 31},${top + 2} L${x + 42},${top - 3} L${x + 42},211 Z`
+      : `M${x},211 L${x + 2},${top} L${x + 40},${top} L${x + 42},211 Z`;
+    shape(ctx, shaft, gradient(ctx, x, 0, x + 42, 0, stone, [-.15, .3, .05, -.3, -.45]), 1.2, LINE);
+    clipped(ctx, shaft, () => {
+      for (const flute of [9, 17, 25, 33]) {
+        box(ctx, x + flute, top - 12, 2.2, 225 - top, 'rgba(26,20,40,.34)', 0);
+        box(ctx, x + flute + 2.2, top - 12, 1, 225 - top, 'rgba(230,220,255,.2)', 0);
+      }
+      for (let y = top + 22; y < 205; y += 26) stroke(ctx, `M${x},${y} q21,4 42,0`, 'rgba(34,26,40,.65)', 1.2);
+      speckle(ctx, random, 80, [x, top - 8, x + 42, 211], 'rgba(235,220,240,.2)', 'rgba(24,18,34,.34)', 3);
+    });
+    for (let i = 0; i < 2; i++) {
+      const y = top + random() * (190 - top);
+      stroke(ctx, `M${x + random() * 30},${y} l${random() * 10 - 5},${9 + random() * 8} l${random() * 12 - 6},${7 + random() * 9}`, 'rgba(28,20,34,.7)', 1);
+    }
+    if (!broken) {
+      // Capital with a scroll at each end.
+      box(ctx, x - 8, top - 9, 58, 7, tone(stone, .22), 1);
+      box(ctx, x - 3, top - 2, 48, 6, tone(stone, .05), 1);
+      for (const cx of [x - 3, x + 45]) {
+        disc(ctx, cx, top + 2, 5.4, tone(stone, .15), 1);
+        disc(ctx, cx, top + 2, 2, tone(stone, -.3), .7);
+      }
+    }
+    box(ctx, x - 6, 199, 54, 7, tone(stone, .12), 1);
+    box(ctx, x - 12, 206, 66, 8, tone(stone, -.1), 1);
+    // Ivy creeping up some of them.
+    if (random() > .45) {
+      const side = random() > .5 ? x + 4 : x + 36;
+      stroke(ctx, `M${side},211 C${side - 14},180 ${side + 12},165 ${side - 3},${Math.max(top + 20, 130)}`, '#31442f', 1.8);
+      leaves(ctx, random, 40, [side, 178, 11, 34], [[62, 92, 66], [84, 112, 76], [48, 74, 58]], 5.4);
+    }
+  }
+  const bird = (unit, wing) => sprite('bird' + wing, [-15, -12, 16, 10], unit, g => {
+    const tip = wing ? 7 : -9;
+    shape(g, `M-2,-1 C-5,${tip * .6} -9,${tip} -14,${tip} C-8,${tip * .35} -6,3 -1,2 Z`, '#22263a', .8, 'rgba(170,170,210,.55)');
+    shape(g, 'M-9,1 L-14,0 L-13,4 L-6,3 C-2,5 4,4 6,1 C9,1 11,0 14,-1 L9,-3 C8,-5 4,-5 3,-3 C0,-3 -4,-1 -9,1 Z', '#2e3248', .8, 'rgba(170,170,210,.55)');
+    shape(g, `M0,0 C2,${tip * .8} 7,${tip * 1.1} 12,${tip} C8,${tip * .4} 7,2 3,2 Z`, '#3c415c', .8, 'rgba(180,180,220,.6)');
+    disc(g, 7, -2.6, .8, '#f4d27a', 0);
+  });
+  const firefly = unit => sprite('firefly', [-9, -9, 9, 9], unit, g => {
+    const glow = g.createRadialGradient(0, 0, 0, 0, 0, 9);
+    glow.addColorStop(0, 'rgba(255,250,200,.95)');
+    glow.addColorStop(.22, 'rgba(255,230,140,.6)');
+    glow.addColorStop(1, 'rgba(255,220,120,0)');
+    g.fillStyle = glow;
+    g.fillRect(-9, -9, 18, 18);
+  });
+
+  scenes[2] = {
+    backdrop(ctx) {
+      const random = seeded(832);
+      ctx.lineJoin = ctx.lineCap = 'round';
+      const sky = ctx.createLinearGradient(0, 0, 0, 235);
+      sky.addColorStop(0, '#1e2440');
+      sky.addColorStop(.6, '#54486a');
+      sky.addColorStop(1, '#b0806e');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 1000, 420);
+      for (let i = 0; i < 130; i++) {
+        const x = random() * 1000;
+        const y = random() * 140;
+        const r = .4 + random() * .9;
+        disc(ctx, x, y, r, `rgba(255,244,214,${.35 + random() * .5})`, 0);
+        if (i % 19 === 0) stroke(ctx, `M${x - 4},${y} H${x + 4} M${x},${y - 4} V${y + 4}`, 'rgba(255,244,214,.55)', .6);
+      }
+      // A full moon with maria and a halo, behind thin clouds.
+      const halo = ctx.createRadialGradient(720, 65, 20, 720, 65, 110);
+      halo.addColorStop(0, 'rgba(246,225,190,.4)');
+      halo.addColorStop(1, 'rgba(246,225,190,0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(600, -50, 240, 240);
+      disc(ctx, 720, 65, 29, gradient(ctx, 695, 40, 745, 92, [238, 220, 190], [.5, .1, -.15]), 0);
+      for (const [x, y, r] of [[710, 55, 7], [728, 72, 9], [714, 78, 4], [734, 52, 4], [702, 68, 3]]) disc(ctx, x, y, r, 'rgba(150,126,130,.32)', 0);
+      for (const [x, y, w] of [[610, 84, 190], [700, 46, 130], [120, 58, 220], [380, 100, 170]]) {
+        shape(ctx, `M${x},${y} C${x + w * .2},${y - 10} ${x + w * .35},${y - 3} ${x + w * .5},${y - 8} C${x + w * .7},${y - 12} ${x + w * .8},${y - 2} ${x + w},${y} C${x + w * .6},${y + 5} ${x + w * .3},${y + 3} ${x},${y} Z`, 'rgba(120,108,150,.42)', 0);
+      }
+      shape(ctx, 'M0,156 L70,120 L160,87 L205,118 L261,149 L322,128 L390,103 L470,134 L547,163 L610,135 L672,114 L740,138 L814,159 L912,126 L1000,99 L1000,223 L0,221 Z', gradient(ctx, 0, 90, 0, 220, [86, 92, 118], [.1, -.15]), 1, LINE);
+      shape(ctx, 'M0,187 L90,160 L176,134 L260,163 L337,184 L454,153 L568,187 L660,170 L753,157 L870,172 L1000,151 L1000,225 L0,225 Z', gradient(ctx, 0, 134, 0, 225, [64, 62, 84], [.08, -.2]), 1, LINE);
+      for (let i = 0; i < 70; i++) {
+        const x = random() * 1000;
+        const y = 178 + random() * 22;
+        const h = 10 + random() * 16;
+        shape(ctx, `M${x},${y} L${x - h * .26},${y} L${x},${y - h} L${x + h * .26},${y} Z`, 'rgba(36,40,58,.85)', 0);
+      }
+      // The colonnade.
+      for (let index = 0; index < 7; index++) {
+        const broken = index === 2 || index === 3;
+        column(ctx, random, 88 + index * 137, broken ? 155 : 54 + random() * 59, broken);
+      }
+      // Half of an arch still springs from the first broken column.
+      shape(ctx, 'M370,158 C378,110 446,90 492,96 L486,113 C452,110 408,122 402,158 Z', gradient(ctx, 370, 96, 492, 158, [118, 104, 112], [.2, -.25]), 1.2, LINE);
+      for (const [x, y] of [[386, 130], [418, 108], [456, 101]]) stroke(ctx, `M${x - 8},${y - 8} L${x + 6},${y + 6}`, 'rgba(36,28,44,.7)', 1);
+      ground(ctx, random, [128, 108, 112]);
+      // Cracked flagstones, fallen blocks and a toppled drum.
+      for (let i = 0; i < 48; i++) {
+        const y = 232 + random() * 180;
+        const x = random() * 1000;
+        const w = 26 + (y - 220) * .3 + random() * 34;
+        const h = w * (.16 + random() * .08);
+        shape(ctx, `M${x},${y} L${x + w * .8},${y - h * .2} L${x + w},${y + h * .7} L${x + w * .18},${y + h} Z`, `rgba(160,146,160,${.1 + random() * .12})`, .9, 'rgba(34,26,42,.4)');
+      }
+      for (let i = 0; i < 36; i++) {
+        const x = random() * 1000;
+        const y = 214 + random() * (x < 95 || x > 910 ? 172 : 22);
+        const s = 4 + random() * 11;
+        shape(ctx, `M${x - s},${y} L${x - s * .7},${y - s * .7} L${x + s * .2},${y - s * .85} L${x + s * .8},${y - s * .5} L${x + s},${y} Z`, tone([130, 118, 128], random() * .2 - .1), .9, LINE);
+        shape(ctx, `M${x - s * .7},${y - s * .7} L${x + s * .2},${y - s * .85} L${x - s * .1},${y - s * .4} Z`, 'rgba(230,220,250,.25)', 0);
+      }
+      shape(ctx, 'M884,224 C880,206 890,198 904,198 L952,200 C966,204 968,226 954,232 L900,232 C892,232 886,230 884,224 Z', gradient(ctx, 0, 198, 0, 232, [124, 110, 118], [.2, -.35]), 1.3, LINE);
+      for (const x of [912, 926, 940]) stroke(ctx, `M${x},200 q-6,16 0,31`, 'rgba(32,24,42,.5)', 1.6);
+      for (let i = 0; i < 40; i++) {
+        const x = random() * 1000;
+        const side = x < 110 || x > 890;
+        const y = 216 + random() * (side ? 190 : 18);
+        for (let k = -2; k <= 2; k++) stroke(ctx, `M${x + k},${y} q${k},-5 ${k * 3},-${5 + random() * 7}`, i % 2 ? '#4a5a52' : '#6a7260', 1.1);
+      }
+      vignette(ctx, 1000, 420, 'rgba(190,170,230,.09)', 'rgba(10,8,26,.52)');
+    },
+
+    // Same flight paths as the original, so the click targets follow them.
+    draw(ctx, width, height, clock, reactions) {
+      const view = stage(ctx, width, height);
+      const scatter = Math.sin(reactions[0] * Math.PI / 2) ** 2;
+      const stirred = Math.sin(reactions[1] * Math.PI / 2) ** 2;
+      const birdsX = 335 + Math.sin(clock * .35) * 120 + scatter * 98;
+      const birdsY = 100 + Math.cos(clock * .53) * 14 - scatter * 42;
+      for (let i = 0; i < 4; i++) {
+        const wing = Math.sin(clock * 9 - i * .68) > 0 ? 1 : 0;
+        view.put(bird(view.unit, wing), birdsX - 36 * i - scatter * i * 8, birdsY + 9 * i + (i % 2) * 7 - scatter * (i % 2) * 14, { scale: 1.05 - i * .07 });
+      }
+      for (let i = 0; i < 19; i++) {
+        const x = 692 + 125 * Math.sin(i * 17 + clock * .75 + stirred * i * .21);
+        const y = 203 + Math.cos(i * 13 - clock * 1.13) * 33 - stirred * 41;
+        const glint = 1.4 + (Math.sin(clock * 3 + i) + 1) * .55;
+        view.put(firefly(view.unit), x, y, { scale: glint * .48 });
+      }
+      return [[birdsX / 1000, birdsY / 420], [.70, .49]];
+    }
+  };
+
   return {
     has: index => Boolean(scenes[index]),
     backdrop: (ctx, index, width, height) => scenes[index].backdrop(ctx, width, height),
