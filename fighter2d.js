@@ -924,13 +924,22 @@ const ArenaArt2D = (() => {
     return entry;
   }
 
+  function drop() {
+    cache.clear();
+    stats.sprites = stats.bytes = stats.bakeMs = 0;
+  }
+  // New matchups bring new sprites. Between bouts, start over once they pass about 12 MB, so a long
+  // session does not keep every look it has shown.
+  function release() {
+    if (stats.bytes > 12 * 1048576) drop();
+  }
+
   // Sprites are baked at the size they appear on screen; a resize rebakes them.
   function prepare(pixelsPerMetre) {
     const wanted = Math.ceil(pixelsPerMetre * 1.1 / 4) * 4;
     if (wanted === bakedScale) return;
     bakedScale = wanted;
-    cache.clear();
-    stats.sprites = stats.bytes = stats.bakeMs = 0;
+    drop();
   }
 
   function bodySprites(style, team, trim, base) {
@@ -1281,6 +1290,7 @@ const ArenaArt2D = (() => {
 
   return {
     draw: drawFighter,
+    release,
     stats,
     has: key => Object.hasOwn(weaponArt, key),
     hasArmor: key => Object.hasOwn(sets, key),

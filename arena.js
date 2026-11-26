@@ -2714,6 +2714,7 @@ function startBout(generated = null) {
   scheduled.length = 0;
   finisher = null;
   ArenaEffects.reset();
+  ArenaArt2D.release();
   fighters.forEach((fighter, index) => {
     fighter.x = -fighter.direction * 2.6;
     fighter.z = fighter.gait = fighter.velocity = 0;
