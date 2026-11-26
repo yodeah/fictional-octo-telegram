@@ -336,4 +336,25 @@
       disc(g, -31, 0, 4.2, tone(c.brass, 0), 1.1);
     }
   };
+
+  art.maul = {
+    box: [-66, -44, 104, 44],
+    draw(g, c) {
+      haft(g, c.wood, -58, 88, 3.8);
+      wrap(g, c.grip, -50, -18, 4.8);
+      wrap(g, c.grip, -8, 22, 4.8);
+      for (const x of [40, 66]) band(g, c.iron, x, 5.4);
+      // The head lies across the haft: banded iron with two struck faces.
+      shape(g, 'M72,-26 L102,-26 L102,26 L72,26 Z', gradient(g, 72, 0, 102, 0, c.iron, [-.45, -.05, .5, 0, -.35]), 1.4);
+      for (const s of [-1, 1]) {
+        metal(g, `M70,${s * 24} L104,${s * 24} L101,${s * 38} L73,${s * 38} Z`, 40, c.steel, 101);
+        shape(g, `M75,${s * 38} L99,${s * 38} L97,${s * 42} L77,${s * 42} Z`, tone(c.brass, -.05), 1.1);
+        for (const x of [77, 87, 97]) rivet(g, x, s * 28, 1.6, c.brass);
+      }
+      shape(g, 'M69,-8 L105,-8 L105,8 L69,8 Z', steelAcross(g, 8, c.brass), 1.2);
+      disc(g, 87, 0, 5, gradient(g, 83, -4, 91, 4, c.iron, [.5, -.4]), 1);
+      disc(g, 87, 0, 2, c.teamCss, .5);
+      band(g, c.brass, -59, 5.6, 5);
+    }
+  };
 })();
