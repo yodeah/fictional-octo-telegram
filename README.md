@@ -45,7 +45,7 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
-The **Quality** menu saves your choice for the next visit. Low is the default. Switch to Medium or High for more facets on the fighters, equipment, bolts and finisher props.
+The **Quality** menu saves your choice for the next visit. Low is the default. Medium and High refine the fighters, equipment, bolts, finisher props and the three venues. High draws about twice as much geometry as Low in the reference bout.
 
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
 
@@ -69,7 +69,7 @@ The benchmark overlay is hidden by default so it never covers the fight. Select 
 
 The overlay toggles the fighter painter between **Canvas** (the default) and **WebGL**, and **Polys 1×/3×** builds each fighter three times over to test three times as many polygons with the same picture. The choices are saved in the browser; `?renderer=webgl` and `?polygons=3` set them from the address bar.
 
-Opening with `?bench` adds face and triangle-equivalent counts by fighter part. The same breakdown is available from `ArenaBench.snapshot().geometry` while that overlay is open. Use **Polys 1×** to compare Quality levels.
+Opening with `?bench` adds face and triangle-equivalent counts by fighter part, plus cached and animated scenery counts and the most recent backdrop rebuild time. The same breakdown is available from `ArenaBench.snapshot()` while that overlay is open. Use **Polys 1×** to compare Quality levels.
 
 The second row of buttons finds what limits the frame rate on a device. **Res full / Res 1×** draws the arena at up to 2 pixels per CSS pixel or at 1 (`?res=1`), which tests fill rate. **Fighters**, **Scenery** and **Effects** each skip drawing that part: the fighters' polygons and shadows, the animated crowd and wildlife, or dust, trails, blood, sparks, magic, bolts and damage numbers. These toggles change only the picture, are never saved, and add **TEST TOGGLE ON** to the overlay while active. The **Scene · Fighters · FX** line shows the main-thread milliseconds each part took per frame. Only the depth-sorted fighter polygons move to WebGL (`gl-renderer.js`). They are painted in sorted order into an offscreen WebGL canvas that is drawn into the arena canvas where Canvas 2D would have filled them, so backdrops, shadows and effects keep their layering. Concave and self-crossing polygons use a stencil pass with the same nonzero fill rule as Canvas 2D. Rendering is capped at 120 FPS; skipped frames leave the simulation clock alone, so the next frame advances by the full elapsed time.
 

@@ -74,8 +74,11 @@ const ArenaBench = (() => {
 
   // Main-thread ms for [backdrop and scenery, fighters, effects] in the frame being drawn.
   let pendingParts = null;
-  function parts(scene, fighters, effects) {
+  let animatedFacets = 0;
+  let backdrop = { facets: 0, rebuildMs: 0 };
+  function parts(scene, fighters, effects, facets) {
     pendingParts = [scene, fighters, effects];
+    animatedFacets = facets;
   }
 
   // `now` is the animation frame timestamp; drawMs is how long draw() took on the main thread.
@@ -245,6 +248,8 @@ const ArenaBench = (() => {
         + (probe.lowRes || !probe.fighters || !probe.scene || !probe.effects ? ' · TEST TOGGLE ON' : '')
     ];
     if (info.geometry) {
+      lines.push('Scenery ' + backdrop.facets + ' cached / ' + animatedFacets + ' animated facets · '
+        + f(backdrop.rebuildMs, 1) + ' ms cache rebuild');
       lines.push('Geometry (faces / triangles)');
       for (const { name, parts } of info.geometry) {
         lines.push(name + ' · ' + Object.entries(parts).map(([part, count]) =>
@@ -272,10 +277,14 @@ const ArenaBench = (() => {
     get drawEffects() { return probe.effects; },
     get measureGeometry() { return query.has('bench') && !panel.hidden; },
     parts,
+    reportBackdrop(facets, rebuildMs) {
+      backdrop = { facets, rebuildMs };
+    },
     onResolutionChange(callback) { onResolution = callback; },
     // Read-only copy of the statistics for scripted comparisons.
     snapshot() {
       return { ...stats, recent: stats.recent.slice(), geometry: structuredClone(info.geometry),
+        backdrop: { ...backdrop }, animatedFacets,
         avg: stats.frames ? stats.frames * 1000 / stats.time : null,
         drawAvg: stats.frames ? stats.drawSum / stats.frames : null, hz: 1000 / refresh, expected: expected(), renderer: active, polys: info.polygons };
     },

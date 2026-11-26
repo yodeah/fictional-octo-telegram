@@ -1837,6 +1837,11 @@ function randomSource(seed) {
 
 function drawBackdrop() {
   const rand = randomSource(351);
+  let facets = 0;
+  const face = (points, color) => {
+    polygon(points, color);
+    facets++;
+  };
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
   gradient.addColorStop(0, '#8a563b');
   gradient.addColorStop(.48, '#ad7651');
@@ -1849,8 +1854,15 @@ function drawBackdrop() {
   for (let row = 0; row < 7; row++) {
     for (let column = -1; column < width / stone; column++) {
       const x = (column + (row % 2) * .5) * stone;
+      const y = row * height * .069;
       ctx.fillStyle = rand() > .52 ? '#ffd29b16' : '#5227121c';
-      ctx.fillRect(x + 1, row * height * .069, stone - 2, height * .069 - 2);
+      ctx.fillRect(x + 1, y, stone - 2, height * .069 - 2);
+      facets++;
+      const pattern = row + column + 1;
+      if ((modelDetail === 2 && pattern % 4 !== 0) || (modelDetail === 1 && pattern % 3 === 0)) {
+        const lip = Math.min(5, height * .018);
+        face([[x + 1, y], [x + stone - 1, y], [x + stone - lip, y + lip], [x + 2, y + lip]], '#f1bc7950');
+      }
     }
   }
   const bay = clamp(width / 8, 90, 145);
@@ -1874,12 +1886,31 @@ function drawBackdrop() {
     ctx.strokeStyle = '#c79970';
     ctx.lineWidth = 4;
     ctx.stroke();
+    if (modelDetail) {
+      const facetsPerArch = modelDetail === 2 ? 11 : 7;
+      const rim = Math.min(7, w * .074);
+      const arch = (segment, outset = 0) => {
+        const angle = Math.PI * (1 + segment / facetsPerArch);
+        return [x + w * .5 + Math.cos(angle) * (w * .38 + outset),
+          y + w * .45 + Math.sin(angle) * (w * .35 + outset)];
+      };
+      for (let segment = 0; segment < facetsPerArch; segment++) {
+        face([arch(segment), arch(segment + 1), arch(segment + 1, rim), arch(segment, rim)],
+          ['#c3996b', '#ae835a', '#cfa778'][segment % 3]);
+      }
+      face([[x - 4, y + w * .54], [x + 1, y + w * .60], [x + 1, y + h], [x - 4, y + h]], '#c69a70');
+      if (modelDetail === 2) {
+        face([[x + w + 4, y + w * .54], [x + w - 3, y + w * .60], [x + w - 3, y + h],
+          [x + w + 4, y + h]], '#91613f');
+      }
+    }
     ctx.fillStyle = '#d8ae7f';
     ctx.fillRect(x + w * .45, y + w * .08, w * .10, 5);
     ctx.fillStyle = '#bf976f';
     ctx.fillRect(x - 3, y + w * .54, 8, h - w * .54);
     ctx.fillStyle = '#513322';
     ctx.fillRect(x + w * .24, y + h - 7, w * .52, 7);
+    facets += 5;
   }
 
   ctx.fillStyle = '#815134';
@@ -1898,10 +1929,18 @@ function drawBackdrop() {
     const h = height * .26;
     ctx.fillStyle = '#d9ad75';
     ctx.fillRect(x - w * .61, y - 3, w * 1.22, 4);
-    polygon([[x - w / 2, y], [x + w / 2, y], [x + w / 2, y + h * .86], [x, y + h], [x - w / 2, y + h * .86]], cloth);
-    polygon([[x - w / 2, y], [x - w * .13, y], [x - w * .10, y + h * .96], [x - w / 2, y + h * .86]], fold);
-    polygon([[x, y + h * .28], [x + w * .22, y + h * .48], [x, y + h * .66], [x - w * .22, y + h * .48]], '#d7a46b');
-    polygon([[x, y + h * .37], [x + w * .12, y + h * .48], [x, y + h * .57], [x - w * .12, y + h * .48]], cloth);
+    face([[x - w / 2, y], [x + w / 2, y], [x + w / 2, y + h * .86], [x, y + h], [x - w / 2, y + h * .86]], cloth);
+    face([[x - w / 2, y], [x - w * .13, y], [x - w * .10, y + h * .96], [x - w / 2, y + h * .86]], fold);
+    if (modelDetail) {
+      face([[x + w * .32, y], [x + w * .50, y], [x + w * .50, y + h * .86],
+        [x + w * .28, y + h * .92]], '#30252c42');
+      if (modelDetail === 2) {
+        face([[x - w * .50, y + h * .80], [x, y + h * .94], [x + w * .50, y + h * .80],
+          [x + w * .50, y + h * .86], [x, y + h], [x - w * .50, y + h * .86]], '#d6a676bd');
+      }
+    }
+    face([[x, y + h * .28], [x + w * .22, y + h * .48], [x, y + h * .66], [x - w * .22, y + h * .48]], '#d7a46b');
+    face([[x, y + h * .37], [x + w * .12, y + h * .48], [x, y + h * .57], [x - w * .12, y + h * .48]], cloth);
   }
 
   for (let i = 0; i < 380; i++) {
@@ -1926,6 +1965,7 @@ function drawBackdrop() {
   glow.addColorStop(1, '#1e0e0963');
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, width, height);
+  return facets;
 }
 
 function ellipse(x, y, rx, ry, color) {
@@ -2119,11 +2159,13 @@ function resize() {
   canvas.width = Math.round(width * density);
   canvas.height = Math.round(height * density);
   ctx.setTransform(density, 0, 0, density, 0, 0);
-  scenery.backdrop(width, height, drawBackdrop);
+  const started = performance.now();
+  const backdropFacets = scenery.backdrop(width, height, drawBackdrop, modelDetail);
   backdrop = document.createElement('canvas');
   backdrop.width = canvas.width;
   backdrop.height = canvas.height;
   backdrop.getContext('2d').drawImage(canvas, 0, 0);
+  ArenaBench.reportBackdrop(backdropFacets, performance.now() - started);
   draw();
 }
 
@@ -2155,7 +2197,7 @@ function draw() {
     ctx.translate(shakeX * scale, shakeY * scale);
     ctx.drawImage(backdrop, 0, 0, width, height);
   }
-  if (ArenaBench.drawScenery) scenery.draw(width, height, sceneryClock);
+  const animatedFacets = ArenaBench.drawScenery ? scenery.draw(width, height, sceneryClock, modelDetail) : 0;
   const sceneDone = performance.now();
   if (ArenaBench.drawEffects) ArenaEffects.drawStains(ctx, project, scale);
   const stainsDone = performance.now();
@@ -2201,7 +2243,8 @@ function draw() {
   if (effects) drawEffects();
   ctx.restore();
   if (effects) ArenaEffects.drawLabels(ctx, project, width, height);
-  ArenaBench.parts(sceneDone - startedAt, fightersDone - stainsDone, stainsDone - sceneDone + performance.now() - fightersDone);
+  ArenaBench.parts(sceneDone - startedAt, fightersDone - stainsDone, stainsDone - sceneDone + performance.now() - fightersDone,
+    animatedFacets);
 }
 
 // Magic, bolts, particles, blood and sparks, drawn over the fighters and hitboxes.
@@ -3179,8 +3222,8 @@ elements.speed.addEventListener('click', () => {
 qualitySelect.addEventListener('change', () => {
   modelDetail = qualityLevels.indexOf(qualitySelect.value);
   try { localStorage.setItem('arena-quality', qualitySelect.value); } catch { /* private mode */ }
+  resize();
   ArenaBench.reset();
-  draw();
 });
 
 // Showing gear and stats only changes the page layout, so it stays available during a fight.

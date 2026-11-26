@@ -88,6 +88,14 @@ The Quality rollout uses a fixed idle Varro and Cassian fixture for geometry cou
 | Fighter bodies, armor, helmets and all shields | 2,347 / 5,138 | 3,579 / 7,806 | 4,395 / 9,650 |
 | Held and stowed weapons, embedded bolts and finisher props | 2,347 / 5,138 | 3,656 / 7,967 | 4,576 / 10,026 |
 
+Scenery counts at a 375 × 812 CSS-pixel viewport in the Mac browser, with no active scenery reaction. Each pair gives cached backdrop shapes / animated facets. The cache rebuilds on a venue change, resize or Quality change. Curved details such as firefly glows are included in timings.
+
+| Venue | Low | Medium | High |
+| --- | ---: | ---: | ---: |
+| The Sand Pit | 145 / 64 | 225 / 89 | 298 / 128 |
+| Fernwood Clearing | 281 / 9 | 430 / 13 | 561 / 18 |
+| Moonlit Ruins | 97 / 4 | 144 / 6 | 191 / 8 |
+
 See the README section "Renderers and benchmark". To measure: open `?bench`, pick a renderer and polygon multiplier, tap **Reset**, and let a fight run 15–20 seconds. Use Rematch or Auto-rematch (not Generate matchup) to keep the same fighters. To reproduce the tables above from the console, wrap `drawGladiator`, `faces.sort` and `paintFaces` with timers and read `ArenaBench.snapshot()`.
 
 The 120 FPS cap was checked with simulated timestamps: 60, 90 and 120 Hz screens draw every frame, and 144, 165 and 240 Hz screens average 120 FPS with no false drops.

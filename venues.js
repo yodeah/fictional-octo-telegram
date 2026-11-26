@@ -11,6 +11,7 @@ const ArenaVenues = (() => {
   const rowColors = ['#a66547', '#80713e', '#567b74', '#744d42', '#b08656', '#665153', '#87948b'];
   const faceColors = ['#c89567', '#a47050', '#865738', '#dfb784'];
   const groundColors = ['#253b30', '#374536', '#172d2c'];
+  let facetCount = 0;
 
   function randomSource(seed) {
     return () => {
@@ -20,6 +21,7 @@ const ArenaVenues = (() => {
   }
 
   function polygon(ctx, color, points) {
+    facetCount++;
     ctx.fillStyle = color;
     ctx.beginPath();
     for (const [index, [x, y]] of points.entries()) {
@@ -28,6 +30,12 @@ const ArenaVenues = (() => {
     }
     ctx.closePath();
     ctx.fill();
+  }
+
+  function stoneRect(ctx, color, x, y, width, height) {
+    facetCount++;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, width, height);
   }
 
   function oval(ctx, color, x, y, rx, ry, angle = 0) {
@@ -44,7 +52,7 @@ const ArenaVenues = (() => {
     return ink;
   }
 
-  function branches(ctx, random, row) {
+  function branches(ctx, random, row, detail) {
     const color = ['#75846a', '#515f4e', '#374b3d'][row];
     const leaf = ['#859270', '#617653', '#526b4d'][row];
     for (let i = 0; i < 15 - row * 2; i++) {
@@ -53,14 +61,22 @@ const ArenaVenues = (() => {
       const tip = -80 + random() * (135 - row * 27);
       const w = 5 + row * 3 + random() * 12;
       const tilt = (random() - .5) * 38;
+      const refined = detail === 2 || (detail === 1 && i % 2 === 0);
       polygon(ctx, color, [[x - w, floor], [x + tilt * .3 - w * .4, floor * .54], [x + tilt, tip],
         [x + tilt * .4 + w * .45, floor * .52], [x + w, floor]]);
+      if (refined) polygon(ctx, '#e2cf9e37', [[x - w, floor], [x + tilt * .3 - w * .4, floor * .54],
+        [x + tilt, tip], [x + tilt * .31, floor * .55], [x - w * .28, floor]]);
       for (const side of [-1, 1]) {
         const y = 58 + random() * 57;
         const extent = 21 + random() * 37 + row * 9;
         polygon(ctx, color, [[x, y + 24], [x + extent * side, y - 31], [x + extent * side * .58, y - 6], [x, y + 36]]);
+        if (refined) polygon(ctx, '#c7ba883e', [[x, y + 24], [x + extent * side, y - 31],
+          [x + extent * side * .50, y + 1], [x, y + 29]]);
         polygon(ctx, leaf, [[x + extent * side * 1.43, y - 29], [x + extent * side * .82, y - 79],
           [x + extent * side * .27, y - 66], [x + extent * side * .12, y - 23], [x + extent * side * .95, y - 13]]);
+        if (refined) polygon(ctx, '#c3cb8e46', [[x + extent * side * .27, y - 66],
+          [x + extent * side * .82, y - 79], [x + extent * side * 1.43, y - 29],
+          [x + extent * side * .69, y - 48]]);
       }
     }
   }
@@ -82,12 +98,12 @@ const ArenaVenues = (() => {
     ctx.stroke();
   }
 
-  function forest(ctx) {
+  function forest(ctx, detail) {
     const random = randomSource(649);
     ctx.fillStyle = gradient(ctx, '#e1d6a0', '#8fa380', 0, 240);
     ctx.fillRect(0, 0, 1000, 420);
     oval(ctx, '#f9e2a46c', 535, 83, 175, 96);
-    for (let row = 0; row < 3; row++) branches(ctx, random, row);
+    for (let row = 0; row < 3; row++) branches(ctx, random, row, detail);
     for (let i = 0; i < 18; i++) {
       const x = random() * 1000;
       oval(ctx, i % 2 ? '#66744d' : '#475d46', x, 186 + random() * 29, 23 + random() * 44, 18 + random() * 22);
@@ -97,6 +113,10 @@ const ArenaVenues = (() => {
     polygon(ctx, '#6c6949', [[169, 211], [225, 193], [356, 196], [382, 205], [333, 206], [217, 216]]);
     oval(ctx, '#9a8059', 359, 212, 25, 9, -.13);
     oval(ctx, '#554936', 358, 212, 14, 5, -.13);
+    if (detail) {
+      polygon(ctx, '#847551', [[166, 217], [222, 201], [322, 202], [283, 209], [197, 223]]);
+      polygon(ctx, '#ae8f62', [[337, 211], [349, 204], [365, 203], [379, 208], [366, 208], [347, 213]]);
+    }
     for (let i = 0; i < 83; i++) {
       const x = random() * 1000;
       const y = 209 + random() * 31 + ((x < 88 || x > 912) ? random() * 190 : 0);
@@ -104,10 +124,13 @@ const ArenaVenues = (() => {
       const color = groundColors[i % groundColors.length];
       polygon(ctx, color, [[x, y], [x - s * .46, y - s * .79], [x + s * .1, y - s * .43],
         [x + s * .67, y - s], [x + s * .38, y]]);
+      if (detail === 2 || (detail === 1 && i % 2 === 0)) {
+        polygon(ctx, '#adbb7342', [[x + s * .15, y - s * .38], [x + s * .67, y - s], [x + s * .31, y]]);
+      }
     }
   }
 
-  function ruins(ctx) {
+  function ruins(ctx, detail) {
     const random = randomSource(832);
     ctx.fillStyle = gradient(ctx, '#303850', '#b0836d', 0, 240);
     ctx.fillRect(0, 0, 1000, 420);
@@ -122,15 +145,25 @@ const ArenaVenues = (() => {
     for (let index = 0; index < 7; index++) {
       const x = 88 + index * 137;
       const top = index === 2 || index === 3 ? 155 : 54 + random() * 59;
-      ctx.fillStyle = '#6c6061';
-      ctx.fillRect(x, top, 42, 211 - top);
-      ctx.fillStyle = '#948379';
-      ctx.fillRect(x, top, 12, 210 - top);
-      ctx.fillRect(x - 7, top - 4, 55, 10);
-      ctx.fillStyle = '#4d4b55';
-      for (let y = top + 18; y < 206; y += 23) ctx.fillRect(x, y, 42, 1.5);
-      ctx.fillStyle = '#9e8c7b';
-      ctx.fillRect(x - 12, 199, 62, 14);
+      stoneRect(ctx, '#6c6061', x, top, 42, 211 - top);
+      stoneRect(ctx, '#948379', x, top, 12, 210 - top);
+      stoneRect(ctx, '#948379', x - 7, top - 4, 55, 10);
+      if (detail) {
+        polygon(ctx, '#bca58d', [[x - 7, top - 4], [x + 48, top - 4], [x + 41, top], [x - 2, top + 1]]);
+        polygon(ctx, '#514c55', [[x + 36, top + 6], [x + 42, top + 3], [x + 42, 207], [x + 37, 207]]);
+      }
+      for (let y = top + 18; y < 206; y += 23) {
+        stoneRect(ctx, '#4d4b55', x, y, 42, 1.5);
+        if (detail === 2 || (detail === 1 && (Math.round((y - top - 18) / 23) + index) % 2 === 0)) {
+          polygon(ctx, '#ad918173', [[x + 3, y + 2], [x + 35, y + 2], [x + 29, y + 6], [x + 3, y + 5]]);
+        }
+      }
+      stoneRect(ctx, '#9e8c7b', x - 12, 199, 62, 14);
+      if (detail === 2) {
+        polygon(ctx, '#bda890', [[x - 12, 199], [x + 50, 199], [x + 45, 204], [x - 8, 204]]);
+        polygon(ctx, '#52464e', [[x - 1, top + 10], [x + 17, top + 14], [x + 21, top + 27],
+          [x + 14, top + 17], [x - 1, top + 14]]);
+      }
     }
     terrain(ctx, random, ['#8d7570', '#605563']);
     for (let i = 0; i < 36; i++) {
@@ -139,10 +172,12 @@ const ArenaVenues = (() => {
       const s = 2 + random() * 11;
       polygon(ctx, i % 2 ? '#978b84' : '#5d5862', [[x - s, y], [x - s * .3, y - s * .65],
         [x + s * .68, y - s * .55], [x + s, y]]);
+      if (detail === 2 || (detail === 1 && i % 2 === 0)) polygon(ctx, i % 2 ? '#b1a196' : '#837381',
+        [[x - s, y], [x - s * .3, y - s * .65], [x + s * .68, y - s * .55], [x + s * .20, y - s * .21]]);
     }
   }
 
-  function crowd(ctx, clock, cheer) {
+  function crowd(ctx, clock, cheer, detail) {
     const width = 1000;
     const excitement = Math.min(1, cheer * 1.6);
     for (let row = 0; row < 2; row++) {
@@ -155,9 +190,14 @@ const ArenaVenues = (() => {
         const lift = (Math.sin(clock * 2.7 - i * .67) + 1) * 3
           + (Math.sin(clock * 9 - i * .67) + 1) * excitement * 5;
         polygon(ctx, coat, [[x - 13, y + 16], [x - 9, y + 2], [x + 8, y + 1], [x + 13, y + 16]]);
+        if (detail === 2 || (detail === 1 && i % 2 === row)) {
+          polygon(ctx, '#e9cb9862', [[x - 8, y + 2], [x + 8, y + 1], [x + 1, y + 8], [x - 3, y + 4]]);
+        }
         if (cheer || i % 4 === 0) {
           polygon(ctx, coat, [[x - 7, y + 4], [x - 15, y - lift], [x - 18, y - lift + 3],
             [x - 13, y + 11], [x - 7, y + 12]]);
+          if (detail === 2) polygon(ctx, '#f2d59e58', [[x - 7, y + 4], [x - 15, y - lift],
+            [x - 14, y - lift + 4], [x - 8, y + 8]]);
           oval(ctx, face, x - 15, y - lift, 2.9, 2.7);
         }
         oval(ctx, face, x, y - 3, 5.0, 5.7);
@@ -169,7 +209,7 @@ const ArenaVenues = (() => {
     return [[.50, .332]];
   }
 
-  function wildlife(ctx, clock, reactions) {
+  function wildlife(ctx, clock, reactions, detail) {
     const squirrelHop = Math.sin(reactions[0] * Math.PI / 2) ** 2;
     const boarRun = Math.sin(reactions[1] * Math.PI / 2) ** 2;
     const bob = Math.sin(clock * 4.4 + boarRun * 4);
@@ -182,11 +222,17 @@ const ArenaVenues = (() => {
     oval(ctx, '#26342244', 0, 16, 35, 5);
     oval(ctx, '#493b31', -4, -5, 30, 16);
     polygon(ctx, '#6e5640', [[-32, -8], [-20, -22], [-3, -22], [16, -13], [9, 1], [-13, 7], [-35, 2]]);
+    if (detail) {
+      polygon(ctx, '#927456', [[-32, -8], [-20, -22], [-3, -22], [16, -13], [-7, -12], [-23, -4]]);
+      polygon(ctx, '#503f32', [[-35, 2], [-23, -4], [9, 1], [-13, 7]]);
+    }
     for (const [i, x] of [-23, -12, 7, 16].entries()) {
       const step = bob * (i % 2 ? -4 : 4);
       polygon(ctx, i % 2 ? '#514236' : '#332d27', [[x - 2, 3], [x + 4, 3], [x + step + 3, 14], [x + step - 3, 14]]);
+      if (detail === 2) polygon(ctx, '#856e54', [[x - 2, 3], [x + 1, 3], [x + step, 10], [x + step - 3, 14]]);
     }
     polygon(ctx, '#59483c', [[11, -17], [22, -11], [33, -7], [37, 2], [25, 7], [11, 2]]);
+    if (detail) polygon(ctx, '#906f53', [[11, -17], [22, -11], [33, -7], [28, -4], [15, -8]]);
     polygon(ctx, '#cbb195', [[30, 3], [38, 0], [39, -5], [41, 0], [36, 6]]);
     polygon(ctx, '#6e5640', [[14, -14], [14, -24], [23, -17], [22, -8]]);
     oval(ctx, '#e2cb9c', 25, -9, 1.6, 1.3);
@@ -201,6 +247,10 @@ const ArenaVenues = (() => {
     ctx.scale(facing, 1);
     oval(ctx, '#643c29', -12, -12, 9, 13, -.49);
     oval(ctx, '#ac6e3e', -14, -17, 7, 10, -.38);
+    if (detail) {
+      polygon(ctx, '#d39352', [[-20, -23], [-13, -25], [-8, -18], [-14, -18], [-11, -8]]);
+      if (detail === 2) polygon(ctx, '#7b472f', [[-18, -20], [-14, -18], [-11, -8], [-16, -13]]);
+    }
     oval(ctx, '#ad6940', 0, 0, 11, 6.3);
     oval(ctx, '#c88d55', 7, -6, 6.6, 5.9);
     polygon(ctx, '#bd7e51', [[5, -9], [6, -17], [10, -10], [9, -6]]);
@@ -209,7 +259,7 @@ const ArenaVenues = (() => {
     return [[squirrelX / 1000, (squirrelY - 12) / 420], [boarX / 1000, (boarY - 8) / 420]];
   }
 
-  function moonlife(ctx, clock, reactions) {
+  function moonlife(ctx, clock, reactions, detail) {
     const scatter = Math.sin(reactions[0] * Math.PI / 2) ** 2;
     const stirred = Math.sin(reactions[1] * Math.PI / 2) ** 2;
     const birdsX = 335 + Math.sin(clock * .35) * 120 + scatter * 98;
@@ -220,6 +270,9 @@ const ArenaVenues = (() => {
       const flap = Math.sin(clock * 9 - i * .68) * 5;
       polygon(ctx, '#32364a', [[x - 10, y - flap], [x - 3, y - 2], [x, y + 2], [x + 6, y - flap - 2],
         [x + 12, y - flap], [x + 3, y + 2], [x, y + 4]]);
+      if (detail === 2 || (detail === 1 && i % 2 === 0)) {
+        polygon(ctx, '#66637a', [[x, y + 2], [x + 6, y - flap - 2], [x + 12, y - flap], [x + 3, y + 2]]);
+      }
     }
     for (let i = 0; i < 19; i++) {
       const x = 692 + 125 * Math.sin(i * 17 + clock * .75 + stirred * i * .21);
@@ -277,23 +330,24 @@ const ArenaVenues = (() => {
       victory() {
         if (index === 0) reactions[0] = clock + 2.4;
       },
-      backdrop(width, height, original) {
-        if (index === 0) {
-          original();
-          return;
-        }
+      backdrop(width, height, original, detail) {
+        if (index === 0) return original();
+        facetCount = 0;
         ctx.save();
         ctx.scale(width / sceneWidth, height / sceneHeight);
-        if (index === 1) forest(ctx);
-        else ruins(ctx);
+        if (index === 1) forest(ctx, detail);
+        else ruins(ctx, detail);
         ctx.restore();
+        return facetCount;
       },
-      draw(width, height, time) {
+      draw(width, height, time, detail) {
+        facetCount = 0;
         clock = time;
         const active = reactions.map(value => Math.max(0, value - clock));
         ctx.save();
         ctx.scale(width / sceneWidth, height / sceneHeight);
-        const points = index === 0 ? crowd(ctx, clock, active[0]) : index === 1 ? wildlife(ctx, clock, active) : moonlife(ctx, clock, active);
+        const points = index === 0 ? crowd(ctx, clock, active[0], detail) : index === 1
+          ? wildlife(ctx, clock, active, detail) : moonlife(ctx, clock, active, detail);
         ctx.restore();
         if (clock >= nextMarkerAt) {
           points.forEach(([x, y], i) => {
@@ -302,6 +356,7 @@ const ArenaVenues = (() => {
           });
           nextMarkerAt = clock + .14;
         }
+        return facetCount;
       }
     };
   }

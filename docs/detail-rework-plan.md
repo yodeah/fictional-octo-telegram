@@ -2,11 +2,13 @@
 
 High Quality should show about twice the current geometric detail across fighters, equipment and venues. Medium should target about 1.5× and Low should retain today's geometry as a fallback. Put the new faces into visible contours and changes in surface angle, such as a helmet brow, a shield rim or a chipped stone edge. Keep the flat-shaded style, team colours, current camera and direct `index.html` entry point.
 
+The Quality menu and geometry upgrades are now in the game. High draws 4,576 faces and 10,026 triangle equivalents in the fixed reference pose. Low is the default while physical phone performance is being evaluated. See the [measured rollout](rendering-performance.md#benchmark-overlay).
+
 ## Work already in the game
 
-- `e6f6495` added the optional WebGL fighter painter and the FPS overlay. `5032b96` added resolution, fighter, scenery and effects probes with timings for those groups. The Quality setting and per-model counts are still to be implemented.
+- `e6f6495` added the optional WebGL fighter painter and the FPS overlay. `5032b96` added resolution, fighter, scenery and effects probes with timings for those groups.
 - `90c2309` set the 2× target after the first phone test reported about 24 FPS on Canvas and 22 FPS on WebGL. The Mac benchmark reached 60 FPS with either painter at 1× and in the synthetic 3× test. The phone bottleneck is still undiagnosed. See [rendering performance notes](rendering-performance.md).
-- The animation work introduced `displayPose`, weapon trails and hit reactions. The newer gear and finisher work added 15 special weapons that share base meshes, activated visual states, and five finisher paths. In the current pipeline, the wielded and stowed equipment, frozen fighters and ragdolls all pass through the same fighter model builder. Some projectiles and finisher props are drawn later in Canvas.
+- The animation work introduced `displayPose`, weapon trails and hit reactions. The gear and finisher work added 15 special weapons that share base meshes, activated visual states and weapon-specific finishers. Wielded and stowed equipment, frozen fighters and ragdolls all pass through the same fighter model builder. Some projectiles and finisher props are drawn later in Canvas.
 
 ## Scope and budgets
 
@@ -52,7 +54,7 @@ The historical Mac browser timings at 2,347 faces were 3.2 / 6.4 ms average / wo
 ## Verification for each playable commit
 
 - Deliver one coherent, visible change or one useful diagnostic improvement per commit. Record its scope and before/after geometry and timings with the relevant fixtures in the performance notes.
-- Complete a bout in Canvas and WebGL and check the console. Check the changed model at phone and desktop sizes, with the Hitboxes overlay during contact and with the appropriate guard, swap, fall or finisher pose. Use the `?force` switches documented in the README for the five finishers. Compare the two painters on the same pose, paying attention to overlaps and concave faces.
+- Complete a bout in Canvas and WebGL and check the console. Check the changed model at phone and desktop sizes, with the Hitboxes overlay during contact and with the appropriate guard, swap, fall or finisher pose. Use the `?force` switches documented in the Mechanics guide for the finishers. Compare the two painters on the same pose, paying attention to overlaps and concave faces.
 - Keep simulation timing, hitboxes, weapon segments, stats, and random rolls intact. Keep models anchored to the existing pose and use seeded variation for the art. Confirm tier changes mid-bout affect drawing only. When testing a rendering change that touches a shared helper, compare outcome, event order and random-call count under the same seeded, fixed simulation steps.
 - Verify performance at 1× simulation speed and 1× Polys with the same fixtures. Compare draw time and drops for each painter. On the test phone, Low should match or beat its own pre-change baseline. Set the default only after checking live frame pacing, including a heavy bout and an active venue. Review the trade-off if High reaches the face target but misses the device's frame budget.
 - Stage the relevant files and report the commit hash, `open index.html`, what to try and the measured change.
