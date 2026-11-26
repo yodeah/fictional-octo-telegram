@@ -97,4 +97,37 @@
       plate(g, 'M-21,10 L-27,20 L-7,20 L-6,14 Z', plateFill(g, -27, -6, c.iron));
     }
   });
+
+  sets.gilded = derive('plate', { steel: [222, 186, 108], iron: [152, 112, 66], brass: [168, 60, 56] }, {
+    box: { head: [-44, -52, 30, 28] },
+    torso(g, c, base) {
+      base(g, c);
+      // Filigree scrolls and a jewelled medallion.
+      for (const s of [-1, 1]) {
+        stroke(g, `M3,-36 C${3 + s * 8},-30 ${3 + s * 14},-36 ${3 + s * 11},-42 C${3 + s * 9},-45 ${3 + s * 6},-41 ${3 + s * 9},-39`, tone(c.iron, -.35), 1.3);
+        stroke(g, `M3,-26 C${3 + s * 6},-20 ${3 + s * 12},-24 ${3 + s * 10},-30`, tone(c.iron, -.35), 1.1);
+      }
+      disc(g, 3, -51, 7, gradient(g, -3, -57, 9, -45, [248, 220, 140], [.5, 0, -.4]), 1.2);
+      disc(g, 3, -51, 4.2, gradient(g, 0, -54, 6, -48, [196, 40, 60], [.45, 0, -.45]), .9);
+      disc(g, 4.4, -52.6, 1.2, '#fff', 0);
+      for (const x of [-9, 15]) disc(g, x, -50, 2, '#3f8fb0', .7);
+    },
+    head(g, c) {
+      // A tall plume and gilded wings on an open-faced parade helmet.
+      face(g);
+      const plume = 'M2,-24 C-4,-52 -30,-54 -42,-34 C-34,-40 -26,-38 -24,-34 C-38,-30 -40,-16 -38,-4 C-30,-22 -16,-24 -8,-18 Z';
+      shape(g, plume, gradient(g, -38, -48, -6, -16, [240, 232, 214], [.25, 0, -.3]), 1.3);
+      for (let i = 0; i < 12; i++) stroke(g, `M0,-24 C${-8 - i},${-48 + i * 2} ${-28 - i},${-40 + i * 3} ${-37},${-18 + i * 1.4}`, 'rgba(120,90,60,.3)', .6);
+      const dome = 'M-17,6 C-22,-14 -10,-23 2,-23 C13,-23 19,-15 18,-7 L1,-9 L-5,-1 L-8,13 L-17,12 Z';
+      plate(g, dome, gradient(g, -18, 4, 14, -20, c.steel, [-.5, -.15, .2, .8, .1]));
+      plate(g, 'M-18,-9 Q2,-13 20,-8 L20,-4.6 Q2,-9 -18,-5 Z', gradient(g, 0, -12, 0, -5, c.brass, [.5, 0, -.3]));
+      for (let i = 0; i < 4; i++) {
+        shape(g, `M-6,${-2 - i * 1.6} Q${-18 - i * 3},${-6 - i * 6} ${-30 + i * 2},${-14 - i * 8} Q${-20},${-8 - i * 3} -8,${3 - i * 2} Z`,
+          gradient(g, -30, -34, -6, 0, [248, 216, 132], [.4, 0, -.25]), .9);
+      }
+      disc(g, -5, 0, 3.4, gradient(g, -8, -3, -2, 3, c.steel, [.7, -.3]), 1);
+      disc(g, 6, -15, 2.6, '#c4283c', .8);
+      plate(g, 'M-4,2 C-2,8 2,13 8,15 L5,19 C-2,17 -7,10 -6,3 Z', plateFill(g, -7, 8, c.steel));
+    }
+  });
 })();
