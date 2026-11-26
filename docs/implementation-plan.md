@@ -20,6 +20,7 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 | `duel.js` | Seeded, fixed-step wrapper around the engine. The same seed gives the same fight. |
 | `game.js`, `game.css`, `art.js` | Screens, saving and drawn scenes. |
 | `arena.js` and friends | Combat engine and its drawing. |
+| `fighter2d.js`, `weapons2d.js`, `armor2d.js` | The 2D fighter art, the default. Details in [2d-art-poc.md](2d-art-poc.md). |
 | `tests/` | Headless tests: rules, repeatable fights, whole runs, weapon balance. |
 | `sandbox.html` | The old sparring page, for trying weapons. |
 
@@ -60,6 +61,14 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - Any new energy check in the engine must use the cost after the stance multiplier.
 - Wounds made the sensible bot finish 17 of 30 runs instead of 19 (`node tests/report.mjs`). It pays the surgeon only before a champion; paying every time starves it of debt money.
 - Stance matchups are sensitive to combat changes. If one of those tests fails after a combat edit, check the new rates on a few hundred seeds before picking another matchup.
+
+**2D art (merged 2026-11-26)**
+- 2D is the default; the **Art** button on the fight screen (or `?style=3d`) brings back the 3D meshes. The choice is kept in `localStorage` under `arena-art`.
+- New weapons, shields and armor need an entry in the 2D files, or they keep their 3D mesh. Rags borrow the leather set.
+- The picture never changes the fight. A new script must also be listed in `sandbox.html` and `tests/harness.mjs`.
+
+**Deploying**
+- Every push to `swords-and-sandals` rebuilds https://yodeah.github.io/fictional-octo-telegram/. Check it with `gh api repos/yodeah/fictional-octo-telegram/pages/builds/latest --jq '.status + " " + .commit'`.
 
 **Working in the repository**
 - `swords-and-sandals` is usually checked out in another worktree. Branch from `origin/swords-and-sandals` under a new name and push with `git push origin HEAD:swords-and-sandals`.

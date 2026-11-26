@@ -6,6 +6,10 @@ After each coherent change passes verification, create a Git commit for it.
 - Review the diff and stage only the files relevant to the change. Leave unrelated edits alone.
 - Use a concise commit message that describes the outcome.
 
+## Deploy
+
+After each commit, push it with `git push origin HEAD:swords-and-sandals`. That rebuilds the GitHub Pages site (https://yodeah.github.io/fictional-octo-telegram/). Check that the build finished for your commit before reporting.
+
 ## Playable build
 
 Every commit that changes the game must be a meaningful improvement in a working state that I can start and test. There is no build step: the build is `index.html` and its files.

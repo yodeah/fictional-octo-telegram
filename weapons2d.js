@@ -1,0 +1,775 @@
+'use strict';
+
+// 2D art for the weapons, shields and special weapons beyond the first set in fighter2d.js.
+// Centimetres, +x from the grip toward the head; a positive 3D offset is -y here. Each head covers
+// the same stretch weaponSegments() hit-tests.
+(() => {
+  const { weapons: art, shields, tools } = ArenaArt2D;
+  const { OUTLINE, DARKLEATHER, tone, gradient, shape, stroke, disc, rivet, wear, clipped, seeded } = tools;
+
+  // ---- shared parts
+  // Light falls from above on anything lying along the weapon.
+  const across = (g, r, rgb, stops = [.1, .26, -.12, -.45]) => gradient(g, 0, -r, 0, r, rgb, stops);
+  const steelAcross = (g, r, rgb) => gradient(g, 0, -r, 0, r, rgb, [.15, .75, .3, -.1, .2, -.4]);
+  const poly = points => 'M' + points.map(p => p.join(',')).join(' L') + ' Z';
+  function haft(g, rgb, x0, x1, r = 3.2) {
+    const d = `M${x0},${-r * .9} C${x0 + (x1 - x0) * .3},${-r * 1.2} ${x0 + (x1 - x0) * .6},${-r * .8} ${x1},${-r} L${x1},${r} C${x0 + (x1 - x0) * .6},${r * 1.2} ${x0 + (x1 - x0) * .3},${r * .8} ${x0},${r * .9} Z`;
+    shape(g, d, across(g, r, rgb), 1.2);
+    wear(g, d, [x0, -r, x1, r], Math.round((x1 - x0) * .6), 'rgba(255,216,168,.3)', 'rgba(25,10,2,.4)', 113, 7);
+  }
+  function wrap(g, rgb, x0, x1, r = 3.8) {
+    shape(g, `M${x0},${-r} L${x1},${-r} L${x1},${r} L${x0},${r} Z`, across(g, r, rgb), 1);
+    for (let x = x0 + 1.5; x < x1 - 3; x += 4) stroke(g, `M${x},${-r} L${x + 3.6},${r}`, tone(DARKLEATHER, -.15), 1.1);
+  }
+  function band(g, rgb, x, r = 4.6, w = 4.4) {
+    shape(g, `M${x - w / 2},${-r} h${w} v${r * 2} h${-w} Z`, gradient(g, 0, -r, 0, r, rgb, [.6, .12, -.42]), .9);
+  }
+  // A blade or head: filled steel with a bright upper edge and wear.
+  function metal(g, d, r, rgb, seed = 5) {
+    shape(g, d, steelAcross(g, r, rgb), 0);
+    clipped(g, d, () => {
+      g.save();
+      g.translate(0, 1.1);
+      stroke(g, d, 'rgba(255,250,240,.8)', 1.3);
+      g.restore();
+    });
+    stroke(g, d, OUTLINE, 1.3);
+    wear(g, d, [-50, -r - 4, 180, r + 4], 90, 'rgba(255,255,255,.4)', 'rgba(30,30,45,.3)', seed, 4);
+  }
+  // Reference materials, so a special that overrides one also recolors parts with their own base color.
+  const STEEL_REF = tools.STEEL;
+  const IRON_REF = tools.IRON;
+  const WOOD_REF = tools.WOOD;
+  // One chain link, lying along the chain; every second one is drawn squashed to look turned.
+  function linkArt() {
+    return {
+      box: [-9, -7, 9, 7],
+      draw(g, c) {
+        for (const [color, w] of [[OUTLINE, 4.6], [tone(c.iron, .15), 2.6]]) {
+          g.beginPath();
+          g.ellipse(0, 0, 5.4, 3.8, 0, 0, Math.PI * 2);
+          g.strokeStyle = color;
+          g.lineWidth = w;
+          g.stroke();
+        }
+        stroke(g, 'M-4.4,-2.6 Q0,-4.6 4.4,-2.6', 'rgba(255,255,255,.7)', .8);
+      }
+    };
+  }
+  // A spiked iron ball of the given radius in centimetres.
+  function ballArt(r) {
+    const reach = r * 1.45;
+    return {
+      box: [-reach - 2, -reach - 2, reach + 2, reach + 2],
+      draw(g, c) {
+        for (let i = 0; i < 8; i++) {
+          g.save();
+          g.rotate(i * Math.PI / 4 + .3);
+          metal(g, `M${r * .75},${-r * .27} L${reach},0 L${r * .75},${r * .27} Z`, r * .4, c.steel, 151);
+          g.restore();
+        }
+        disc(g, 0, 0, r, gradient(g, -r, -r, r, r, c.iron, [.65, .1, -.15, -.5]), 1.4);
+        stroke(g, `M${-r},0 C${-r * .4},${r * .45} ${r * .4},${r * .45} ${r},0`, tone(c.brass, 0), 2.4);
+        for (const x of [-r * .5, 0, r * .5]) rivet(g, x, r * .32 - Math.abs(x) * .12, 1.2, c.brass);
+        disc(g, -r * .38, -r * .4, r * .2, 'rgba(255,255,255,.75)', 0);
+      }
+    };
+  }
+  // A special is its base weapon in its own materials, with a few details painted on top.
+  function special(key, base, colors, extra, overrides) {
+    art[key] = { ...art[base], colors, extra, ...overrides };
+  }
+
+  art.rapier = {
+    box: [-34, -20, 142, 20],
+    draw(g, c) {
+      metal(g, 'M16,-3.2 L60,-2.6 L112,-1.8 L137,0 L112,1.8 L60,2.6 L16,3.2 Z', 3.2, c.steel, 11);
+      stroke(g, 'M18,0 L118,0', tone(c.iron, -.2), .7);
+      wrap(g, c.grip, -19, 12, 3.2);
+      // Swept hilt: knuckle bow, side rings and long quillons.
+      for (const [d, w] of [['M16,-4 C8,-16 -14,-16 -21,-4', 2.4], ['M15,4 C22,17 34,13 27,3', 2.2],
+        ['M17,-4 C24,-14 32,-11 27,-3', 2.2], ['M14,4 C6,12 -4,13 -8,5', 1.8]]) {
+        stroke(g, d, OUTLINE, w + 1.6);
+        stroke(g, d, tone(c.brass, .05), w);
+        stroke(g, d, tone(c.brass, .55), w * .3);
+      }
+      shape(g, 'M14,-17 C20,-18 19,-8 18,0 C19,8 14,12 17,17 C11,18 12,9 13,0 C12,-8 9,-16 14,-17 Z', steelAcross(g, 17, c.brass), 1.1);
+      disc(g, 15.6, 0, 3.2, c.teamCss, .8);
+      disc(g, -24, 0, 5, gradient(g, -28, -4, -20, 4, c.brass, [.65, 0, -.45]), 1.1);
+      rivet(g, -30, 0, 1.6, c.brass);
+    }
+  };
+
+  art.falchion = {
+    box: [-34, -38, 134, 24],
+    draw(g, c) {
+      // A heavy blade that widens and curves up toward a clipped point.
+      const blade = 'M17,-8.6 C34,-14 56,-18 88,-24 C102,-27 116,-27 128,-22 C124,-18 120,-11 117,-6 C108,2 94,5 88,4.6 C66,4 46,6 17,8.6 Z';
+      metal(g, blade, 24, c.steel, 13);
+      stroke(g, 'M20,-2 C46,-6 70,-9 100,-17', tone(c.iron, -.1), 2.4);
+      stroke(g, 'M20,-3.2 C46,-7.2 70,-10.2 100,-18.2', 'rgba(255,255,255,.7)', .7);
+      for (let i = 0; i < 4; i++) disc(g, 34 + i * 9, 2 - i * .6, 1.2, tone(c.iron, -.35), .5);
+      wrap(g, c.grip, -20, 13, 4);
+      shape(g, 'M13,-17 L20,-15 L19,-6 L22,0 L19,6 L20,15 L13,17 L14,0 Z', steelAcross(g, 17, c.brass), 1.2);
+      disc(g, 17, 0, 2.2, c.teamCss, .6);
+      shape(g, 'M-20,-5 C-27,-8 -33,-4 -31,2 C-31,7 -25,8 -20,5 Z', gradient(g, -32, -6, -20, 6, c.brass, [.6, 0, -.45]), 1.2);
+    }
+  };
+
+  art.greatsword = {
+    box: [-68, -38, 169, 38],
+    draw(g, c) {
+      const blade = 'M19,-6.4 L36,-6 L38,-10.6 L42,-7.6 L129,-7.2 L163,0 L129,7.2 L42,7.6 L38,10.6 L36,6 L19,6.4 Z';
+      metal(g, blade, 9, c.steel, 17);
+      shape(g, 'M44,-1.8 L126,-1.2 L134,0 L126,1.2 L44,1.8 Z', across(g, 1.8, c.iron, [-.3, .3]), .5);
+      wrap(g, c.grip, -52, 14, 4.4);
+      band(g, c.brass, -22, 5.4, 3.6);
+      for (const s of [-1, 1]) {
+        shape(g, `M14,${s * 5} C16,${s * 15} 20,${s * 24} 31,${s * 32} C33,${s * 36} 27,${s * 36} 25,${s * 33} C16,${s * 27} 11,${s * 16} 13,${s * 5} Z`,
+          steelAcross(g, 34, c.brass), 1.2);
+        disc(g, 29.5, s * 33.4, 3, gradient(g, 27, -3, 32, 3, c.brass, [.6, -.3]), 1);
+      }
+      shape(g, 'M10,-7 L22,-6 L24,0 L22,6 L10,7 Z', steelAcross(g, 7, c.iron), 1.1);
+      disc(g, 17, 0, 3, c.teamCss, .8);
+      shape(g, 'M-52,-5 L-58,-8.6 L-66,0 L-58,8.6 L-52,5 Z', gradient(g, -64, -7, -52, 7, c.brass, [.6, 0, -.45]), 1.2);
+      disc(g, -58, 0, 2.6, c.teamCss, .7);
+    }
+  };
+
+  art.claymore = {
+    box: [-68, -38, 180, 38],
+    draw(g, c) {
+      metal(g, 'M19,-7.6 L46,-8.4 L121,-6.6 L151,-4.8 L175,0 L151,4.8 L121,6.6 L46,8.4 L19,7.6 Z', 8.4, c.steel, 19);
+      shape(g, 'M34,0 L56,-1.9 L148,0 L56,1.9 Z', across(g, 1.9, c.iron, [-.35, .3]), .5);
+      wrap(g, c.grip, -52, 14, 4.2);
+      // Quillons sweep toward the blade and end in four-ring knots.
+      for (const s of [-1, 1]) {
+        shape(g, `M13,${s * 4} L29,${s * 27} L24,${s * 30} L11,${s * 9} Z`, steelAcross(g, 30, c.iron), 1.2);
+        for (const [dx, dy] of [[3.4, 0], [-3.4, 0], [0, 3.4], [0, -3.4]]) {
+          disc(g, 27 + dx, s * 30 + dy, 3, tone(c.iron, .12), .9);
+          disc(g, 27 + dx, s * 30 + dy, 1.1, tone(c.iron, -.5), 0);
+        }
+      }
+      shape(g, 'M12,-7 L24,-5 L30,0 L24,5 L12,7 Z', steelAcross(g, 7, c.iron), 1.1);
+      disc(g, 18, 0, 2.2, c.teamCss, .6);
+      disc(g, -57, 0, 6.4, gradient(g, -62, -5, -52, 5, c.iron, [.55, 0, -.4]), 1.2);
+      disc(g, -57, 0, 2.4, c.teamCss, .7);
+    }
+  };
+
+  art.executioner = {
+    box: [-68, -36, 162, 36],
+    draw(g, c) {
+      // Broad, parallel and blunt-tipped, made for one heavy cut.
+      const blade = 'M19,-9 L34,-13 L146,-14 L156,-5 L156,7 L148,13 L34,13 L19,9 Z';
+      metal(g, blade, 14, [153, 151, 139].map((v, i) => Math.round(v * c.steel[i] / STEEL_REF[i])), 23);
+      shape(g, 'M36,-3.4 L134,-3.4 L134,3.4 L36,3.4 Z', across(g, 3.4, c.iron, [-.4, .2]), .6);
+      for (const x of [141, 148]) disc(g, x, -1, 2.4, tone(c.iron, -.55), .8);
+      // Engraved scales of justice, cut dark with a lit edge.
+      const scales = 'M62,-11 V11 M62,-10 H78 M78,-10 L73,-5 H83 Z M62,10 H78 M78,10 L73,5 H83 Z';
+      stroke(g, scales, 'rgba(255,245,215,.8)', 2.6);
+      stroke(g, scales, tone(c.brass, -.45), 1.4);
+      disc(g, 62, 0, 2.6, tone(c.brass, .1), .8);
+      wrap(g, c.grip, -52, 14, 4.6);
+      shape(g, 'M12,-27 L21,-29 L22,-8 L25,0 L22,8 L21,29 L12,27 L14,0 Z', steelAcross(g, 29, c.brass), 1.3);
+      for (const y of [-21, 21]) disc(g, 17, y, 2.2, tone(c.iron, -.3), .7);
+      disc(g, 18, 0, 3.4, c.teamCss, .8);
+      shape(g, 'M-52,-7 L-64,-6 L-66,6 L-52,7 Z', steelAcross(g, 7, c.brass), 1.2);
+    }
+  };
+
+  art.spear = {
+    box: [-124, -26, 184, 26],
+    draw(g, c) {
+      haft(g, c.wood, -118, 128, 3);
+      wrap(g, c.grip, -16, 16, 3.8);
+      shape(g, 'M-122,0 L-116,-3.4 L-108,-3.6 L-108,3.6 L-116,3.4 Z', steelAcross(g, 4, c.iron), 1.1);
+      // Two thick tassels under the head.
+      for (const s of [-1, 1]) {
+        shape(g, `M122,${s * 3} C114,${s * 6} 106,${s * 9} 100,${s * 18} L105,${s * 15} L104,${s * 21} L110,${s * 14} L111,${s * 18} C115,${s * 10} 120,${s * 8} 127,${s * 4} Z`,
+          gradient(g, 100, s * 20, 124, s * 3, c.team, [-.2, .15, .05]), 1.1);
+        stroke(g, `M121,${s * 4.6} C115,${s * 7} 109,${s * 10} 104,${s * 16}`, 'rgba(255,215,185,.55)', .8);
+      }
+      shape(g, 'M118,-4.4 L134,-3.4 L134,3.4 L118,4.4 Z', steelAcross(g, 4.4, c.brass), 1.1);
+      metal(g, 'M132,-3.4 C140,-12 150,-11 158,-9 L179,0 L158,9 C150,11 140,12 132,3.4 Z', 11, c.steel, 29);
+      stroke(g, 'M134,0 L176,0', tone(c.iron, -.15), 1.4);
+      stroke(g, 'M134,-1 L170,-1', 'rgba(255,255,255,.7)', .6);
+    }
+  };
+
+  art.trident = {
+    box: [-120, -30, 192, 30],
+    draw(g, c) {
+      haft(g, c.wood, -115, 142, 3.1);
+      wrap(g, c.grip, -16, 16, 3.9);
+      for (const x of [-112, -24, 24, 128]) band(g, c.brass, x, 4.4);
+      for (const s of [-1, 1]) {
+        metal(g, `M134,${s * 2} C140,${s * 12} 140,${s * 22} 152,${s * 23} L170,${s * 22} L168,${s * 27} L182,${s * 19} L170,${s * 16} L153,${s * 15.6} C147,${s * 14} 147,${s * 7} 146,${s * 3} Z`, 27, c.steel, 31);
+      }
+      metal(g, 'M136,-3.4 L166,-3 L164,-7 L187,0 L164,7 L166,3 L136,3.4 Z', 7, c.steel, 37);
+      shape(g, 'M126,-5 L142,-7 L146,0 L142,7 L126,5 Z', steelAcross(g, 7, c.brass), 1.2);
+      disc(g, 137, 0, 2.4, c.teamCss, .6);
+      shape(g, 'M-119,0 L-112,-4 L-108,0 L-112,4 Z', tone(c.brass, 0), 1);
+    }
+  };
+
+  art.halberd = {
+    box: [-120, -28, 192, 38],
+    draw(g, c) {
+      haft(g, c.wood, -115, 148, 3.3);
+      wrap(g, c.grip, -16, 16, 4);
+      for (const x of [-112, -19, 17]) band(g, c.brass, x, 4.6);
+      // Axe blade on one side (+y), hook on the other, spike on top.
+      metal(g, 'M124,2 L129,31 C141,34 154,32 160,27 C168,22 173,15 177,9 L157,-1 L120,0 Z', 33, c.steel, 41);
+      stroke(g, 'M129,28 C142,31 156,29 171,13', 'rgba(255,255,255,.8)', 1.2);
+      disc(g, 146, 15, 3.4, tone(c.iron, -.4), .9);
+      metal(g, 'M134,-3 C138,-12 142,-20 132,-25 C146,-24 152,-14 152,-3 Z', 24, c.steel, 43);
+      metal(g, 'M148,-5 L166,-3.4 L189,0 L166,3.4 L148,5 Z', 6, c.steel, 47);
+      shape(g, 'M116,-4.6 L154,-4.6 L154,4.6 L116,4.6 Z', steelAcross(g, 4.6, c.iron), 1.1);
+      for (const x of [122, 134, 146]) rivet(g, x, 0, 1.4, c.brass);
+      shape(g, 'M-119,0 L-112,-4 L-108,0 L-112,4 Z', tone(c.iron, 0), 1);
+    }
+  };
+
+  art.axe = {
+    box: [-34, -52, 112, 20],
+    draw(g, c) {
+      haft(g, c.wood, -29, 79, 3.4);
+      wrap(g, c.grip, -24, 8, 4.2);
+      // The cutting edge sits on the positive side of the haft (-y).
+      metal(g, 'M55,6 L77,6 L79,-14 C84,-30 92,-38 98,-43 C86,-50 70,-52 62,-49 C52,-47 45,-43 40,-39 C50,-34 56,-24 56,-14 Z', 50, c.steel, 53);
+      stroke(g, 'M44,-40 C56,-46 78,-49 95,-43', 'rgba(255,255,255,.85)', 1.6);
+      stroke(g, 'M58,-14 C60,-24 56,-32 52,-37 M76,-14 C78,-24 84,-32 88,-37', 'rgba(30,30,45,.5)', 1);
+      shape(g, 'M54,-8 L78,-8 L78,7 L54,7 Z', steelAcross(g, 8, c.iron), 1.2);
+      for (const x of [60, 72]) rivet(g, x, 0, 1.5, c.brass);
+      shape(g, 'M66,-16 l6,-7 l-6,-7 l-6,7 Z', tone(c.brass, .1), .8);
+      band(g, c.brass, -28, 4.8);
+    }
+  };
+
+  art.beardedAxe = {
+    box: [-34, -54, 114, 20],
+    draw(g, c) {
+      haft(g, c.wood, -29, 106, 3.2);
+      wrap(g, c.grip, -24, 8, 4.1);
+      // A long beard drops back toward the hand.
+      metal(g, 'M86,6 L100,6 C104,-8 106,-14 107,-20 C100,-34 88,-45 68,-50 C55,-52 45,-47 38,-41 C52,-38 62,-30 64,-22 C70,-12 80,-8 86,-6 Z', 52, c.steel, 59);
+      stroke(g, 'M42,-42 C56,-50 86,-48 104,-22', 'rgba(255,255,255,.85)', 1.6);
+      stroke(g, 'M70,-28 C80,-34 90,-30 96,-20 C86,-22 80,-20 76,-14', tone(c.iron, -.2), 1.1);
+      shape(g, 'M82,-8 L102,-8 L102,7 L82,7 Z', steelAcross(g, 8, c.iron), 1.2);
+      for (const x of [87, 97]) rivet(g, x, 0, 1.4, c.brass);
+      for (const x of [20, 62]) band(g, c.brass, x, 4.4);
+      band(g, c.iron, -28, 4.8);
+    }
+  };
+
+  art.crescentAxe = {
+    box: [-78, -58, 134, 20],
+    draw(g, c) {
+      haft(g, c.wood, -72, 110, 3.6);
+      wrap(g, c.grip, -54, -26, 4.4);
+      wrap(g, c.grip, -12, 14, 4.4);
+      metal(g, 'M72,8 L86,6 C98,-8 112,-14 128,-34 C118,-46 100,-55 80,-54 C70,-54 58,-48 52,-42 C68,-40 78,-30 80,-22 C80,-14 76,-4 72,0 Z', 54, c.steel, 61);
+      stroke(g, 'M56,-43 C80,-58 110,-52 125,-35', 'rgba(255,255,255,.85)', 1.8);
+      // Pierced crescent and engraving.
+      shape(g, 'M94,-26 C104,-32 106,-42 96,-46 C104,-38 100,-30 90,-30 Z', tone(c.iron, -.55), .8);
+      stroke(g, 'M84,-22 C96,-20 108,-24 118,-34', tone(c.brass, .2), 1.2);
+      metal(g, 'M104,-4 L132,0 L104,4 Z', 5, c.steel, 67);
+      shape(g, 'M68,-8 L106,-7 L106,7 L68,8 Z', steelAcross(g, 8, c.iron), 1.2);
+      for (const x of [76, 88, 99]) rivet(g, x, 0, 1.5, c.brass);
+      for (const x of [-70, 20, 56]) band(g, c.brass, x, 4.8);
+    }
+  };
+
+  art.mace = {
+    box: [-36, -28, 108, 28],
+    draw(g, c) {
+      haft(g, c.wood, -30, 70, 3.5);
+      wrap(g, c.grip, -23, 10, 4.3);
+      for (const x of [18, 56]) band(g, c.iron, x, 4.6);
+      // Flanged head: two flanges in profile and one facing the viewer.
+      for (const s of [-1, 1]) {
+        metal(g, `M62,${s * 7} C66,${s * 14} 68,${s * 20} 72,${s * 24} L79,${s * 16} L90,${s * 22} C94,${s * 16} 96,${s * 11} 98,${s * 7} Z`, 24, c.steel, 71);
+        shape(g, `M66,${s * 9} L73,${s * 19} L79,${s * 12} L89,${s * 18} L94,${s * 8} Z`, 'rgba(20,20,35,.28)', 0);
+      }
+      shape(g, 'M61,-8 C72,-10 88,-10 98,-7 L98,7 C88,10 72,10 61,8 Z', steelAcross(g, 10, c.iron), 1.3);
+      metal(g, 'M64,-2.8 L75,-6 L84,-3.4 L95,-4 L99,0 L95,4 L84,3.4 L75,6 L64,2.8 Z', 6, c.steel, 73);
+      stroke(g, 'M66,0 L96,0', 'rgba(255,255,255,.75)', .9);
+      shape(g, 'M97,-5 L106,0 L97,5 Z', steelAcross(g, 5, c.brass), 1.1);
+      band(g, c.brass, 61, 8.6, 4);
+      disc(g, -32, 0, 4.4, gradient(g, -36, -4, -28, 4, c.brass, [.6, -.4]), 1.1);
+    }
+  };
+
+  art.morningstar = {
+    box: [-36, -32, 124, 32],
+    draw(g, c) {
+      haft(g, c.wood, -30, 76, 3.5);
+      wrap(g, c.grip, -23, 10, 4.3);
+      for (const x of [20, 56, 70]) band(g, c.iron, x, 4.8);
+      const spike = (angle, reach) => {
+        g.save();
+        g.translate(91, 0);
+        g.rotate(angle);
+        metal(g, `M13,-4.6 L${reach},0 L13,4.6 Z`, 5, c.steel, 79);
+        g.restore();
+      };
+      for (let i = -3; i <= 4; i++) spike(i * Math.PI / 4, i === 0 ? 31 : 28);
+      disc(g, 91, 0, 17, gradient(g, 80, -14, 102, 14, c.iron, [.6, .1, -.2, -.5]), 1.4);
+      wear(g, 'M74,0 a17,17 0 1 0 34,0 a17,17 0 1 0 -34,0 Z', [74, -17, 108, 17], 50, 'rgba(255,255,255,.35)', 'rgba(20,20,30,.4)', 83, 3);
+      for (const [x, y] of [[85, -7], [97, 4], [83, 7]]) {
+        disc(g, x, y, 3.6, gradient(g, x - 3, y - 3, x + 3, y + 3, c.steel, [.7, -.4]), .9);
+      }
+      shape(g, 'M72,-7 L80,-8 L80,8 L72,7 Z', steelAcross(g, 8, c.brass), 1.1);
+      disc(g, -32, 0, 4.4, tone(c.iron, 0), 1.1);
+    }
+  };
+
+  art.club = {
+    box: [-36, -24, 114, 24],
+    draw(g, c) {
+      const body = 'M-30,-3.6 C0,-3.4 28,-5 48,-9 C68,-13 82,-18 98,-17 C110,-16 111,16 98,17 C82,18 68,13 48,9 C28,5 0,3.4 -30,3.6 Z';
+      shape(g, body, across(g, 17, [152, 105, 59].map((v, i) => Math.round(v * c.wood[i] / WOOD_REF[i])), [.2, .3, -.05, -.45]), 1.4);
+      wear(g, body, [-30, -17, 108, 17], 130, 'rgba(255,220,170,.35)', 'rgba(30,12,2,.45)', 89, 8);
+      for (const [x, y] of [[66, 3], [90, -7]]) {
+        g.beginPath();
+        g.ellipse(x, y, 4.4, 2.6, .2, 0, Math.PI * 2);
+        g.fillStyle = 'rgba(55,28,8,.7)';
+        g.fill();
+      }
+      for (const [x, r] of [[62, 12.4], [77, 16], [93, 17.4]]) {
+        band(g, c.brass, x, r, 3.6);
+        for (const y of [-r * .6, 0, r * .6]) rivet(g, x, y, 1.1, c.brass);
+      }
+      for (const [x, y] of [[70, -14], [85, -17], [70, 14], [85, 17]]) {
+        metal(g, `M${x - 3},${y} L${x},${y + Math.sign(y) * 6} L${x + 3},${y} Z`, 24, c.iron, 97);
+      }
+      wrap(g, c.grip, -26, 10, 4.2);
+      disc(g, -31, 0, 4.2, tone(c.brass, 0), 1.1);
+    }
+  };
+
+  art.maul = {
+    box: [-66, -44, 104, 44],
+    draw(g, c) {
+      haft(g, c.wood, -58, 88, 3.8);
+      wrap(g, c.grip, -50, -18, 4.8);
+      wrap(g, c.grip, -8, 22, 4.8);
+      for (const x of [40, 66]) band(g, c.iron, x, 5.4);
+      // The head lies across the haft: banded iron with two struck faces.
+      shape(g, 'M72,-26 L102,-26 L102,26 L72,26 Z', gradient(g, 72, 0, 102, 0, c.iron, [-.45, -.05, .5, 0, -.35]), 1.4);
+      for (const s of [-1, 1]) {
+        metal(g, `M70,${s * 24} L104,${s * 24} L101,${s * 38} L73,${s * 38} Z`, 40, c.steel, 101);
+        shape(g, `M75,${s * 38} L99,${s * 38} L97,${s * 42} L77,${s * 42} Z`, tone(c.brass, -.05), 1.1);
+        for (const x of [77, 87, 97]) rivet(g, x, s * 28, 1.6, c.brass);
+      }
+      shape(g, 'M69,-8 L105,-8 L105,8 L69,8 Z', steelAcross(g, 8, c.brass), 1.2);
+      disc(g, 87, 0, 5, gradient(g, 83, -4, 91, 4, c.iron, [.5, -.4]), 1);
+      disc(g, 87, 0, 2, c.teamCss, .5);
+      band(g, c.brass, -59, 5.6, 5);
+    }
+  };
+
+  art.pickhammer = {
+    box: [-66, -54, 108, 38],
+    draw(g, c) {
+      haft(g, c.wood, -61, 88, 3.4);
+      wrap(g, c.grip, -52, -20, 4.4);
+      wrap(g, c.grip, -8, 22, 4.4);
+      for (const x of [50, 68]) band(g, c.iron, x, 5);
+      // Curved beak on one side (-y), crested hammer face on the other.
+      metal(g, 'M78,-8 C84,-22 88,-36 96,-50 C100,-36 101,-20 98,-8 Z', 50, c.steel, 103);
+      metal(g, 'M78,8 L80,22 L72,24 L74,34 L84,30 L88,35 L92,30 L102,34 L102,23 L95,22 L96,8 Z', 36, c.steel, 107);
+      shape(g, 'M74,-10 L100,-10 L100,10 L74,10 Z', steelAcross(g, 10, c.iron), 1.3);
+      metal(g, 'M100,-3.4 L106,0 L100,3.4 Z', 4, c.steel, 109);
+      disc(g, 87, 0, 4, tone(c.brass, .1), .9);
+      for (const x of [78, 96]) rivet(g, x, 0, 1.4, c.brass);
+      band(g, c.brass, -60, 5, 4);
+    }
+  };
+
+  art.sledge = {
+    box: [-66, -42, 108, 42],
+    draw(g, c) {
+      haft(g, c.wood, -61, 80, 4);
+      wrap(g, c.grip, -52, -20, 5);
+      wrap(g, c.grip, -8, 22, 5);
+      // A rough-cut block lashed to the haft.
+      const stone = [130, 115, 100].map((v, i) => Math.round(v * c.iron[i] / IRON_REF[i]));
+      const block = 'M74,-35 L88,-39 L102,-33 L105,-14 L101,4 L105,22 L100,36 L84,39 L72,33 L70,14 L74,-2 L69,-18 Z';
+      shape(g, block, gradient(g, 70, -30, 106, 30, stone, [.4, .1, -.1, -.45]), 1.5);
+      wear(g, block, [69, -39, 106, 39], 150, 'rgba(255,240,210,.3)', 'rgba(30,18,8,.45)', 113, 3.5);
+      stroke(g, 'M88,-39 L84,-24 L90,-16 M105,22 L94,20 L92,28 M70,14 L78,16 L80,26', 'rgba(35,22,12,.7)', 1);
+      stroke(g, 'M75,-33 L87,-36 L101,-31', 'rgba(255,240,215,.7)', 1.4);
+      for (const y of [-13, 12]) {
+        shape(g, `M68,${y - 4} L106,${y - 3} L106,${y + 4} L68,${y + 3} Z`, steelAcross(g, 20, c.iron), 1.1);
+        for (const x of [73, 87, 101]) rivet(g, x, y, 1.4, c.brass);
+      }
+      stroke(g, 'M60,-4 L72,-22 M60,4 L72,22 M60,-4 L72,20 M60,4 L72,-20', tone(DARKLEATHER, .15), 2.2);
+      band(g, c.iron, 60, 6, 6);
+    }
+  };
+
+  art.flail = {
+    box: [-34, -10, 68, 10],
+    draw(g, c) {
+      haft(g, c.wood, -25, 58, 3.4);
+      wrap(g, c.grip, -20, 10, 4.2);
+      for (const x of [20, 44]) band(g, c.iron, x, 4.6);
+      band(g, c.brass, 58, 5.6, 7);
+      disc(g, 63, 0, 3.4, tone(c.iron, .1), 1);
+      disc(g, -28, 0, 4.4, tone(c.brass, 0), 1.1);
+    },
+    link: linkArt(),
+    ball: ballArt(17)
+  };
+
+  art.scourge = {
+    box: [-34, -10, 68, 10],
+    draw(g, c) {
+      haft(g, DARKLEATHER, -25, 58, 3.2);
+      wrap(g, c.grip, -20, 26, 4);
+      for (const x of [30, 38, 46]) band(g, c.brass, x, 4.4, 3);
+      shape(g, 'M54,-6 L66,-4 L66,4 L54,6 Z', steelAcross(g, 6, c.iron), 1.2);
+      stroke(g, 'M-26,0 c-6,8 -2,9 -6,4', tone(DARKLEATHER, .2), 2);
+    },
+    link: linkArt(),
+    // Several barbs on a small weight.
+    ball: {
+      box: [-18, -18, 18, 18], turns: true,
+      draw(g, c) {
+        for (const a of [-1.2, -.4, .4, 1.2, 2.6, -2.6]) {
+          g.save();
+          g.rotate(a);
+          metal(g, 'M6,-3 C11,-3 14,0 17,5 C12,2 9,3 6,3 Z', 6, c.steel, 127);
+          g.restore();
+        }
+        disc(g, 0, 0, 8.6, gradient(g, -7, -7, 7, 7, c.iron, [.55, 0, -.5]), 1.3);
+        rivet(g, -2, -2, 2.2, c.brass);
+      }
+    }
+  };
+
+  art.twinFlail = {
+    box: [-34, -14, 70, 14],
+    draw(g, c) {
+      haft(g, c.wood, -25, 56, 3.6);
+      wrap(g, c.grip, -20, 12, 4.4);
+      for (const x of [24, 42]) band(g, c.brass, x, 4.8);
+      shape(g, 'M52,-6 L62,-11 L66,-8 L60,0 L66,8 L62,11 L52,6 Z', steelAcross(g, 11, c.iron), 1.3);
+      disc(g, 57, 0, 2.6, c.teamCss, .7);
+      disc(g, -28, 0, 4.6, tone(c.brass, 0), 1.1);
+    },
+    link: linkArt(),
+    ball: ballArt(12.5)
+  };
+
+  art.arbalest = {
+    box: [-74, -52, 90, 52],
+    string: { tip: 50, span: 46, nock: -2, pull: 20, bolt: 80 },
+    draw(g, c) {
+      const stock = 'M-60,-5 L-44,-7 C-20,-6 -4,-9 14,-8 L78,-6 L81,0 L78,6 L12,7 C0,8 -8,15 -22,15 L-30,10 C-42,12 -52,16 -61,15 Z';
+      shape(g, stock, across(g, 14, c.wood, [.25, .05, -.15, -.45]), 1.4);
+      wear(g, stock, [-60, -9, 81, 15], 110, 'rgba(255,214,160,.28)', 'rgba(25,10,2,.4)', 131, 9);
+      shape(g, 'M-14,-9 L84,-7 L84,-3 L-14,-4 Z', steelAcross(g, 6, c.steel), 1);
+      // Windlass crank at the butt.
+      stroke(g, 'M-52,-6 L-52,-20 M-60,-20 L-44,-20', OUTLINE, 4.6);
+      stroke(g, 'M-52,-6 L-52,-20 M-60,-20 L-44,-20', tone(c.iron, .15), 2.6);
+      disc(g, -52, -7, 6, gradient(g, -57, -12, -47, -2, c.brass, [.6, -.35]), 1.2);
+      for (const y of [-20]) for (const x of [-60, -44]) disc(g, x, y, 2.6, tone(c.wood, .1), .9);
+      stroke(g, 'M4,7 Q3,18 15,17 Q24,15 23,7', OUTLINE, 3);
+      stroke(g, 'M4,7 Q3,18 15,17 Q24,15 23,7', tone(c.brass, 0), 1.6);
+      for (const s of [-1, 1]) {
+        metal(g, `M66,${s * 4} C76,${s * 18} 70,${s * 36} 52,${s * 45} L48,${s * 50} L47,${s * 44} C60,${s * 34} 64,${s * 18} 58,${s * 4} Z`, 50, c.steel, 137);
+        stroke(g, `M62,${s * 22} L70,${s * 24}`, tone(c.brass, 0), 3);
+        rivet(g, 50, s * 46, 1.8, c.brass);
+      }
+      shape(g, 'M54,-9 L70,-8 L70,8 L54,9 Z', steelAcross(g, 9, c.iron), 1.2);
+      for (const x of [59, 65]) rivet(g, x, 0, 1.5, c.brass);
+      stroke(g, 'M78,-8 C92,-9 92,9 78,8', OUTLINE, 4);
+      stroke(g, 'M78,-8 C92,-9 92,9 78,8', tone(c.iron, .1), 2.2);
+      shape(g, 'M24,-3 L46,-2.6 L46,3 L24,3.4 Z', across(g, 3, c.grip, [.15, -.3]), .8);
+    }
+  };
+
+  art.repeater = {
+    box: [-46, -36, 90, 36],
+    string: { tip: 50, span: 29, nock: 18, pull: 18, bolt: 76 },
+    draw(g, c) {
+      const stock = 'M-42,-3 L-28,-6 L70,-5 L81,-1 L79,4 L10,5 C2,6 -2,14 -14,14 L-20,8 L-42,10 Z';
+      shape(g, stock, across(g, 12, c.wood, [.25, .05, -.15, -.45]), 1.4);
+      wear(g, stock, [-42, -6, 81, 13], 70, 'rgba(255,214,160,.28)', 'rgba(25,10,2,.4)', 139, 8);
+      // Box magazine on top with a lever.
+      shape(g, 'M10,-20 L48,-19 L50,-6 L8,-6 Z', across(g, 14, c.wood, [.35, .1, -.2, -.35]), 1.3);
+      for (const x of [14, 28, 42]) shape(g, `M${x},-19.6 h3.4 v13.4 h-3.4 Z`, steelAcross(g, 18, c.iron), .8);
+      for (let i = 0; i < 4; i++) stroke(g, `M${18 + i * 6},-24 L${19 + i * 6},-20`, '#e6dcc2', 1.8);
+      stroke(g, 'M40,-18 C34,-32 6,-32 -12,-20', OUTLINE, 4.4);
+      stroke(g, 'M40,-18 C34,-32 6,-32 -12,-20', tone(c.brass, .05), 2.4);
+      disc(g, -13, -19, 3.4, tone(c.wood, -.1), 1);
+      shape(g, 'M12,5 L22,5 L24,17 L14,18 Z', across(g, 18, c.grip, [.1, -.1, -.35]), 1.1);
+      for (const s of [-1, 1]) {
+        metal(g, `M62,${s * 3} C70,${s * 12} 64,${s * 23} 52,${s * 29} L48,${s * 33} L48,${s * 27} C58,${s * 21} 60,${s * 12} 55,${s * 3} Z`, 33, c.brass, 149);
+        rivet(g, 50, s * 29.4, 1.4, c.iron);
+      }
+      shape(g, 'M52,-7 L66,-6 L66,6 L52,7 Z', steelAcross(g, 7, c.iron), 1.1);
+      band(g, c.brass, 74, 6, 5);
+    }
+  };
+
+  art.ashScepter = {
+    box: [-72, -26, 152, 26],
+    glow: { x: 130, color: 'teal' },
+    draw(g, c) {
+      const ash = [150, 156, 150].map((v, i) => Math.round(v * c.wood[i] / WOOD_REF[i]));
+      haft(g, ash, -66, 112, 3.2);
+      wrap(g, c.grip, -18, 14, 4.2);
+      for (const x of [-39, -22, 18, 85, 104]) band(g, c.iron, x, 4.8);
+      shape(g, 'M-70,0 L-66,-3.6 L-60,-3.6 L-60,3.6 L-66,3.6 Z', steelAcross(g, 4, c.iron), 1);
+      for (const s of [-1, 1]) {
+        shape(g, `M106,${s * 3} C108,${s * 14} 116,${s * 19} 132,${s * 15} L128,${s * 10} C119,${s * 13} 115,${s * 9} 114,${s * 3} Z`,
+          steelAcross(g, 19, c.iron), 1.2);
+      }
+      const crystal = [89, 190, 183];
+      shape(g, 'M112,-6 L128,-13 L148,-3 L146,5 L128,13 L112,6 Z', gradient(g, 114, 10, 144, -10, crystal, [-.35, .05, .55, .1]), 1.2);
+      shape(g, 'M112,-6 L128,-13 L132,-1 Z', 'rgba(235,255,250,.55)', 0);
+      stroke(g, 'M112,-6 L132,-1 L148,-3 M128,-13 L132,-1 L128,13', 'rgba(235,255,250,.8)', .7);
+      disc(g, 108, 0, 4.6, gradient(g, 104, -4, 112, 4, c.iron, [.55, -.35]), 1);
+      // A bone charm tied under the head.
+      stroke(g, 'M98,3 Q95,12 90,16', OUTLINE, 2.4);
+      stroke(g, 'M98,3 Q95,12 90,16', tone(DARKLEATHER, .25), 1.1);
+      shape(g, 'M90,14 C96,15 96,23 89,25 C83,23 83,16 90,14 Z', '#d9d3c4', 1);
+      disc(g, 89.4, 19.6, 1.6, '#4a8f88', 0);
+    }
+  };
+
+  art.sunStaff = {
+    box: [-100, -28, 156, 28],
+    glow: { x: 129, color: 'sun' },
+    draw(g, c) {
+      haft(g, c.wood, -94, 114, 3.4);
+      wrap(g, c.grip, -30, 18, 4.4);
+      for (const x of [-60, -39, -12, 40, 85, 106]) band(g, c.brass, x, 4.8);
+      shape(g, 'M-99,0 L-94,-4 L-86,-4 L-86,4 L-94,4 Z', steelAcross(g, 4, c.brass), 1.1);
+      for (let i = 0; i < 12; i++) {
+        const long = i % 2 === 0;
+        g.save();
+        g.translate(129, 0);
+        g.rotate(i * Math.PI / 6);
+        shape(g, `M10,${long ? -4.4 : -3} L${long ? 25 : 19},0 L10,${long ? 4.4 : 3} Z`, gradient(g, 10, -4, 24, 4, c.brass, [.7, .15, -.25]), 1);
+        g.restore();
+      }
+      disc(g, 129, 0, 14, gradient(g, 119, -10, 139, 10, c.brass, [.6, 0, -.4]), 1.4);
+      disc(g, 129, 0, 9.4, gradient(g, 122, -7, 136, 7, [255, 190, 70], [.75, .2, -.15]), 1);
+      disc(g, 126.4, -2.8, 2.6, 'rgba(255,255,235,.95)', 0);
+    }
+  };
+
+  shields.buckler = {
+    box: [-29, -33, 29, 33],
+    half: [21, 26],
+    draw(g, c) {
+      const oval = (x, rx, ry, fill, line = 1.3) => {
+        g.beginPath();
+        g.ellipse(x, 0, rx, ry, 0, 0, Math.PI * 2);
+        g.fillStyle = fill;
+        g.fill();
+        if (line) {
+          g.strokeStyle = OUTLINE;
+          g.lineWidth = line;
+          g.stroke();
+        }
+      };
+      // A small steel fist shield: fluted face, painted ring and a deep boss.
+      oval(-2.4, 24, 29, tone(c.iron, -.45));
+      oval(0, 24, 29, gradient(g, -20, 24, 20, -24, c.steel, [-.5, -.1, .2, .75, -.05]), 1.6);
+      oval(0, 19, 23, gradient(g, -16, 20, 16, -20, c.team, [-.4, -.1, .1, .25, -.1]), 1.1);
+      for (let i = 0; i < 12; i++) {
+        const a = i * Math.PI / 6;
+        stroke(g, `M${Math.cos(a) * 8},${Math.sin(a) * 9.6} L${Math.cos(a) * 18},${Math.sin(a) * 22}`, 'rgba(30,8,5,.55)', 1.6);
+        stroke(g, `M${Math.cos(a) * 8 + 1},${Math.sin(a) * 9.6} L${Math.cos(a) * 18 + 1},${Math.sin(a) * 22}`, tone(c.trim, .1), .8);
+      }
+      for (let i = 0; i < 10; i++) {
+        const a = i * Math.PI / 5 + .3;
+        rivet(g, Math.cos(a) * 21.6, Math.sin(a) * 26.2, 1.4, c.brass);
+      }
+      oval(0, 9.6, 11.6, gradient(g, -8, 10, 8, -10, c.brass, [-.45, 0, .45]));
+      oval(2, 6, 7.4, gradient(g, -5, 6, 6, -6, c.steel, [-.5, 0, .8]), 1);
+      disc(g, 4, -3, 1.7, 'rgba(255,255,255,.9)', 0);
+      wear(g, 'M-23,0 C-23,-38 23,-38 23,0 C23,38 -23,38 -23,0 Z', [-23, -28, 23, 28], 60, 'rgba(255,240,220,.35)', 'rgba(20,10,8,.35)', 157, 3);
+      stroke(g, 'M-16,-17 C-8,-26 5,-28 13,-22', 'rgba(255,252,240,.7)', 1.5);
+    }
+  };
+
+  shields.tower = {
+    box: [-46, -68, 46, 68],
+    half: [38, 58],
+    draw(g, c) {
+      const board = 'M-39,-52 C-37,-62 -20,-65 0,-65 C20,-65 37,-62 39,-52 C42,-20 42,20 39,52 C37,62 20,65 0,65 C-20,65 -37,62 -39,52 C-42,20 -42,-20 -39,-52 Z';
+      g.save();
+      g.translate(-3.4, 0);
+      shape(g, board, tone(DARKLEATHER, -.15), 1.4);
+      g.restore();
+      shape(g, board, gradient(g, -40, 30, 40, -30, c.iron, [-.5, -.1, .2, .6, -.1]), 1.8);
+      const face = 'M-33,-49 C-31,-56 -17,-59 0,-59 C17,-59 31,-56 33,-49 C36,-20 36,20 33,49 C31,56 17,59 0,59 C-17,59 -31,56 -33,49 C-36,20 -36,-20 -33,-49 Z';
+      shape(g, face, gradient(g, -34, 0, 34, 0, c.team, [-.45, -.12, .1, .22, -.2]), 1.2);
+      clipped(g, face, () => {
+        // Spread wings, laurel and lightning in the legion style.
+        for (const sy of [-1, 1]) {
+          for (let i = 0; i < 5; i++) {
+            const y = sy * (16 + i * 6);
+            shape(g, `M${-3 - i * .5},${sy * 13} Q${-24 + i * 3},${y} ${-30 + i * 4},${y + sy * 8} Q${-14 + i * 2},${y + sy * 3} ${-3},${sy * 19} Z`, tone(c.brass, .2 - i * .08), .7);
+            shape(g, `M${3 + i * .5},${sy * 13} Q${24 - i * 3},${y} ${30 - i * 4},${y + sy * 8} Q${14 - i * 2},${y + sy * 3} ${3},${sy * 19} Z`, tone(c.brass, .2 - i * .08), .7);
+          }
+          stroke(g, `M-31,${sy * 51} H31`, tone(c.trim, .1), 2.4);
+          stroke(g, `M-31,${sy * 46} H31`, tone(c.trim, -.15), 1);
+        }
+        stroke(g, 'M0,-56 V-26 M0,26 V56', tone(c.brass, .1), 3);
+      });
+      wear(g, face, [-34, -58, 34, 58], 260, 'rgba(255,232,200,.26)', 'rgba(20,5,2,.32)', 163, 3.6);
+      stroke(g, 'M-24,18 L-6,36', 'rgba(35,10,5,.8)', 1.6);
+      stroke(g, 'M-23,17.2 L-5,35', 'rgba(255,225,190,.5)', .6);
+      for (let i = 0; i < 9; i++) {
+        const y = -48 + i * 12;
+        rivet(g, -36.6, y, 1.9, c.brass);
+        rivet(g, 36.6, y, 1.9, c.brass);
+      }
+      for (const x of [-18, 0, 18]) {
+        rivet(g, x, -61.6, 1.9, c.brass);
+        rivet(g, x, 61.6, 1.9, c.brass);
+      }
+      shape(g, 'M-15,-15 L15,-15 L15,15 L-15,15 Z', gradient(g, -15, 15, 15, -15, c.brass, [-.4, 0, .45]), 1.4);
+      for (const [x, y] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) rivet(g, x, y, 1.6, c.steel);
+      disc(g, 0, 0, 10, gradient(g, -8, 8, 8, -8, c.steel, [-.5, 0, .8]), 1.3);
+      disc(g, 2.8, -3.4, 2.2, 'rgba(255,255,255,.9)', 0);
+      stroke(g, 'M-31,-44 C-30,-54 -16,-56 -2,-57', 'rgba(255,250,235,.65)', 1.8);
+    }
+  };
+
+  special('stormbrand', 'sword', { steel: [170, 198, 228], grip: [38, 50, 86], brass: [228, 200, 96], teamCss: '#7fd0ff' }, g => {
+    const bolt = 'M22,0 L36,-3.4 L42,1.6 L58,-3 L64,2.4 L80,-2 L86,2 L106,0';
+    stroke(g, bolt, 'rgba(90,190,255,.65)', 4.4);
+    stroke(g, bolt, '#e8fbff', 1.3);
+    stroke(g, 'M42,1.6 L48,6 L55,4.6 M64,2.4 L71,6.4 M58,-3 L62,-6.4', '#bfeaff', .9);
+  });
+
+  special('snarecaster', 'crossbow', { steel: [118, 150, 104], wood: [86, 92, 48], iron: [92, 104, 64], grip: [58, 90, 44] }, g => {
+    // Cord wound round the stock, with a weighted loop hanging below.
+    for (const x of [-6, 4, 40]) for (let i = 0; i < 4; i++) stroke(g, `M${x + i * 2.4},-7 q4,6 0,13`, '#92c470', 1.3);
+    stroke(g, 'M44,5 C40,20 20,24 22,14 C24,8 36,12 34,22 L30,30', '#92c470', 1.5);
+    disc(g, 30, 31, 3, '#4f6a3a', 1);
+  });
+
+  special('lastOath', 'greatsword', { steel: [158, 146, 154], grip: [112, 24, 30], brass: [226, 210, 180], iron: [100, 30, 36], teamCss: '#ff5a4a' }, g => {
+    stroke(g, 'M42,0 L140,0', 'rgba(255,70,50,.55)', 4.6);
+    stroke(g, 'M42,0 L140,0', '#ffb09a', 1);
+    for (let x = 52; x < 124; x += 11) stroke(g, `M${x},-2.6 L${x + 3},2.6 M${x + 3},-2.6 L${x + 5},0`, '#ff7a5a', .8);
+    // An oath ribbon tied at the guard.
+    shape(g, 'M12,6 C6,16 -6,18 -12,30 L-7,27 L-4,32 C0,22 10,18 17,8 Z', tone([150, 30, 36], 0), 1);
+  });
+
+  special('dawnMender', 'mace', { steel: [246, 220, 150], iron: [214, 190, 130], grip: [150, 106, 62], brass: [250, 230, 170] }, g => {
+    for (let i = -3; i <= 3; i++) {
+      g.save();
+      g.translate(80, 0);
+      g.rotate(i * .42);
+      shape(g, `M21,-2.2 L${i % 2 ? 29 : 35},0 L21,2.2 Z`, tone([255, 226, 130], .2), .8);
+      g.restore();
+    }
+    disc(g, 80, 0, 5, gradient(g, 76, -4, 84, 4, [255, 214, 110], [.7, 0]), 1);
+    disc(g, 80, 0, 2, '#fffbe8', 0);
+  }, { box: [-36, -30, 120, 30], glow: { x: 80, color: 'sun' } });
+
+  special('dragonBow', 'crossbow', { steel: [206, 82, 46], iron: [84, 36, 28], wood: [80, 46, 34], grip: [40, 22, 20], brass: [240, 204, 128] }, g => {
+    // Horned limb tips, a dragon head at the front and scales on the stock.
+    for (const s of [-1, 1]) shape(g, `M50,${s * 33} C58,${s * 36} 66,${s * 40} 70,${s * 39} C62,${s * 36} 57,${s * 30} 54,${s * 28} Z`, tone([240, 214, 150], 0), 1);
+    for (let x = -30; x < 44; x += 6) stroke(g, `M${x},-4 q3,4 6,0`, '#f0b070', .9);
+    shape(g, 'M68,-8 C78,-12 86,-9 90,-4 L80,-3 L88,2 C84,6 76,8 68,7 Z', gradient(g, 68, -10, 88, 6, [190, 60, 36], [.35, 0, -.35]), 1.2);
+    shape(g, 'M71,-9 L66,-18 L76,-11 Z', '#f0cc80', .9);
+    disc(g, 78, -6, 1.6, '#ffe27a', .6);
+  }, { box: [-46, -42, 96, 42] });
+
+  special('wintersBite', 'axe', { steel: [196, 230, 250], iron: [128, 160, 188], grip: [150, 176, 200], wood: [168, 176, 190], brass: [220, 244, 255] }, g => {
+    for (const [x, y, h] of [[48, -45, 9], [62, -50, 13], [80, -50, 10], [94, -43, 8]]) {
+      shape(g, `M${x - 3},${y} L${x - 1},${y - h} L${x + 3},${y + 1} Z`, 'rgba(225,248,255,.92)', .8, '#4a7690');
+    }
+    stroke(g, 'M66,-34 L66,-18 M60,-30 L72,-22 M72,-30 L60,-22', '#f2fdff', 1.4);
+    for (const [x, y] of [[52, 6], [70, 7]]) shape(g, `M${x - 2.4},${y} L${x},${y + 11} L${x + 2.4},${y} Z`, '#dff6ff', .8, '#4a7690');
+  }, { box: [-34, -66, 112, 22] });
+
+  special('leechFang', 'rapier', { steel: [150, 40, 56], brass: [226, 216, 194], grip: [58, 20, 26], iron: [90, 24, 34], teamCss: '#ff3a50' }, g => {
+    for (const s of [-1, 1]) shape(g, `M17,${s * 8} C24,${s * 12} 30,${s * 11} 37,${s * 3} C28,${s * 7} 23,${s * 6} 18,${s * 3} Z`, tone([236, 226, 204], 0), 1);
+    stroke(g, 'M24,0 L122,0', '#ff8a96', .9);
+    for (const x of [48, 78, 104]) shape(g, `M${x},1.6 q2.6,4.6 0,6.4 q-2.6,-1.8 0,-6.4 Z`, '#b01828', .6);
+  });
+
+  special('earthshaker', 'maul', { steel: [150, 128, 104], iron: [92, 76, 62], brass: [206, 128, 64], grip: [110, 70, 42] }, g => {
+    // Glowing cracks run through the head.
+    const cracks = 'M80,-24 L88,-14 L83,-6 M92,24 L85,14 L91,7 M96,-30 L90,-22 M78,30 L84,23';
+    stroke(g, cracks, 'rgba(255,120,30,.7)', 3.8);
+    stroke(g, cracks, '#ffd28a', 1.1);
+    shape(g, 'M87,-7 L93,0 L87,7 L81,0 Z', '#ffa040', 1);
+  });
+
+  special('jailersChain', 'flail', { iron: [96, 98, 108], steel: [140, 142, 152], brass: [140, 94, 62], grip: [50, 46, 46], wood: [72, 64, 58] }, g => {
+    // A cuff and key hanging from the haft.
+    stroke(g, 'M34,5 q-4,10 2,15', OUTLINE, 2.4);
+    for (const [color, w] of [[OUTLINE, 4.4], ['#8e929a', 2.4]]) stroke(g, 'M29,24 a7,7 0 1 0 14,0 a7,7 0 1 0 -14,0', color, w);
+    stroke(g, 'M14,5 L14,18 M14,15 L19,15 M14,18 L18,18', '#c9a45a', 1.8);
+    disc(g, 14, 5, 2.6, '#c9a45a', .8);
+  }, { box: [-34, -12, 70, 34] });
+
+  special('phoenixSpear', 'spear', { steel: [246, 178, 74], iron: [176, 90, 40], brass: [255, 214, 120], wood: [152, 56, 38], grip: [196, 60, 36], team: [255, 120, 40] }, g => {
+    // Feathers of flame sweep back from the head.
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        shape(g, `M${138 - i * 5},${s * 5} C${124 - i * 8},${s * (10 + i * 4)} ${112 - i * 7},${s * (18 + i * 3)} ${100 - i * 5},${s * (17 + i * 2)} C${114 - i * 6},${s * (9 + i * 2)} ${122 - i * 5},${s * 5} ${132 - i * 5},${s * 3} Z`,
+          tone([[255, 214, 90], [255, 140, 44], [216, 66, 34]][i], 0), .9);
+      }
+    }
+    disc(g, 144, 0, 3.4, '#fff2b0', .9);
+  }, { box: [-124, -28, 184, 28], glow: { x: 150, color: 'sun' } });
+
+  special('tidecaller', 'trident', { steel: [112, 204, 218], brass: [232, 220, 186], wood: [46, 96, 112], grip: [32, 74, 92], teamCss: '#9ff4ff' }, g => {
+    for (let x = 36; x < 120; x += 12) stroke(g, `M${x},0 q3,-5 6,0 q3,5 6,0`, '#a8eef8', 1.1);
+    shape(g, 'M124,5 C116,8 114,20 122,22 C132,22 136,12 132,6 Z', gradient(g, 116, 6, 132, 22, [246, 224, 206], [.3, 0, -.25]), 1.1);
+    for (let i = 0; i < 4; i++) stroke(g, `M128,6 L${117 + i * 4.4},${20 - Math.abs(i - 1.5)}`, 'rgba(160,100,90,.7)', .7);
+  }, { glow: { x: 164, color: 'teal' } });
+
+  special('gamblersClub', 'club', { brass: [214, 52, 58], grip: [40, 94, 56], iron: [236, 230, 214] }, g => {
+    // Bone dice set into the head, one dangling from the grip.
+    for (const [x, y, pips] of [[70, 3, [[0, 0], [-2.6, -2.6], [2.6, 2.6]]], [86, -3, [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4], [0, 0]]]]) {
+      shape(g, `M${x - 5.4},${y - 5.4} h10.8 v10.8 h-10.8 Z`, '#f6f0e2', 1.1);
+      for (const [dx, dy] of pips) disc(g, x + dx, y + dy, 1.1, '#2a1a14', 0);
+    }
+    stroke(g, 'M-26,4 q-4,8 -2,13', '#e0c690', 1);
+    shape(g, 'M-33,16 h9 v9 h-9 Z', '#f6f0e2', 1);
+    disc(g, -28.5, 20.5, 1.4, '#c4283c', 0);
+  }, { box: [-38, -26, 114, 28] });
+
+  special('briarBlade', 'falchion', { steel: [124, 160, 98], iron: [62, 94, 44], brass: [110, 74, 46], grip: [52, 90, 40], teamCss: '#e0566a' }, g => {
+    stroke(g, 'M14,6 C30,10 36,-8 52,-4 C66,0 70,-18 88,-14 C98,-12 102,-22 112,-22', OUTLINE, 3.6);
+    stroke(g, 'M14,6 C30,10 36,-8 52,-4 C66,0 70,-18 88,-14 C98,-12 102,-22 112,-22', '#5f7a34', 1.9);
+    for (const [x, y, d] of [[30, 3, 1], [46, -5, -1], [64, -6, 1], [80, -16, -1], [98, -16, 1]]) {
+      shape(g, `M${x - 2},${y} L${x + 2},${y + d * 7} L${x + 3},${y} Z`, '#c2dc96', .8);
+    }
+    for (const [x, y] of [[40, -3], [92, -17]]) disc(g, x, y, 2.4, '#c4445a', .8);
+  });
+
+  special('pendulum', 'twinFlail', { steel: [188, 164, 230], iron: [98, 76, 140], brass: [214, 196, 244], grip: [60, 44, 84], wood: [76, 58, 100], teamCss: '#d8b4ff' }, g => {
+    // A swinging-weight sigil on a violet wrap.
+    shape(g, 'M24,-5 H46 V5 H24 Z', tone([120, 88, 176], 0), 1);
+    stroke(g, 'M30,-3 L38,2', '#f2e8ff', 1);
+    disc(g, 39.6, 2, 2.2, '#f2e8ff', .5);
+    stroke(g, 'M28,3 Q35,6 43,2', '#d8c0ff', .8);
+    disc(g, 57, 0, 3.6, '#c79cff', 1);
+  }, { glow: { x: 58, color: 'blue' } });
+
+  special('headsmansVerdict', 'executioner', { steel: [206, 202, 194], grip: [30, 28, 32], brass: [92, 84, 78], iron: [42, 40, 46], teamCss: '#8a1c1c' }, g => {
+    // A tally of past verdicts and a black tassel.
+    for (let i = 0; i < 5; i++) stroke(g, `M${88 + i * 4},5 l-1,6`, '#2a2228', 1);
+    stroke(g, 'M85,10 L107,6', '#2a2228', 1);
+    stroke(g, 'M40,9.6 L150,9.6', 'rgba(120,20,20,.75)', 2);
+    for (let i = 0; i < 6; i++) stroke(g, `M-62,6 q${-3 + i * 1.4},8 ${-8 + i * 2.6},${17 + (i % 3) * 3}`, i % 2 ? '#2a1e24' : '#6a1a20', 1.7);
+    disc(g, -62, 6, 2.8, '#4a3a34', .9);
+  }, { box: [-74, -36, 162, 36] });
+})();

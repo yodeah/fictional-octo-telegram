@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
-const files = ['venues.js', 'matchups.js', 'effects.js', 'bench.js', 'gl-renderer.js', 'specials.js', 'finishers.js', 'arena.js', 'duel.js', 'rules.js'];
+const files = ['venues.js', 'matchups.js', 'effects.js', 'bench.js', 'gl-renderer.js', 'specials.js', 'finishers.js', 'fighter2d.js', 'weapons2d.js', 'armor2d.js', 'arena.js', 'duel.js', 'rules.js'];
 
 // Any property is another stub and any call returns one. Assigned values are kept.
 function stub(values = {}) {

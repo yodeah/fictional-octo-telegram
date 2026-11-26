@@ -25,7 +25,7 @@ About 3 minutes. They check the rules, that a seed repeats a fight, weapon balan
 
 ## Combat engine
 
-The sections below describe the combat engine and the sparring sandbox. The fighters use low-poly 3D geometry rendered on Canvas 2D with a perspective camera.
+The sections below describe the combat engine and the sparring sandbox. The fighters are drawn as 2D cut-out art on Canvas 2D; the older low-poly 3D meshes are still available (see 2D art below).
 
 ## Design decision: fights are fully idle
 
@@ -99,6 +99,10 @@ Opening with `?bench` adds face and triangle-equivalent counts by fighter part, 
 The second row of buttons finds what limits the frame rate on a device. **Res full / Res 1×** draws the arena at up to 2 pixels per CSS pixel or at 1 (`?res=1`), which tests fill rate. **Fighters**, **Scenery** and **Effects** each skip drawing that part: the fighters' polygons and shadows, the animated crowd and wildlife, or dust, trails, blood, sparks, magic, bolts and damage numbers. These toggles change only the picture, are never saved, and add **TEST TOGGLE ON** to the overlay while active. The **Scene · Fighters · FX** line shows the main-thread milliseconds each part took per frame. Only the depth-sorted fighter polygons move to WebGL (`gl-renderer.js`). They are painted in sorted order into an offscreen WebGL canvas that is drawn into the arena canvas where Canvas 2D would have filled them, so backdrops, shadows and effects keep their layering. Concave and self-crossing polygons use a stencil pass with the same nonzero fill rule as Canvas 2D. Rendering is capped at 120 FPS; skipped frames leave the simulation clock alone, so the next frame advances by the full elapsed time.
 
 Measured at phone size on a Mac (60 Hz), both renderers held 60 FPS with no drops at 1× and 3×. WebGL cut main-thread draw time from 3.2 to 2.3 ms at 1× and from 9.2 to 5.0 ms at 3×, and painting alone from 1.8 to 0.4 ms. The first test on a phone reported about 24 FPS on Canvas and 22 FPS on WebGL. The follow-up phone profiling steps and full measurements are in [docs/rendering-performance.md](docs/rendering-performance.md). The plan for doubling geometric detail with a Quality setting is in [docs/detail-rework-plan.md](docs/detail-rework-plan.md).
+
+## 2D art
+
+**Art 3D / Art 2D** switches the fighters between detailed 2D cut-out art (the default, `fighter2d.js`) and the older 3D meshes. `?style=2d` or `?style=3d` sets it from the address bar, and `?cast=1` or `?cast=2` starts from a set matchup. Every weapon, special, shield and armor kit has 2D art (`weapons2d.js`, `armor2d.js`); a new item needs it too, or it keeps its 3D mesh there. It changes only the picture. Findings, measurements and the plan are in [docs/2d-art-poc.md](docs/2d-art-poc.md).
 
 ## Armor geometry
 
