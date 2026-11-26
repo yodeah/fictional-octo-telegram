@@ -10,6 +10,8 @@ Each fighter has a main weapon, optional backup weapon, shield, armor, and spell
 
 Armor has separate attack and defense bonuses for stab, slash, crush, magic, and ranged. The greatsword and war maul trade slower, more expensive swings for higher accuracy and damage. They use both hands, so the shield moves to the back and stops providing defense or blocks until a one-handed weapon is drawn.
 
+The armory contains 27 weapons across blades, polearms, axes, impact weapons, flails, ranged weapons, and staves. Twelve armor sets include four plate harnesses, four leather kits, and four robes. Weapons have different silhouettes, attack profiles, and resource costs. Armor sets trade protection, movement speed, and bonuses to their combat style.
+
 Fighters automatically switch between their two weapons based on distance, skills, energy, mana, and the opponent’s armor. Unused weapons stay visible on the back or hip. Crossbows fire ranged bolts. Staves increase spell power by 30%. The combat triangle gives melee an advantage against leather, ranged an advantage against robes, and magic an advantage against plate. Armor also gives a small boost to its own combat style. [Old School RuneScape combat triangle](https://oldschool.runescape.wiki/w/Combat_triangle)
 
 Melee fighters press crossbow users at close range. A crowded shot loses damage and accuracy, so the shooter favors a melee backup or retreats while casting when a spell is available.

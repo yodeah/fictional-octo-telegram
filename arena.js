@@ -17,13 +17,38 @@ const weapons = {
   greatsword: { name: 'Greatsword', twoHanded: true, accuracy: 18, range: 2.88, damage: 23, energy: 34, block: .25, tempo: .77, rest: 1.21, draw: 1.17, swing: 1.30, lift: .65, extension: .52 },
   maul: { name: 'War maul', twoHanded: true, accuracy: 15, range: 2.35, damage: 26, energy: 39, block: .30, tempo: .71, rest: 1.08, draw: 1.30, swing: 1.20, lift: .66, extension: .49 }
 };
+const variants = {
+  rapier: ['sword', { name: 'Rapier', range: 2.61, damage: 11, energy: 17, accuracy: 12, tempo: 1.12, block: .29, draw: .89, swing: 1.24 }],
+  falchion: ['sword', { name: 'Falchion', range: 2.42, damage: 16, energy: 24, tempo: .93, block: .23, lift: .73 }],
+  claymore: ['greatsword', { name: 'Claymore', range: 2.98, damage: 24, energy: 36, accuracy: 20, tempo: .75 }],
+  executioner: ['greatsword', { name: 'Executioner blade', range: 2.65, damage: 28, energy: 43, accuracy: 11, tempo: .68, block: .22 }],
+  trident: ['spear', { name: 'Trident', range: 3.06, damage: 13, energy: 22, accuracy: 8, tempo: .95 }],
+  halberd: ['spear', { name: 'Halberd', twoHanded: true, range: 3.11, damage: 22, energy: 33, accuracy: 13, tempo: .76, rest: .58, draw: .78, swing: .52, lift: .20 }],
+  beardedAxe: ['axe', { name: 'Bearded axe', range: 2.23, damage: 19, energy: 30, accuracy: 4, tempo: .87 }],
+  crescentAxe: ['axe', { name: 'Crescent axe', twoHanded: true, range: 2.47, damage: 24, energy: 36, accuracy: 12, tempo: .74, lift: .80 }],
+  morningstar: ['mace', { name: 'Morningstar', range: 2.22, damage: 18, energy: 27, accuracy: 5, tempo: .89 }],
+  club: ['mace', { name: 'Bronzewood club', range: 2.15, damage: 13, energy: 17, tempo: 1.04, block: .30 }],
+  scourge: ['flail', { name: 'Chain scourge', range: 2.66, damage: 12, energy: 21, accuracy: 5, tempo: .93, block: .10, chain: .66 }],
+  twinFlail: ['flail', { name: 'Twin flail', range: 2.47, damage: 19, energy: 31, tempo: .76, block: .14 }],
+  pickhammer: ['maul', { name: 'War pick', range: 2.39, damage: 20, energy: 29, accuracy: 21, tempo: .82, block: .22 }],
+  sledge: ['maul', { name: 'Stone sledge', range: 2.40, damage: 30, energy: 46, accuracy: 8, tempo: .65 }],
+  arbalest: ['crossbow', { name: 'Windlass arbalest', twoHanded: true, range: 4.74, damage: 21, energy: 24, tempo: .67, block: .21 }],
+  repeater: ['crossbow', { name: 'Repeating bow', range: 4.25, damage: 11, energy: 12, tempo: 1.04, block: .16 }],
+  ashScepter: ['staff', { name: 'Ash scepter', range: 2.40, spellPower: 1.24, castTempo: 1.13, block: .21 }],
+  sunStaff: ['staff', { name: 'Sun staff', twoHanded: true, range: 2.55, spellPower: 1.41, castTempo: .88 }]
+};
+for (const [key, [family, stats]] of Object.entries(variants)) weapons[key] = { ...weapons[family], ...stats, family };
+const weaponFamily = key => weapons[key]?.family || key;
+const weaponGroups = { sword: 'Blades', greatsword: 'Blades', spear: 'Polearms', axe: 'Axes', mace: 'Impact weapons',
+  maul: 'Impact weapons', flail: 'Flails', crossbow: 'Ranged', staff: 'Staves' };
 const shields = {
   buckler: { name: 'Buckler', defense: 11, mobility: 1.08, energy: 9, width: .24, height: .29, shape: 1 },
   round: { name: 'Round shield', defense: 20, mobility: 1, energy: 15, width: .34, height: .43, shape: 1 },
   tower: { name: 'Tower shield', defense: 34, mobility: .76, energy: 22, width: .40, height: .61, shape: .66 }
 };
 const bonusTypes = ['Stab', 'Slash', 'Crush', 'Magic', 'Ranged'];
-const meleeType = { sword: 1, spear: 0, axe: 1, mace: 2, flail: 2, staff: 2, greatsword: 1, maul: 2 };
+const meleeTypes = { sword: 1, spear: 0, axe: 1, mace: 2, flail: 2, staff: 2, greatsword: 1, maul: 2 };
+const meleeType = key => ['rapier', 'pickhammer'].includes(key) ? 0 : key === 'halberd' ? 1 : meleeTypes[weaponFamily(key)];
 const styles = { melee: 'Melee', ranged: 'Ranged', magic: 'Magic' };
 const armors = {
   plate: {
@@ -39,6 +64,18 @@ const armors = {
     melee: 1.10, ranged: 1.28, magic: .96, attackBonus: [-2, -2, 0, 18, -6], defenseBonus: [3, 4, 5, 17, -5]
   }
 };
+const armorVariants = {
+  bronze: ['plate', { name: 'Bronze lorica', cut: 'lamellar', color: [141, 105, 75], shell: [181, 133, 79], edging: [105, 65, 47], defense: 10, mobility: .99, attackBonus: [4, 5, 2, -12, -5], defenseBonus: [21, 27, 16, -8, 26] }],
+  fortress: ['plate', { name: 'Blackiron harness', cut: 'fortress', color: [64, 75, 88], shell: [94, 114, 131], edging: [165, 161, 130], defense: 18, mobility: .84, power: 1.08, attackBonus: [2, 3, 6, -22, -14], defenseBonus: [33, 40, 30, -15, 42] }],
+  gilded: ['plate', { name: 'Gilded parade plate', cut: 'ornate', color: [134, 115, 77], shell: [205, 170, 108], edging: [127, 77, 61], defense: 13, mobility: .95, power: 1.10, attackBonus: [4, 11, 1, -17, -9], defenseBonus: [23, 39, 20, -11, 31] }],
+  scout: ['leather', { name: 'Dune scout leathers', cut: 'mantle', color: [155, 112, 70], shell: [183, 137, 84], edging: [221, 188, 116], defense: 5, mobility: 1.10, attackBonus: [1, 0, 0, -3, 17], defenseBonus: [6, 8, 6, 21, 17] }],
+  brigandine: ['leather', { name: 'Crimson brigandine', cut: 'lamellar', color: [116, 49, 47], shell: [151, 72, 60], edging: [194, 144, 92], defense: 10, mobility: 1, power: 1.08, attackBonus: [0, 2, 3, -6, 12], defenseBonus: [13, 17, 11, 24, 23] }],
+  nightHide: ['leather', { name: 'Nightstalker hide', cut: 'night', color: [53, 70, 60], shell: [76, 110, 87], edging: [145, 163, 91], defense: 7, mobility: 1.04, power: 1.12, attackBonus: [0, 0, 0, -2, 21], defenseBonus: [6, 10, 8, 36, 16] }],
+  tide: ['robes', { name: 'Tideweave robes', cut: 'mantle', color: [47, 110, 130], edging: [145, 224, 220], defense: 4, mobility: 1.09, power: 1.10, attackBonus: [-3, -2, 0, 15, -5], defenseBonus: [3, 5, 4, 24, -3] }],
+  cinder: ['robes', { name: 'Cinder robes', cut: 'ornate', color: [126, 55, 51], edging: [255, 163, 82], defense: 3, mobility: 1.04, power: 1.17, attackBonus: [-3, 1, 0, 21, -8], defenseBonus: [2, 4, 5, 12, -9] }],
+  astral: ['robes', { name: 'Astral vestments', cut: 'astral', color: [66, 82, 119], edging: [180, 199, 246], defense: 5, mobility: 1.03, power: 1.14, attackBonus: [-5, -3, -1, 23, -7], defenseBonus: [7, 5, 6, 20, -7] }]
+};
+for (const [key, [base, stats]] of Object.entries(armorVariants)) armors[key] = { ...armors[base], ...stats };
 const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor', spellbook: 'Spellbook' };
 const signed = value => value > 0 ? '+' + value : String(value);
 
@@ -112,7 +149,22 @@ function equipmentPicker(fighter, prefix, type, choices) {
   select.setAttribute('aria-describedby', detail.id);
   const automatic = new Option('Auto', 'auto');
   select.add(automatic);
-  for (const [key, item] of Object.entries(choices)) select.add(new Option(item.name, key));
+  const groups = new Map();
+  for (const [key, item] of Object.entries(choices)) {
+    const group = type === 'armor' ? styles[item.style] : weaponGroups[weaponFamily(key)];
+    const option = new Option(item.name, key);
+    if (!group) {
+      select.add(option);
+      continue;
+    }
+    if (!groups.has(group)) {
+      const container = document.createElement('optgroup');
+      container.label = group;
+      select.append(container);
+      groups.set(group, container);
+    }
+    groups.get(group).append(option);
+  }
   select.value = 'auto';
   select.describe = () => {
     const item = choices[select.value === 'auto' ? fighter.gear[type] : select.value];
@@ -130,10 +182,11 @@ function equipmentPicker(fighter, prefix, type, choices) {
     } else if (type === 'weapon' || type === 'reserve') {
       lines.push('Base damage ' + item.damage + ' · Reach ' + item.range.toFixed(1),
         'Speed ' + Math.round(item.tempo * 100) + '% · ' + item.energy + ' energy per attack');
-      if (item.spellPower) lines.push('+30% spell power · Free Staff Spark');
+      if (item.spellPower) lines.push('+' + Math.round((item.spellPower - 1) * 100) + '% spell power · Free Staff Spark');
       if (item.style === 'ranged') lines.push('Ranged bolts · Strong against robes', 'Reduced damage and accuracy up close');
-      if (item.twoHanded) lines.push('+' + item.accuracy + ' ' + bonusTypes[meleeType[select.value === 'auto' ? fighter.gear[type] : select.value]]
-        + ' attack · Uses both hands', 'Shield is stowed while wielding');
+      const key = select.value === 'auto' ? fighter.gear[type] : select.value;
+      if (item.accuracy) lines.push('+' + item.accuracy + ' ' + bonusTypes[meleeType(key)] + ' attack');
+      if (item.twoHanded) lines.push('Uses both hands · Shield is stowed');
       if (type === 'reserve') lines.push('Carrying a spare lowers speed by 4% · Swaps cost ' + switchCost + ' energy');
     } else if (type === 'shield') {
       lines.push('Defense +' + item.defense, 'Speed ' + Math.round(item.mobility * 100) + '% · ' + item.energy + ' energy per block');
@@ -238,7 +291,7 @@ const shieldReady = fighter => !weapons[fighter.weapon].twoHanded;
 const mobility = fighter => (shieldReady(fighter) ? shields[fighter.gear.shield].mobility : 1) * armors[fighter.gear.armor].mobility
   * (carriesSpare(fighter) ? .96 : 1) * (fighter.hastedUntil > elapsed ? 1.12 : 1);
 const defense = fighter => fighter.defense + (shieldReady(fighter) ? shields[fighter.gear.shield].defense : 0) + armors[fighter.gear.armor].defense;
-const attackType = (style, key) => style === 'magic' ? 3 : style === 'ranged' ? 4 : meleeType[key];
+const attackType = (style, key) => style === 'magic' ? 3 : style === 'ranged' ? 4 : meleeType(key);
 
 function accuracyBonus(attacker, defender, style, key) {
   const type = attackType(style, key);
@@ -421,14 +474,160 @@ function weaponAxis(hand, angle) {
   ];
 }
 
-function flailChain(anchor, windup, strike, clock, fraction) {
-  const angle = -1.48 + Math.sin(clock * 7) * .13 * (1 - strike) - windup * 2.8 + strike * 1.50;
-  return shifted(anchor, Math.cos(angle) * .48 * fraction,
-    Math.sin(angle) * .48 * fraction - .14 * (1 - strike) * Math.sin(Math.PI * fraction));
+function flailChain(anchor, windup, strike, clock, fraction, length = .48, offset = 0) {
+  const angle = -1.48 + Math.sin(clock * 7) * .13 * (1 - strike) - windup * 2.8 + strike * 1.50 + offset;
+  return shifted(anchor, Math.cos(angle) * length * fraction,
+    Math.sin(angle) * length * fraction - .14 * (1 - strike) * Math.sin(Math.PI * fraction), offset * .19 * fraction);
+}
+
+function flailTrails(key, anchor, windup, strike, clock) {
+  if (key === 'twinFlail') return [-.23, .23].map(offset => fraction => flailChain(anchor, windup, strike, clock, fraction, .46, offset));
+  return [fraction => flailChain(anchor, windup, strike, clock, fraction, weapons[key].chain)];
+}
+
+function forgedBlade(along, sections, render, tint = metal) {
+  for (let index = 1; index < sections.length; index++) {
+    const [s0, bend0, half0, bevel0] = sections[index - 1];
+    const [s1, bend1, half1, bevel1] = sections[index];
+    const point = (s, bend, shift, depth) => shifted(along(s, bend + shift), 0, 0, depth);
+    const leftA = point(s0, bend0, -half0, .015);
+    const spineA = point(s0, bend0, 0, bevel0);
+    const rightA = point(s0, bend0, half0, .015);
+    const leftB = point(s1, bend1, -half1, .015);
+    const spineB = point(s1, bend1, 0, bevel1);
+    const rightB = point(s1, bend1, half1, .015);
+    render([leftA, spineA, spineB, leftB], tint, .86);
+    render([spineA, rightA, rightB, spineB], tint, 1.2);
+    if (half0 > .045) {
+      render([leftA, point(s0, bend0, -half0 * .78, .026), point(s1, bend1, -half1 * .78, .026), leftB], tint, 1.32);
+    }
+  }
+}
+
+function variantWeapon(key, along, limb, paint) {
+  const family = weaponFamily(key);
+  const band = (distance, width, height, color = bronze) =>
+    limb(along(distance - width / 2), along(distance + width / 2), [height, height], [height, height], color, 8);
+  if (family === 'sword' || family === 'greatsword') {
+    const heavy = family === 'greatsword';
+    const handle = heavy ? -.54 : -.29;
+    limb(along(handle), along(.21), [.073, .067], [.056, .057], leather, 8);
+    for (let wrap = handle + .075; wrap < .02; wrap += .088) band(wrap, .020, .075, darkSteel);
+    band(handle, .082, .085);
+    const guard = key === 'rapier' ? .17 : heavy ? .31 : .24;
+    for (const direction of [-1, 1]) {
+      limb(along(.17), along(heavy ? .33 : .05, direction * guard), [.064, .068], [.036, .056], bronze, 8);
+    }
+    if (key === 'rapier') {
+      limb(along(.07, -.13), along(.17, .15), [.116, .070], [.090, .055], bronze, 10);
+      forgedBlade(along, [[.19, 0, .053, .064], [.75, 0, .046, .05], [1.19, 0, .030, .037], [1.37, 0, 0, .016]], paint);
+    } else if (key === 'falchion') {
+      forgedBlade(along, [[.18, 0, .086, .062], [.46, .04, .119, .075], [.88, .10, .145, .067], [1.17, .15, .086, .045], [1.28, .22, 0, .017]], paint);
+    } else if (key === 'claymore') {
+      forgedBlade(along, [[.25, 0, .152, .085], [.42, 0, .164, .093], [1.21, 0, .13, .060], [1.51, 0, .095, .04], [1.74, 0, 0, .017]], paint);
+      paint([shifted(along(.35), 0, 0, .102), shifted(along(.56, -.037), 0, 0, .093),
+        shifted(along(1.48), 0, 0, .06), shifted(along(.56, .037), 0, 0, .093)], darkSteel, .95);
+    } else {
+      forgedBlade(along, [[.19, 0, .125, .083], [.44, 0, .222, .085], [1.17, 0, .226, .074], [1.46, 0, .199, .049], [1.55, .054, 0, .018]], paint, [153, 151, 139]);
+      paint([shifted(along(1.19, -.055), 0, 0, .084), shifted(along(1.27), 0, 0, .083),
+        shifted(along(1.19, .055), 0, 0, .084), shifted(along(1.11), 0, 0, .088)], bronze, 1.25);
+    }
+    return true;
+  }
+  if (family === 'spear') {
+    limb(along(-1.15), along(1.48), [.066, .061], [.052, .050], leather, 8);
+    for (const distance of [-1.12, -.19, .17, 1.36]) band(distance, .068, .070);
+    if (key === 'trident') {
+      for (const offset of [-.19, 0, .19]) {
+        limb(along(1.40), along(1.52, offset), [.065, .057], [.040, .048], bronze, 8);
+        limb(along(1.49, offset), along(1.87 - Math.abs(offset) * .32, offset), [.052, .036], [0, 0], metal, 8);
+      }
+    } else {
+      limb(along(1.44), along(1.88), [.091, .056], [0, 0], metal, 8);
+      paint([along(1.22, -.06), along(1.29, -.32), along(1.58, -.28), along(1.76, -.10),
+        along(1.56, .018), along(1.20, .056)], metal, 1.10);
+      paint([shifted(along(1.29, -.32), 0, 0, .027), shifted(along(1.57, -.27), 0, 0, .025),
+        shifted(along(1.73, -.10), 0, 0, .026), shifted(along(1.46, -.14), 0, 0, .049)], bronze, .94);
+    }
+    return true;
+  }
+  if (family === 'axe') {
+    const large = key === 'crescentAxe';
+    limb(along(large ? -.72 : -.30), along(1.07), [.080, .075], [.058, .062], leather, 8);
+    for (const t of [0, .16, .65, 1.02]) band(t, .060, .081);
+    const outline = large ? [[.72, -.086], [1.05, .12], [1.28, .37], [1.06, .49], [.78, .52], [.54, .44], [.80, .23]]
+      : [[.57, -.077], [.89, -.08], [1.07, .20], [.95, .37], [.66, .49], [.38, .41], [.60, .27]];
+    paint(outline.map(([a, b]) => shifted(along(a, b), 0, 0, .073)), metal, 1.09);
+    paint(outline.slice(2, 6).map(([a, b]) => shifted(along(a, b), 0, 0, .081))
+      .concat([shifted(along(.80, .30), 0, 0, .087)]), armor, .84);
+    paint([shifted(along(.76,.108),0,0,.086),shifted(along(.82,.18),0,0,.085),
+      shifted(along(.77,.24),0,0,.087),shifted(along(.70,.174),0,0,.09)], bronze, 1.25);
+    return true;
+  }
+  if (family === 'mace' || family === 'maul') {
+    const heavy = family === 'maul';
+    limb(along(heavy ? -.61 : -.30), along(.94), [.077, .077], [.068, .069], leather, 8);
+    for (const t of [-.22, -.07, .18, .63]) band(t, .056, .08, key === 'club' ? bronze : darkSteel);
+    if (key === 'club') {
+      limb(along(.47), along(1.08), [.12, .102], [.167, .131], [152, 105, 59], 10);
+      for (const t of [.62, .77, .93]) band(t, .032, .13);
+    } else if (key === 'morningstar') {
+      limb(along(.72), along(.91), [.094, .085], [.198, .159], armor, 10);
+      limb(along(.91), along(1.09), [.198, .159], [.065, .057], metal, 10);
+      for (const offset of [-1, 1]) {
+        for (const t of [.77, .91, 1.03]) limb(along(t), along(t + .02, offset * .25), [.063, .064], [0, 0], metal, 6);
+      }
+    } else if (key === 'pickhammer') {
+      limb(along(.86, -.13), along(.92, .16), [.13, .16], [.17, .16], armor, 10);
+      limb(along(.89, .10), along(.94, .48), [.14, .10], [0, 0], metal, 8);
+      limb(along(.86, -.05), along(.81, -.30), [.14, .16], [.132, .14], bronze, 8);
+    } else {
+      limb(along(.88, -.31), along(.88, .33), [.28, .265], [.28, .27], [130, 115, 100], 6);
+      for (const offset of [-.22, .22]) limb(along(.61, offset), along(1.13, offset), [.044, .155], [.041, .15], darkSteel, 6);
+    }
+    return true;
+  }
+  if (family === 'crossbow') {
+    const heavy = key === 'arbalest';
+    const arm = heavy ? .46 : .29;
+    limb(along(heavy ? -.58 : -.40), along(.81), [.132, .13], [.082, .068], leather, 10);
+    limb(along(-.14, .04), along(.84, .035), [.047, .087], [.034, .058], metal, 8);
+    if (!heavy) limb(along(.17, -.16), along(.55, -.17), [.088, .094], [.067, .076], bronze, 8);
+    for (const side of [-1, 1]) {
+      limb(along(.64), along(.62, side * arm * .67), [.072, .06], [.057, .052], armor, 8);
+      limb(along(.62, side * arm * .67), along(.50, side * arm), [.052, .05], [.031, .034], bronze, 8);
+      limb(along(.50, side * arm), along(heavy ? -.02 : .18), [.016, .016], [.017, .015], [215, 190, 162], 4);
+    }
+    band(.74, .048, .086);
+    return true;
+  }
+  if (family === 'staff') {
+    const sun = key === 'sunStaff';
+    limb(along(sun ? -.94 : -.66), along(1.15), [.072, .067], [.059, .054], sun ? leather : [103, 115, 117], 8);
+    for (const d of [-.39, -.16, .12, .85, 1.06]) band(d, .040, .073, sun ? bronze : armor);
+    if (sun) {
+      for (let spoke = 0; spoke < 8; spoke++) {
+        const theta = spoke * Math.PI / 4;
+        limb(along(1.29 + Math.cos(theta) * .08, Math.sin(theta) * .08),
+          along(1.29 + Math.cos(theta) * .235, Math.sin(theta) * .235), [.044, .044], [0, 0], bronze, 8);
+      }
+      limb(along(1.16), along(1.29), [.086, .075], [.117, .105], [245, 179, 72], 10);
+      limb(along(1.29), along(1.47), [.117, .105], [0, 0], [255, 210, 100], 10);
+    } else {
+      limb(along(1.06), along(1.27, -.11), [.081, .098], [.052, .052], darkSteel, 8);
+      limb(along(1.06), along(1.27, .11), [.081, .098], [.052, .052], darkSteel, 8);
+      limb(along(1.13), along(1.30), [.087, .081], [.13, .119], [89, 190, 183], 8);
+      limb(along(1.30), along(1.48), [.13, .119], [.027, .032], [169, 231, 221], 8);
+    }
+    return true;
+  }
+  return false;
 }
 
 function weaponModel(fighter, hand, angle, windup, strike, clock, limb, transform, key = fighter.weapon) {
   const along = weaponAxis(hand, angle);
+  const paint = (points, color, light) => surface(points, color, light, transform);
+  if (variants[key] && variantWeapon(key, along, limb, paint)) return;
   if (key === 'greatsword') {
     limb(along(-.53), along(.23), [.073, .077], [.066, .065], leather, 8);
     limb(along(-.62), along(-.49), [.086, .079], [.107, .092], bronze, 8);
@@ -481,7 +680,7 @@ function weaponModel(fighter, hand, angle, windup, strike, clock, limb, transfor
     limb(along(.91), along(1.13), [.10, .043], [0, 0], metal);
     return;
   }
-  const flail = key === 'flail';
+  const flail = weaponFamily(key) === 'flail';
   const tip = flail ? .61 : .77;
   limb(along(-.23), along(tip), [.082, .077], [.065, .062], leather, 6);
   if (key === 'axe') {
@@ -494,21 +693,24 @@ function weaponModel(fighter, hand, angle, windup, strike, clock, limb, transfor
     limb(along(.79), along(.98), [.21, .17], [.12, .11], armor, 6);
     return;
   }
-  const chainPoint = fraction => flailChain(along(tip), windup, strike, clock, fraction);
-  const ball = chainPoint(1);
-  for (let i = 0; i < 5; i++) {
-    const link = chainPoint(i / 5);
-    limb(link, chainPoint((i + 1) / 5), [.043, .04], [.043, .04], i % 2 ? armor : metal, 6);
-  }
-  const [bx, by, bz] = ball;
-  limb([bx, by - .15, bz], ball, [.075, .075], [.17, .17], armor, 6);
-  limb(ball, [bx, by + .15, bz], [.17, .17], [.075, .075], metal, 6);
-  for (let i = 0; i < 5; i++) {
-    const theta = (i + .5) * Math.PI * 2 / 5;
-    const dx = Math.cos(theta), dy = Math.sin(theta);
-    surface([[bx + dx * .13 - dy * .05, by + dy * .13 + dx * .05, bz + .10],
-      [bx + dx * .24, by + dy * .24, bz + .10],
-      [bx + dx * .13 + dy * .05, by + dy * .13 - dx * .05, bz + .10]], metal, .98, transform);
+  const chains = flailTrails(key, along(tip), windup, strike, clock);
+  const radius = key === 'scourge' ? .10 : key === 'twinFlail' ? .125 : .17;
+  for (const chainPoint of chains) {
+    const ball = chainPoint(1);
+    for (let i = 0; i < 5; i++) {
+      const link = chainPoint(i / 5);
+      limb(link, chainPoint((i + 1) / 5), [.043, .04], [.043, .04], i % 2 ? armor : metal, 6);
+    }
+    const [bx, by, bz] = ball;
+    limb([bx, by - radius * .88, bz], ball, [.075, .075], [radius, radius], armor, 6);
+    limb(ball, [bx, by + radius * .88, bz], [radius, radius], [.075, .075], metal, 6);
+    for (let i = 0; i < 5; i++) {
+      const theta = (i + .5) * Math.PI * 2 / 5;
+      const dx = Math.cos(theta), dy = Math.sin(theta);
+      paint([[bx + dx * radius * .76 - dy * .05, by + dy * radius * .76 + dx * .05, bz + .10],
+        [bx + dx * radius * 1.42, by + dy * radius * 1.42, bz + .10],
+        [bx + dx * radius * .76 + dy * .05, by + dy * radius * .76 - dx * .05, bz + .10]], metal, .98);
+    }
   }
 }
 
@@ -588,7 +790,7 @@ function fighterPose(fighter, at = phase) {
   const weapon = weapons[fighter.weapon];
   const aim = swinging ? exchange.aim * strike : 0;
   joints.weaponShoulder = shifted(chest, .02 - windup * .06 + twist * .35, .04, -.30);
-  const channeling = fighter.weapon === 'staff' ? casting * .54 : -casting * .47;
+  const channeling = weapon.spellPower ? casting * .54 : -casting * .47;
   joints.weaponHand = [.32 + channeling + strike * weapon.extension - windup * .47 - recoil * .12 + sway * .11
     + aiming * .43 - shotRecoil * .10 - swapping * .36,
     1.43 - drop + windup * weapon.lift + aim * .22 + sway * .07 + aiming * .17 - swapping * .14, -.30 + strike * .31 + aiming * .20];
@@ -597,8 +799,8 @@ function fighterPose(fighter, at = phase) {
   joints.shieldShoulder = shifted(chest, -.02 - twist * .35, -.025, .30);
   joints.shieldHand = [.36 + guard * .30 + casting * .12 - recoil * (zone === 'arm' ? .31 : .09) - sway * .11,
     1.39 - drop + guard * .25 - recoil * .16 + casting * .16, .48];
-  const aimScale = fighter.weapon === 'spear' ? .44 : .65;
-  const castAngle = fighter.weapon === 'staff' ? -.79 : 1.19;
+  const aimScale = weaponFamily(fighter.weapon) === 'spear' ? .44 : .65;
+  const castAngle = weapon.spellPower ? -.79 : 1.19;
   const angle = weapon.rest + casting * castAngle + windup * weapon.draw - strike * weapon.swing
     + aim * aimScale + sway * .08 - aiming * .16 + shotRecoil * .09 + swapping * .35;
   if (weapon.twoHanded) {
@@ -639,6 +841,8 @@ function loft(rings, color, transform, sides = 24) {
 
 function armorTorso(fighter, pose, transform) {
   const kit = armors[fighter.gear.armor];
+  const shell = kit.shell || metal;
+  const edging = kit.edging || bronze;
   const piece = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, transform, sides);
   const panel = (points, color, light = 1) => surface(points, color, light, transform);
   const stud = (x, y, z, color = bronze) =>
@@ -650,24 +854,24 @@ function armorTorso(fighter, pose, transform) {
     [.43, .411, .385], [.55, .395, .359], [.60, .33, .323], [.645, .224, .253]], kit.color, transform);
 
   if (kit.style === 'melee') {
-    loft([[.14, .327, .35], [.23, .348, .37], [.44, .40, .386], [.57, .38, .35]], metal, transform);
+    loft([[.14, .327, .35], [.23, .348, .37], [.44, .40, .386], [.57, .38, .35]], shell, transform);
     panel([[-.35, .55, .232], [-.24, .59, .32], [0, .38, .404], [.25, .58, .32],
       [.35, .52, .23], [0, .29, .413]], darkSteel, 1.02);
     panel([[-.30, .54, .282], [0, .34, .420], [.30, .54, .282], [.29, .49, .30],
-      [0, .28, .425], [-.28, .49, .305]], bronze, 1.16);
+      [0, .28, .425], [-.28, .49, .305]], edging, 1.16);
     panel([[0, .50, .406], [.087, .422, .418], [0, .34, .423], [-.087, .422, .418]], fighter.trim, 1);
     for (const side of [-1, 1]) {
       const x = side * .20;
       panel([[x - .035, .51, .361], [x + .018, .554, .345], [x + .048, .521, .357],
-        [x + .031, .483, .373], [x - .019, .456, .385]], metal, 1.20);
+        [x + .031, .483, .373], [x - .019, .456, .385]], shell, 1.20);
       for (const y of [.435, .528, .589]) stud(side * (.285 - (y - .45) * .28), y, .319, bronze);
       piece([side * .175, .019, .31], [side * .235 + skirt * .5, -.207, .33], [.108, .075], [.091, .052], darkSteel, 8);
       piece([side * .203 + skirt * .5, -.105, .38], [side * .232 + skirt * .5, -.244, .356],
-        [.090, .036], [.072, .028], armor, 8);
+        [.090, .036], [.072, .028], kit.shell || armor, 8);
       stud(side * .228 + skirt * .5, -.15, .409, bronze);
     }
     for (const y of [.03, .115, .20]) {
-      loft([[y - .07, .33, .34], [y, .355, .368], [y + .035, .31, .339]], armor, transform);
+      loft([[y - .07, .33, .34], [y, .355, .368], [y + .035, .31, .339]], kit.shell || armor, transform);
       stud(-.20, y, .325);
       stud(.20, y, .325);
     }
@@ -679,7 +883,7 @@ function armorTorso(fighter, pose, transform) {
     }
   } else if (kit.style === 'ranged') {
     panel([[-.32, .50, .27], [-.15, .62, .35], [.04, .37, .415], [.22, .55, .34],
-      [.31, .45, .28], [.14, .16, .38], [-.15, .12, .38]], [132, 88, 56], 1.03);
+      [.31, .45, .28], [.14, .16, .38], [-.15, .12, .38]], kit.shell || [132, 88, 56], 1.03);
     for (const x of [-.19, .17]) {
       piece([x, .18, .351], [x * 1.10, .51, .349], [.027, .022], [.031, .020], leather, 6);
       for (const y of [.20, .29, .38, .47]) stud(x + .045, y, .37, [200, 156, 98]);
@@ -690,9 +894,9 @@ function armorTorso(fighter, pose, transform) {
         const y = .18 + row * .082;
         const z = .402 + row * .005;
         panel([[x - .066, y + .028, z], [x + .05, y + .028, z], [x + .056, y - .024, z + .002],
-          [x + .011, y - .053, z + .008], [x - .047, y - .028, z + .004]], [130, 82, 52], .88 + (column + 1) * .10);
+          [x + .011, y - .053, z + .008], [x - .047, y - .028, z + .004]], kit.shell || [130, 82, 52], .88 + (column + 1) * .10);
         panel([[x - .057, y + .025, z + .006], [x + .042, y + .025, z + .006],
-          [x + .042, y + .011, z + .007], [x - .05, y + .011, z + .007]], [201, 149, 88], .94);
+          [x + .042, y + .011, z + .007], [x - .05, y + .011, z + .007]], kit.edging || [201, 149, 88], .94);
         stud(x - .027, y + .008, z + .012, darkSteel);
       }
     }
@@ -723,11 +927,11 @@ function armorTorso(fighter, pose, transform) {
       panel([start, shifted(start, .025, 0, .012), shifted(end, .026, 0, .012), end], bronze, .92);
     }
     panel([[-.20 + skirt, -.505, .315], hem(-.17), hem(.10), [.24 + skirt, -.49, .31],
-      [.21 + skirt, -.444, .316], [.08 + skirt, -.53, .316], [-.16 + skirt, -.54, .316]], bronze, 1.1);
+      [.21 + skirt, -.444, .316], [.08 + skirt, -.53, .316], [-.16 + skirt, -.54, .316]], edging, 1.1);
     panel([[-.30, .54, .30], [-.12, .63, .35], [.03, .40, .43], [.21, .61, .36],
       [.31, .51, .30], [.03, .27, .432]], fighter.color, 1.13);
     panel([[-.24, .55, .326], [.03, .335, .442], [.25, .54, .334], [.235, .49, .348],
-      [.03, .30, .445], [-.21, .51, .36]], bronze, 1.11);
+      [.03, .30, .445], [-.21, .51, .36]], edging, 1.11);
     stud(.03, .29, .454, fighter.trim);
     stud(.03, .22, .444, fighter.trim);
     for (const y of [-.16, -.29, -.42]) {
@@ -742,6 +946,52 @@ function armorTorso(fighter, pose, transform) {
   piece([-.062, .056, .393], [.074, .061, .403], [.054, .028], [.054, .028], bronze, 6);
   panel([[-.029, .035, .433], [.043, .035, .433], [.043, .078, .433], [-.029, .078, .433]], darkSteel, .95);
   for (const x of [-.255, -.169, .159, .244]) stud(x, .058, .365 - Math.abs(x) * .12, bronze);
+  armorSignature(kit, pose, panel, piece);
+}
+
+function armorSignature(kit, pose, panel, piece) {
+  const { cut, edging } = kit;
+  if (!cut) return;
+  const shell = kit.shell || kit.color;
+  if (cut === 'lamellar' || cut === 'fortress') {
+    const breadth = cut === 'fortress' ? .19 : .14;
+    for (let row = 0; row < 3; row++) {
+      const y = .24 + row * .113;
+      for (const side of [-1, 1]) {
+        const x = side * (.15 + row * .037);
+        const z = .442 - row * .023;
+        panel([[x - breadth * .61, y + .054, z], [x + breadth * .61, y + .054, z],
+          [x + breadth * .51, y - .018, z + .01], [x, y - .045, z + .022],
+          [x - breadth * .57, y - .018, z + .01]], shell, 1.12 + row * .035);
+        piece([x - .056, y + .043, z + .012], [x + .057, y + .046, z + .012], [.013, .014], [.012, .012], edging, 6);
+      }
+    }
+    return;
+  }
+  if (cut === 'mantle' || cut === 'night') {
+    panel([[-.31, .62, .296], [-.54, .52, .284], [-.50 + pose.cloth * .4, .25, .321],
+      [-.31, .18, .335], [-.18, .49, .406], [-.04, .64, .352]], shell, cut === 'night' ? .78 : 1.09);
+    piece([-.50, .49, .308], [-.39, .23, .341], [.022, .027], [.017, .02], edging, 8);
+    if (cut === 'night') {
+      for (const x of [-.29, -.17, -.05, .07]) {
+        piece([x - .034, .47, .432], [x, .39, .444], [.014, .013], [.014, .012], edging, 4);
+      }
+    }
+    return;
+  }
+  const large = cut === 'astral' ? .115 : .102;
+  const knot = [.055, .423, .455];
+  for (const [i, { cosine, sine }] of circleProfile(8).entries()) {
+    const a = shifted(knot, cosine * large, sine * large, .01);
+    const b = shifted(knot, cosine * large * .43 - sine * .022, sine * large * .43 + cosine * .022, .018);
+    const c = shifted(knot, cosine * large * .43 + sine * .022, sine * large * .43 - cosine * .022, .018);
+    panel([a, b, c], edging, 1.14 - i * .026);
+  }
+  piece([.034, .40, .467], [.078, .44, .468], [.040, .025], [.039, .024], edging, 10);
+  if (cut === 'astral') {
+    panel([[-.27, -.02, .28], [-.36 + pose.cloth * .45, -.35, .29], [-.34 + pose.cloth, -.72, .30],
+      [-.12 + pose.cloth, -.60, .344], [-.117, -.04, .37]], kit.color, 1.13);
+  }
 }
 
 function armorHelmet(fighter, kit, transform) {
@@ -752,12 +1002,16 @@ function armorHelmet(fighter, kit, transform) {
     loft([[-.15, .225, .227], [.05, .278, .26], [.21, .265, .218], [.315, .128, .135], [.38, .02, .03]], kit.color, transform);
     panel([[-.02, -.12, .234], [.17, -.13, .23], [.25, .012, .205], [.17, .16, .235], [.015, .14, .268]], clothLining, .75);
     panel([[.035, -.11, .247], [.16, -.105, .25], [.226, -.027, .225], [.175, .095, .261], [.061, .106, .275]], face);
-    piece([.052, .138, .271], [.22, .087, .246], [.024, .029], [.026, .025], bronze, 6);
+    piece([.052, .138, .271], [.22, .087, .246], [.024, .029], [.026, .025], kit.edging || bronze, 6);
+    if (kit.cut === 'astral') {
+      piece([-.19, .19, .14], [-.32, .40, .13], [.127, .089], [.040, .051], kit.color, 8);
+      piece([.04, .258, .168], [.055, .385, .143], [.065, .061], [.019, .027], kit.edging, 8);
+    }
     panel([[-.20, .07, .217], [-.077, .22, .223], [.146, .235, .179], [.182, .182, .21],
       [-.057, .193, .248], [-.169, .047, .247]], kit.color, 1.41);
   } else if (kit.style === 'ranged') {
     loft([[-.15, .185, .20], [-.09, .228, .235], [.12, .238, .24], [.233, .205, .21]], face, transform);
-    loft([[.095, .234, .249], [.171, .266, .255], [.291, .18, .189], [.322, .08, .09]], leather, transform);
+    loft([[.095, .234, .249], [.171, .266, .255], [.291, .18, .189], [.322, .08, .09]], kit.shell || leather, transform);
     piece([-.235, .14, .19], [.246, .157, .182], [.028, .087], [.024, .057], fighter.trim, 8);
     panel([[-.23, .176, .177], [-.135, .174, .254], [-.109, -.118, .249], [-.21, -.15, .203]], [118, 87, 57], 1.1);
     piece([.208, .139, .235], [.212, -.036, .233], [.025, .039], [.029, .028], bronze, 6);
@@ -765,12 +1019,14 @@ function armorHelmet(fighter, kit, transform) {
       panel([[x - .012, .169, .257], [x + .009, .194, .26], [x + .03, .166, .259],
         [x + .009, .146, .261]], bronze, 1.2);
     }
+    if (kit.cut === 'night') panel([[-.103, -.021, .275], [.146, .007, .263], [.215, -.052, .247],
+      [.14, -.135, .260], [-.07, -.148, .259]], kit.color, .78);
   } else {
-    loft([[-.155, .216, .222], [-.035, .241, .254], [.13, .272, .264], [.255, .205, .234], [.31, .105, .135]], metal, transform);
+    loft([[-.155, .216, .222], [-.035, .241, .254], [.13, .272, .264], [.255, .205, .234], [.31, .105, .135]], kit.shell || metal, transform);
     panel([[-.165, .053, .217], [.09, .077, .287], [.245, .039, .237],
       [.212, -.039, .249], [.042, -.063, .292], [-.132, -.036, .239]], [47, 40, 34], .9);
     panel([[-.155, .083, .23], [.095, .108, .292], [.25, .065, .245], [.238, .036, .253],
-      [.090, .073, .30], [-.152, .05, .245]], bronze, 1.19);
+      [.090, .073, .30], [-.152, .05, .245]], kit.edging || bronze, 1.19);
     panel([[-.206, .04, .21], [-.106, .015, .274], [-.047, -.138, .27],
       [-.133, -.194, .221], [-.22, -.108, .194]], armor, 1.14);
     piece([-.10, .248, .075], [-.12, .314, .062], [.230, .13], [.18, .09], darkSteel, 8);
@@ -781,6 +1037,10 @@ function armorHelmet(fighter, kit, transform) {
         [x - .014, -.119, .273]], darkSteel, .82);
     }
     piece([-.11, .234, .208], [.118, .209, .215], [.014, .035], [.015, .031], bronze, 6);
+    if (kit.cut === 'fortress') {
+      piece([-.25, .145, .16], [-.33, .33, .14], [.092, .097], [.032, .053], kit.shell, 8);
+      piece([-.19, -.06, .209], [-.12, -.235, .182], [.14, .10], [.081, .061], kit.shell, 8);
+    }
   }
   if (kit.style !== 'melee') {
     panel([[.092, .063, .282], [.176, .060, .27], [.169, .027, .273], [.100, .028, .288]], [54, 40, 33], .98);
@@ -812,11 +1072,11 @@ function drawGladiator(fighter, pose) {
     limb(knee, ankle, [.139, .14], [.103, .106], robed ? clothLining : skin, 8);
     if (plated) {
       limb(shifted(pointBetween(hip, knee, .17), 0, 0, .086), shifted(pointBetween(hip, knee, .70), 0, 0, .092),
-        [.136, .099], [.118, .08], armor, 8);
-      limb(shifted(knee, -.066, .076, .087), shifted(knee, .028, -.083, .085), [.129, .095], [.085, .085], metal, 8);
+        [.136, .099], [.118, .08], kit.shell || armor, 8);
+      limb(shifted(knee, -.066, .076, .087), shifted(knee, .028, -.083, .085), [.129, .095], [.085, .085], kit.shell || metal, 8);
     }
     limb(shifted(pointBetween(knee, ankle, .13), 0, 0, .062), shifted(pointBetween(ankle, knee, .08), 0, 0, .064),
-      [.109, .102], [.090, .080], plated ? metal : robed ? leather : kit.color, 8);
+      [.109, .102], [.090, .080], plated ? kit.shell || metal : robed ? leather : kit.color, 8);
     for (const t of (plated ? [.24, .73] : [.32, .53, .73])) {
       const strap = pointBetween(knee, ankle, t);
       limb(shifted(strap, -.10, -.022, .084), shifted(strap, .10, .022, .084), [.028, .03], [.028, .03], plated ? bronze : leather, 6);
@@ -849,7 +1109,7 @@ function drawGladiator(fighter, pose) {
 
   const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
   if (weapons[spare]) {
-    const long = spare === 'staff' || spare === 'spear' || spare === 'crossbow' || weapons[spare].twoHanded;
+    const long = ['staff', 'spear', 'crossbow'].includes(weaponFamily(spare)) || weapons[spare].twoHanded;
     const mount = torso(long ? [-.43, .39, -.51] : [-.39, .03, -.43]);
     const scaleStowed = long ? .80 : .69;
     const stow = point => pointBetween(mount, point, scaleStowed);
@@ -872,12 +1132,12 @@ function drawGladiator(fighter, pose) {
     const hand = j[side + 'Hand'];
     limb(shoulder, elbow, [.16, .15], [.109, .11], robed ? kit.color : skin, 8);
     limb(elbow, hand, [.115, .118], [.08, .083], robed ? clothLining : skin, 8);
-    const shoulderShell = plated ? metal : robed ? fighter.color : kit.color;
+    const shoulderShell = plated ? kit.shell || metal : robed ? fighter.color : kit.color;
     limb(shifted(shoulder, 0, 0, .046), shifted(pointBetween(shoulder, elbow, .42), 0, 0, .062),
-      [.18, .144], [plated ? .177 : .122, .11], shoulderShell, 8);
+      [kit.cut === 'fortress' ? .24 : .18, .144], [plated ? .177 : .122, .11], shoulderShell, 8);
     if (plated) {
       limb(shifted(pointBetween(shoulder, elbow, .25), 0, 0, .078), shifted(pointBetween(shoulder, elbow, .58), 0, 0, .071),
-        [.163, .12], [.132, .097], armor, 8);
+        [.163, .12], [.132, .097], kit.shell || armor, 8);
       limb(shifted(elbow, 0, .059, .051), shifted(elbow, 0, -.046, .062), [.102, .078], [.07, .065], metal, 8);
     }
     limb(shifted(pointBetween(elbow, hand, .38), 0, 0, .04), shifted(pointBetween(elbow, hand, .85), 0, 0, .039),
@@ -915,18 +1175,30 @@ function weaponClock() {
 
 function weaponSegments(fighter, pose) {
   const along = weaponAxis(pose.joints.weaponHand, pose.angle);
-  switch (fighter.weapon) {
-    case 'sword': return [[along(.23), along(1.13), .105]];
-    case 'spear': return [[along(1.24), along(1.79), .11]];
-    case 'axe': return [[along(.66, .25), along(.66, .44), .19]];
-    case 'mace': return [[along(.67), along(.99), .19]];
-    case 'staff': return [[along(.78), along(1.47), .11]];
-    case 'greatsword': return [[along(.24), along(1.63), .15]];
-    case 'maul': return [[along(.87, -.32), along(.87, .32), .24]];
-    case 'flail': {
-      const ball = flailChain(along(.61), pose.windup, pose.strike, weaponClock(), 1);
-      return [[ball, ball, .22]];
+  const key = fighter.weapon;
+  switch (weaponFamily(key)) {
+    case 'sword': return [[along(.23), along(key === 'rapier' ? 1.37 : key === 'falchion' ? 1.28 : 1.13, key === 'falchion' ? .14 : 0), key === 'rapier' ? .073 : .105]];
+    case 'spear': {
+      if (key === 'trident') return [-.19, 0, .19].map(offset => [along(1.46, offset), along(1.84, offset), .085]);
+      if (key === 'halberd') return [[along(1.20, -.19), along(1.72, -.12), .155], [along(1.43), along(1.88), .10]];
+      return [[along(1.24), along(1.79), .11]];
     }
+    case 'axe': {
+      if (key === 'crescentAxe') return [[along(.63, .44), along(1.25, .36), .18]];
+      if (key === 'beardedAxe') return [[along(.42, .39), along(1.06, .22), .17]];
+      return [[along(.66, .25), along(.66, .44), .19]];
+    }
+    case 'mace': return [[along(.67), along(key === 'mace' ? .99 : 1.08), key === 'morningstar' ? .235 : .19]];
+    case 'staff': return [[along(.78), along(1.47), .11]];
+    case 'greatsword': return [[along(.24), along(key === 'claymore' ? 1.74 : key === 'executioner' ? 1.55 : 1.63), key === 'executioner' ? .22 : .15]];
+    case 'maul': {
+      if (key === 'pickhammer') return [[along(.87, -.20), along(.94, .44), .19]];
+      return [[along(.87, -.32), along(.87, .32), key === 'sledge' ? .28 : .24]];
+    }
+    case 'flail': return flailTrails(key, along(.61), pose.windup, pose.strike, weaponClock()).map(chain => {
+      const ball = chain(1);
+      return [ball, ball, key === 'flail' ? .22 : .165];
+    });
   }
 }
 
@@ -1242,7 +1514,7 @@ function drawMagic() {
   const { attacker, defender, spell, hitAt } = exchange;
   const pose = fighterPose(attacker);
   const staffTip = weaponAxis(pose.joints.weaponHand, pose.angle)(1.40);
-  const start = attacker.weapon === 'staff' ? project(worldPoint(attacker, staffTip))
+  const start = weapons[attacker.weapon].spellPower ? project(worldPoint(attacker, staffTip))
     : project([attacker.x + attacker.direction * .67, 1.64, attacker.z + .59]);
   const end = spell.damage ? project([defender.x - attacker.direction * .31, 1.40, defender.z + .52]) : start;
   const progress = clamp((phase - .55) / (hitAt - .55), 0, 1);
@@ -1311,7 +1583,7 @@ function resize() {
   const density = Math.min(window.devicePixelRatio || 1, 2);
   width = rect.width;
   height = rect.height;
-  scale = Math.min(width / 8.3, height / 3.88);
+  scale = Math.min(width / 8.3, height / 4.02);
   canvas.width = Math.round(width * density);
   canvas.height = Math.round(height * density);
   ctx.setTransform(density, 0, 0, density, 0, 0);
@@ -1438,13 +1710,13 @@ function pickAction(attacker, defender) {
   const targetArmor = armors[defender.gear.armor];
   const distance = Math.abs(attacker.x - defender.x);
   const crowding = closeRange(distance);
-  const opposingCrossbow = defender.weapon === 'crossbow';
+  const opposingCrossbow = weapons[defender.weapon].style === 'ranged';
   const available = attacker.spells.filter(key => canCast(attacker, key));
   const needsSupport = available.some(key => supportPriority(attacker, spells[key]) > 0);
   if (opposingCrossbow && keys.includes('sword') && attacker.energy >= 12 && distance > 1.95 && !needsSupport) {
     return { key: 'sword', style: 'melee' };
   }
-  const useOffhandMagic = elapsed > 1.2 && (Math.random() < .51 || (crowding > .38 && attacker.weapon === 'crossbow'));
+  const useOffhandMagic = elapsed > 1.2 && (Math.random() < .51 || (crowding > .38 && weapons[attacker.weapon].style === 'ranged'));
   const candidates = [];
   for (const key of keys) {
     const weapon = weapons[key];
@@ -1474,6 +1746,7 @@ function pickAction(attacker, defender) {
       const efficiency = mix(.10, .63, 1 - attacker.mp / 100);
       const spellScore = support || ((spell.damage + control) * targetArmor.magic * (.69 + attacker.magic / 210)
         * .91 * repeat * armorPower(attacker, 'magic') * (1 + accuracyBonus(attacker, defender, 'magic', key) / 250)
+        * (weapon.castTempo || 1)
         - spell.cost * .21 * efficiency);
       candidates.push({ key, style: 'magic', spellKey, score: spellScore * boost * switchFactor });
     }
@@ -1510,7 +1783,7 @@ function nextExchange() {
   const ranged = style === 'ranged';
   const initialGap = Math.abs(attacker.x - defender.x);
   const press = ranged && canPress(defender);
-  const castingRetreat = !!spell && (initialGap < 3.45 || previousWeapon === 'crossbow');
+  const castingRetreat = !!spell && (initialGap < 3.45 || weapons[previousWeapon].style === 'ranged');
   const guard = shields[defender.gear.shield];
   const fatigue = spell ? 1 : clamp(attacker.energy / weapon.energy, 0, 1);
   const blockChance = (spell ? spell.block || 0 : weapon.block) + clamp((defense(defender) - 56) / (spell ? 350 : 150), -.10, .20);
@@ -1540,7 +1813,7 @@ function nextExchange() {
     elements.cast.textContent = attacker.name + ' · ' + spell.name;
     elements.cast.style.setProperty('--spell-color', spell.color);
   } else if (ranged) {
-    elements.cast.textContent = attacker.name + (crowded > .35 ? ' · Crowded shot' : ' · Crossbow');
+    elements.cast.textContent = attacker.name + (crowded > .35 ? ' · Crowded shot' : ' · ' + weapon.name);
     elements.cast.style.setProperty('--spell-color', '#e5cf8e');
   }
   if (switched) {
@@ -1556,7 +1829,7 @@ function nextExchange() {
     missedShot: ranged && (evade || Math.random() > clamp(.75 + attacker.ranged / 390 + equipmentAccuracy / 430 - crowded * .45, .24, .98)),
     resistedSpell: spell?.damage && Math.random() > clamp(.95 + equipmentAccuracy / 410, .72, .99),
     attackType: attackType(style, key),
-    tempo: (spell ? .88 : weapon.tempo) * mobility(attacker) * mix(.68, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1),
+    tempo: (spell ? .88 * (weapon.castTempo || 1) : weapon.tempo) * mobility(attacker) * mix(.68, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1),
     hitAt: spell || ranged ? .94 : .78,
     duration: (spell || ranged ? 1.60 : 1.45) + (switched ? .12 : 0),
     positions: fighters.map(fighter => {
