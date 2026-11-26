@@ -138,6 +138,10 @@ const ArenaArt2D = (() => {
   }
 
   // ---------------------------------------------------------------- shared body pieces
+  // Round filler under a knee, elbow or hip, so a bent limb shows no notch between its two parts.
+  const round = (x, y, rx, ry = rx) => `M${x - rx},${y} a${rx},${ry} 0 1 0 ${rx * 2},0 a${rx},${ry} 0 1 0 ${-rx * 2},0 Z`;
+  const clothJoint = (g, rx, rgb, ry = rx) => shape(g, round(0, 0, rx, ry), clothFill(g, -rx, rx, rgb), 1.2);
+  const mailJoint = (g, rx, ry = rx) => mail(g, round(0, 0, rx, ry), [-rx - 1, -ry - 1, rx + 1, ry + 1]);
   function face(g, beard) {
     const skin = 'M-9,-8 C-8,-16 6,-18 11,-9 L12,-3 L16,4 L12.5,5.5 L13,9 L11,10.5 L12,13 C10,19 2,20 -3,16 L-9,9 Z';
     shape(g, skin, gradient(g, -12, 8, 14, -6, SKIN, [-.4, -.12, .08, .2]));
@@ -187,6 +191,8 @@ const ArenaArt2D = (() => {
   // ---------------------------------------------------------------- plate harness
   const plateSet = {
     box: {
+      kneeFill: [-12, -12, 12, 12], knee: [-18, -16, 17, 14], elbowFill: [-11, -11, 11, 11], elbow: [-13, -13, 15, 13],
+      pelvis: [-21, -15, 21, 15],
       torso: [-30, -80, 30, 32], head: [-40, -48, 28, 28], upperArm: [-20, -18, 20, 58], forearm: [-16, -14, 16, 58],
       hand: [-11, -11, 13, 12], thigh: [-18, -8, 18, 58], shin: [-17, -16, 20, 55], foot: [-17, -11, 30, 17],
       cape: [-48, -4, 16, 100]
@@ -303,13 +309,9 @@ const ArenaArt2D = (() => {
         rivet(g, -4, y + 1.2, .9);
       }
       wear(g, vambrace, [-9, 9, 9, 42], 18, 'rgba(255,255,255,.4)', 'rgba(30,30,45,.3)', 23, 3);
-      // Gauntlet cuff and fan-shaped elbow cop.
+      // Gauntlet cuff.
       plate(g, 'M-7,39 L7,39 L10,50 Q0,54 -10,50 Z', plateFill(g, -10, 10));
       stroke(g, 'M-9,49 Q0,52.6 9,49', tone(BRASS, 0), 1.5);
-      plate(g, 'M-3,-7 C8,-10 13,-2 11,5 L5,9 C-4,11 -10,6 -9,0 Z', plateFill(g, -10, 13));
-      for (const [x, y] of [[-12, -9], [-14, -1], [-12, 7]]) stroke(g, `M-3,1 L${x},${y}`, tone(IRON, -.2), 2.2);
-      disc(g, 0, .5, 4.4, gradient(g, -4, -4, 4, 4, BRASS, [.6, 0, -.35]), 1);
-      disc(g, 0, .5, 1.6, tone(IRON, 0), .6);
     },
     hand(g) {
       plate(g, 'M-8,-6 C-3,-10 6,-9 9,-4 C11,1 9,8 3,9 L-5,8 C-9,4 -10,-2 -8,-6 Z', plateFill(g, -9, 10));
@@ -342,11 +344,21 @@ const ArenaArt2D = (() => {
         rivet(g, -2.4, y + 1.4, .95);
       }
       wear(g, greave, [-9, 8, 11, 49], 24, 'rgba(255,255,255,.4)', 'rgba(30,30,45,.3)', 37, 3.5);
-      // Knee cop with a side wing.
+    },
+    kneeFill: g => mailJoint(g, 9.6),
+    elbowFill: g => mailJoint(g, 8.4),
+    pelvis: g => mailJoint(g, 17, 12),
+    // Knee and elbow guards turn halfway between the two limb parts.
+    knee(g) {
       plate(g, 'M-7,-8 C3,-14 15,-8 14,1 C13,8 7,11 0,10 C-8,9 -11,-2 -7,-8 Z', plateFill(g, -10, 14));
       plate(g, 'M-4,-4 C-12,-9 -16,-1 -13,4 C-10,8 -5,6 -3,3 Z', plateFill(g, -15, -2, IRON));
       stroke(g, 'M-6,6 C1,10 9,8 13,2', tone(BRASS, 0), 1.5);
       disc(g, 3, -2, 3, gradient(g, 0, -5, 6, 1, BRASS, [.6, -.3]), .9);
+    },
+    elbow(g) {
+      plate(g, 'M-3,-7 C8,-10 13,-2 11,5 L5,9 C-4,11 -10,6 -9,0 Z', plateFill(g, -10, 13));
+      disc(g, 0, .5, 4.4, gradient(g, -4, -4, 4, 4, BRASS, [.6, 0, -.35]), 1);
+      disc(g, 0, .5, 1.6, tone(IRON, 0), .6);
     },
     foot(g) {
       shape(g, 'M-12,10 L25,10.5 L24,14.5 L-11,14.5 Z', tone(DARKLEATHER, -.35), 1.1);
@@ -364,6 +376,7 @@ const ArenaArt2D = (() => {
   // ---------------------------------------------------------------- hunter's leathers
   const leatherSet = {
     box: {
+      kneeFill: [-12, -12, 12, 12], knee: [-7, -13, 16, 12], elbowFill: [-10, -10, 10, 10], pelvis: [-21, -15, 21, 15],
       torso: [-30, -82, 30, 34], head: [-30, -34, 30, 32], upperArm: [-19, -16, 19, 56], forearm: [-13, -9, 13, 56],
       hand: [-11, -11, 13, 12], thigh: [-17, -9, 17, 58], shin: [-15, -9, 17, 55], foot: [-17, -12, 30, 17],
       cape: [-46, -34, 14, 50]
@@ -508,7 +521,11 @@ const ArenaArt2D = (() => {
         buckle(g, 3.4, y + 1.3, 4.4, 4.4);
       }
       stitches(g, 'M-3,22 C-2,32 -2,40 -2,50');
-      // Knee pad.
+    },
+    kneeFill: (g, c) => clothJoint(g, 9.4, c.dark),
+    elbowFill: g => clothJoint(g, 8, SKIN),
+    pelvis: (g, c) => clothJoint(g, 17, c.dark, 12),
+    knee(g, c) {
       shape(g, 'M-3,-8 C5,-10 12,-4 11,3 L6,8 C0,9 -4,2 -3,-8 Z', gradient(g, -3, 6, 11, -7, c.light, [-.3, 0, .3]), 1.15);
       rivet(g, 4.6, -1, 1.5, STEEL);
     },
@@ -545,6 +562,7 @@ const ArenaArt2D = (() => {
   }
   const robeSet = {
     box: {
+      kneeFill: [-11, -11, 11, 11], elbowFill: [-13, -13, 13, 13], pelvis: [-21, -15, 21, 15],
       torso: [-34, -84, 32, 20], head: [-32, -38, 28, 34], upperArm: [-18, -13, 18, 54], forearm: [-22, -8, 18, 58],
       hand: [-11, -11, 13, 12], thigh: [-14, -7, 14, 57], shin: [-12, -7, 13, 55], foot: [-17, -11, 33, 17],
       cape: [-42, -4, 14, 92], skirt: [-46, -8, 42, 92]
@@ -653,6 +671,9 @@ const ArenaArt2D = (() => {
       for (let i = 0; i < 3; i++) stroke(g, `M${-2 + i * 3.5},-6.4 Q${-.4 + i * 3.5},0 ${-2.4 + i * 3.1},7`, tone(SKIN, -.55), .8);
       stroke(g, 'M1.8,-7 L2.6,-2', tone(ROBE_GOLD, .1), 1.8);
     },
+    kneeFill: (g, c) => clothJoint(g, 8.2, c.dark),
+    elbowFill: (g, c) => clothJoint(g, 10.6, c.main),
+    pelvis: (g, c) => clothJoint(g, 16, c.dark, 12),
     thigh(g, c) {
       shape(g, 'M-10,-2 Q0,-7 10,-2 L7.6,52 Q0,56 -7.6,52 Z', clothFill(g, -10, 10, c.dark), 1.2);
     },
@@ -912,11 +933,13 @@ const ArenaArt2D = (() => {
     return lookup(['body', style, team, trim, base].join(), () => {
       const set = sets[style];
       const colors = palette(team, trim, base);
-      const part = (name, dim) => bake(set.box[name], g => set[name](g, colors), bakedScale / 100, dim);
+      // A set has no sprite for a joint it leaves uncovered.
+      const part = (name, dim) => set[name] ? bake(set.box[name], g => set[name](g, colors), bakedScale / 100, dim) : null;
+      const limbs = ['upperArm', 'forearm', 'hand', 'thigh', 'shin', 'foot', 'kneeFill', 'knee', 'elbowFill', 'elbow'];
       return {
-        torso: part('torso'), head: part('head'), cape: part('cape'), skirt: set.skirt ? part('skirt') : null,
-        near: Object.fromEntries(['upperArm', 'forearm', 'hand', 'thigh', 'shin', 'foot'].map(name => [name, part(name)])),
-        far: Object.fromEntries(['upperArm', 'forearm', 'hand', 'thigh', 'shin', 'foot'].map(name => [name, part(name, true)]))
+        torso: part('torso'), head: part('head'), cape: part('cape'), skirt: part('skirt'), pelvis: part('pelvis'),
+        near: Object.fromEntries(limbs.map(name => [name, part(name)])),
+        far: Object.fromEntries(limbs.map(name => [name, part(name, true)]))
       };
     });
   }
@@ -983,6 +1006,21 @@ const ArenaArt2D = (() => {
       g.translate(ax, ay);
       g.rotate(Math.atan2(-dx, dy));
       g.scale(dir * unit / 100, clamp(Math.hypot(dx, dy) / (rest * 100), unit / 100 * .6, unit / 100 * 1.25));
+      stamp(g, sprite, frost);
+      g.restore();
+    };
+    // A filler or guard at the middle joint, turned halfway between the two limb parts.
+    const joint = (sprite, from, at, to) => {
+      if (!sprite) return;
+      const [ax, ay] = toScreen(from);
+      const [x, y, unit] = toScreen(at);
+      const [bx, by] = toScreen(to);
+      const upper = Math.atan2(ax - x, y - ay);
+      const lower = Math.atan2(x - bx, by - y);
+      g.save();
+      g.translate(x, y);
+      g.rotate(upper + Math.atan2(Math.sin(lower - upper), Math.cos(lower - upper)) / 2);
+      g.scale(dir * unit / 100, unit / 100);
       stamp(g, sprite, frost);
       g.restore();
     };
@@ -1092,8 +1130,13 @@ const ArenaArt2D = (() => {
     }
 
     function arm(side, bank) {
-      bone(bank.upperArm, j[side + 'Shoulder'], j[side + 'Elbow'], side === 'weapon' ? .51 : .43);
-      bone(bank.forearm, j[side + 'Elbow'], j[side + 'Hand'], side === 'weapon' ? .53 : .47);
+      const shoulder = j[side + 'Shoulder'];
+      const elbow = j[side + 'Elbow'];
+      const hand = j[side + 'Hand'];
+      joint(bank.elbowFill, shoulder, elbow, hand);
+      bone(bank.upperArm, shoulder, elbow, side === 'weapon' ? .51 : .43);
+      bone(bank.forearm, elbow, hand, side === 'weapon' ? .53 : .47);
+      joint(bank.elbow, shoulder, elbow, hand);
     }
     function fist(side, bank) {
       const elbow = j[side + 'Elbow'];
@@ -1106,8 +1149,10 @@ const ArenaArt2D = (() => {
       const knee = j[side + 'Knee'];
       const ankle = j[side + 'Ankle'];
       const toe = j[side + 'Toe'];
+      joint(bank.kneeFill, hip, knee, ankle);
       bone(bank.thigh, hip, knee, .515);
       bone(bank.shin, knee, ankle, .505);
+      joint(bank.knee, hip, knee, ankle);
       const pitch = Math.atan2(toe[1] - ankle[1], toe[0] - ankle[0]) - Math.atan2(-.07, .19);
       place(ankle, () => stamp(g, bank.foot, frost), -pitch * dir);
     }
@@ -1129,6 +1174,7 @@ const ArenaArt2D = (() => {
     arm('weapon', parts.far);
     if (!across) heldWeapon();
     leg('rear', parts.far);
+    place(j.hips, () => stamp(g, parts.pelvis, frost), torsoTurn * .5);
     leg('front', parts.near);
     if (parts.skirt) {
       const [ax] = j.frontAnkle;
