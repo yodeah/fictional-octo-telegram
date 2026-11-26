@@ -251,4 +251,22 @@
       band(g, c.iron, -28, 4.8);
     }
   };
+
+  art.crescentAxe = {
+    box: [-78, -58, 134, 20],
+    draw(g, c) {
+      haft(g, c.wood, -72, 110, 3.6);
+      wrap(g, c.grip, -54, -26, 4.4);
+      wrap(g, c.grip, -12, 14, 4.4);
+      metal(g, 'M72,8 L86,6 C98,-8 112,-14 128,-34 C118,-46 100,-55 80,-54 C70,-54 58,-48 52,-42 C68,-40 78,-30 80,-22 C80,-14 76,-4 72,0 Z', 54, c.steel, 61);
+      stroke(g, 'M56,-43 C80,-58 110,-52 125,-35', 'rgba(255,255,255,.85)', 1.8);
+      // Pierced crescent and engraving.
+      shape(g, 'M94,-26 C104,-32 106,-42 96,-46 C104,-38 100,-30 90,-30 Z', tone(c.iron, -.55), .8);
+      stroke(g, 'M84,-22 C96,-20 108,-24 118,-34', tone(c.brass, .2), 1.2);
+      metal(g, 'M104,-4 L132,0 L104,4 Z', 5, c.steel, 67);
+      shape(g, 'M68,-8 L106,-7 L106,7 L68,8 Z', steelAcross(g, 8, c.iron), 1.2);
+      for (const x of [76, 88, 99]) rivet(g, x, 0, 1.5, c.brass);
+      for (const x of [-70, 20, 56]) band(g, c.brass, x, 4.8);
+    }
+  };
 })();
