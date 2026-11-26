@@ -723,4 +723,15 @@
     shape(g, 'M124,5 C116,8 114,20 122,22 C132,22 136,12 132,6 Z', gradient(g, 116, 6, 132, 22, [246, 224, 206], [.3, 0, -.25]), 1.1);
     for (let i = 0; i < 4; i++) stroke(g, `M128,6 L${117 + i * 4.4},${20 - Math.abs(i - 1.5)}`, 'rgba(160,100,90,.7)', .7);
   }, { glow: { x: 164, color: 'teal' } });
+
+  special('gamblersClub', 'club', { brass: [214, 52, 58], grip: [40, 94, 56], iron: [236, 230, 214] }, g => {
+    // Bone dice set into the head, one dangling from the grip.
+    for (const [x, y, pips] of [[70, 3, [[0, 0], [-2.6, -2.6], [2.6, 2.6]]], [86, -3, [[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4], [0, 0]]]]) {
+      shape(g, `M${x - 5.4},${y - 5.4} h10.8 v10.8 h-10.8 Z`, '#f6f0e2', 1.1);
+      for (const [dx, dy] of pips) disc(g, x + dx, y + dy, 1.1, '#2a1a14', 0);
+    }
+    stroke(g, 'M-26,4 q-4,8 -2,13', '#e0c690', 1);
+    shape(g, 'M-33,16 h9 v9 h-9 Z', '#f6f0e2', 1);
+    disc(g, -28.5, 20.5, 1.4, '#c4283c', 0);
+  }, { box: [-38, -26, 114, 28] });
 })();
