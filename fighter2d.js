@@ -1234,7 +1234,7 @@ const ArenaArt2D = (() => {
     // Back to front. Stowed gear and the cloak sit behind everything.
     if (view.shield?.stowed) drawShield();
     if (view.spare) drawWeapon(view.spare.key, view.spare.mount, view.spare.angle, view.spare.scale, view.spare.draw, view.spare.chains);
-    place(view.torsoPoint([-.1, .62, -.2]), () => {
+    if (parts.cape) place(view.torsoPoint([-.1, .62, -.2]), () => {
       // A cape that flares out also lifts a little.
       g.transform(1, 0, swing, 1 - Math.min(.16, Math.abs(swing) * .2), 0, 0);
       stamp(g, parts.cape, frost);
