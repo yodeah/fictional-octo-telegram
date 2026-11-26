@@ -1,10 +1,10 @@
 # Detailed 2D art: investigation, proof of concept and plan
 
-Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Measured 2026-11-26, after the joint and cloth polish.
+Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Measured 2026-11-26. Every weapon, shield and armor kit now has 2D art.
 
 ## Answer
 
-Detailed 2D fighters look far better than the current meshes and draw faster, as long as each part is painted once into a sprite and only moved afterwards. The proof of concept is playable behind the **Art 3D / Art 2D** button.
+Detailed 2D fighters look far better than the current meshes and draw faster, as long as each part is painted once into a sprite and only moved afterwards. The 2D art is playable behind the **Art 3D / Art 2D** button.
 
 **3D (today)**
 
@@ -18,33 +18,34 @@ Detailed 2D fighters look far better than the current meshes and draw faster, as
 
 ## Try it
 
-`open index.html`, then press **Art 3D** so it reads **Art 2D**. The button switches painters at any time, also mid-bout, and remembers the choice. 3D stays the default. In the first matchup only Cassian's spear is still a 3D mesh.
+`open index.html`, then press **Art 3D** so it reads **Art 2D**. The button switches painters at any time, also mid-bout, and remembers the choice. 3D stays the default. Pick any gear under **Show gear, stats & spells**.
 
-To see only gear that has 2D art, run `python3 -m http.server 8000` in the project folder and open one of these (`open` cannot pass address options to a local file):
+To start from a set matchup, run `python3 -m http.server 8000` in the project folder and open one of these (`open` cannot pass address options to a local file):
 
 - <http://localhost:8000/?style=2d&cast=1>: plate with sword and staff against leather with crossbow and sword.
 - <http://localhost:8000/?style=2d&cast=2>: robes with staff against plate with sword and crossbow.
 
-## What is in the proof of concept
+## What has 2D art
 
-One asset per class, all in `fighter2d.js`:
+Everything a fighter can carry or wear:
 
-| Class | Asset |
-| --- | --- |
-| Melee armor | Plate harness: crested helmet, engraved breastplate, mail, pauldrons, greaves, cape |
-| Ranged armor | Hunter's leathers: hooded face, fur mantle, studded jerkin, bracers, boots, quiver |
-| Magic armor | Battle robes: bearded mage, deep hood, embroidered mantle and runed skirt |
-| Melee weapon | Sword |
-| Ranged weapon | Crossbow, with a live string and loaded bolt |
-| Magic weapon | Staff with a glowing crystal |
-| Shield | Round shield, with stuck bolts |
+| Group | Count | File |
+| --- | ---: | --- |
+| First set: plate, leather, robes, sword, crossbow, staff, round shield | 7 | `fighter2d.js` |
+| Other weapons | 24 | `weapons2d.js` |
+| Special weapons, each its base shape in its own materials plus details | 15 | `weapons2d.js` |
+| Buckler and tower shield | 2 | `weapons2d.js` |
+| Other armor kits, each its class's set with its own materials, headgear and signature piece | 9 | `armor2d.js` |
 
-Everything else still works in 2D mode:
+![All weapons](art2d/weapons.jpg)
 
-- The other 24 weapons, the buckler, the tower shield and all specials keep their 3D meshes, painted in place between the sprites.
-- The other nine armor kits use their class's 2D set, so they look alike for now.
+![All armor kits](art2d/armor.jpg)
 
-Nothing in the simulation changed. Sprites hang on the same joints as before, so timing, hit detection and **Hitboxes** are unaffected.
+Each blade and head covers the stretch that `weaponSegments()` hit-tests, and flail chains hang on the same curves as the hit test. Nothing in the simulation changed, so timing, hit detection and **Hitboxes** are unaffected. A sweep of 66 bouts (every finisher and 60 random matchups) drew no 3D mesh in 2D mode.
+
+### Adding an item
+
+Add an entry to `ArenaArt2D.weapons`, `.shields` or `.armors` under the item's key. Until it exists, the item keeps its 3D mesh, or an armor kit borrows its class's set.
 
 ## How it works
 
@@ -54,7 +55,7 @@ Nothing in the simulation changed. Sprites hang on the same joints as before, so
 
 Fillers sit under each knee, elbow and the waist, and the knee and elbow guards turn halfway between the two limb parts. Capes and robe hems trail the body on a damped spring.
 
-So detail costs bake time, not frame time. Far-side limbs get a shaded copy for depth, and the frost finisher uses a lazily made ice-tinted copy.
+So detail costs bake time, not frame time. Far-side limbs and stowed gear get a shaded copy for depth, and the frost finisher uses a lazily made ice-tinted copy.
 
 No image files, build step or dependency were added.
 
@@ -64,16 +65,17 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 
 | Measure | 3D, Quality Low | 2D |
 | --- | ---: | ---: |
-| Main-thread time per `draw()`, desktop 1900×800 | 3.4 ms | 0.32 ms |
-| Main-thread time per `draw()`, phone size 706×620 | 3.4 ms | 0.22 ms |
-| Frame time with 20 full redraws per frame, desktop | 87 ms | 16.7 ms (still 60 FPS) |
-| Frame time with 60 full redraws per frame, desktop | 305 ms | 29 ms |
-| Per draw with the GPU turned off, desktop | 11.1 ms | 7.6 ms |
-| Per draw with the GPU turned off, phone size | 8.5 ms | 4.2 ms |
+| Main-thread time per `draw()`, desktop 1900×800 | 3.9 ms | 0.33 ms |
+| Main-thread time per `draw()`, phone size 706×620 | 4.0 ms | 0.24 ms |
+| Frame time with 20 full redraws per frame, desktop | 89 ms | 16.7 ms (still 60 FPS) |
+| Frame time with 60 full redraws per frame, desktop | 344 ms | 27 ms |
+| Per draw with the GPU turned off, desktop | 12.1 ms | 8.3 ms |
+| Per draw with the GPU turned off, phone size | 9.5 ms | 4.2 ms |
 
 - The repeated redraws are a stress test that includes graphics-chip work, which main-thread timing misses.
 - 3D at Quality High costs about twice Low on the main thread, and 2D already shows far more detail than High.
 - Sprite memory for the first matchup: about 2.8 MB on desktop and 0.5 MB at phone size. Baking took 7–60 ms, once, and repeats after a resize or a new look.
+- Looks pile up over many matchups, so sprites are released between bouts once they pass 12 MB. Peak in the 66-bout sweep was about 15 MB on desktop.
 - A forced-readback timing in the app's hidden browser pane showed 2D as slower. Neither real frame measurement above reproduced that, so it is not counted.
 - **Not measured on a real phone.** Add `?style=2d&cast=1&bench` to the served address and compare with `?style=3d&cast=1&bench`. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
 
@@ -91,26 +93,19 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 
 - Parts are rigid: a fully folded limb or a fallen body can still overlap awkwardly, and the tunic strips do not swing.
 - One side-on drawing per part, so there is no true twist or turn of the torso or shield.
+- Specials do not change their art with their state (Last Oath's blade does not brighten when sworn; the aura still shows it).
 - Sprites do not interleave by depth between the two fighters. The attacker is drawn on top.
 - The backdrop and crowd are still flat, softer art, so the fighters stand out more than the scenery.
-- Mixed fighters (a 3D spear on a 2D body) look inconsistent until every item has art.
 - The Polys and WebGL benchmark toggles do nothing to the sprites.
 
 ## Plan to finish
 
-Each step is a playable commit. Token estimates are rough and cover drawing, browser checks and the commit.
-
-| # | Step | Est. tokens | Done when |
+| # | Step | Est. tokens | State |
 | --- | --- | ---: | --- |
-| 1 | Look at the proof of concept, test on the phone, and decide | — | 2D or 3D is chosen |
-| 2 | **Done:** joint fillers and guards at knee, elbow and waist; spring swing for the cape and skirt | 40k | No visible gaps in a full bout |
-| 3 | Remaining six weapon families: spear, axe, mace, flail, greatsword, maul | 90k | Every family draws in 2D |
-| 4 | Eighteen weapon variants and the buckler and tower shield | 100k | No variant falls back to 3D |
-| 5 | Nine remaining armor kits as variations of the three sets (colors, helmet, one signature piece) | 110k | All twelve kits read apart at game zoom |
-| 6 | Fifteen specials: palette plus one detail each | 70k | No fighter uses a mesh |
-| 7 | Matching backdrop and crowd art for the three venues | 80k | Arena and fighters share one style |
-| 8 | Make 2D the default, remove the 3D painter, WebGL path and Quality setting, update docs | 40k | One renderer remains |
+| 1 | Look at the 2D art, test on the phone, and decide | — | **Open** |
+| 2 | Joint polish and cloth swing | 40k | Done |
+| 3 | All weapons, shields, specials and armor kits, with a first polish pass | 370k | Done |
+| 4 | Matching backdrop and crowd art for the three venues | 80k | Next if 2D is chosen |
+| 5 | Make 2D the default, remove the 3D painter, WebGL path and Quality setting, update docs | 40k | After 4 |
 
-Steps 3–8 come to about 490k tokens. Steps 3–4 (about 190k) remove the mixed look on weapons and shields.
-
-If 2D is chosen, stop adding 3D mesh detail, because step 8 deletes it.
+If 2D is chosen, stop adding 3D mesh detail, because step 5 deletes it. A new weapon or armor kit now needs 2D art too.
