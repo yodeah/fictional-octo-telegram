@@ -411,4 +411,30 @@
     link: linkArt(),
     ball: ballArt(17)
   };
+
+  art.scourge = {
+    box: [-34, -10, 68, 10],
+    draw(g, c) {
+      haft(g, DARKLEATHER, -25, 58, 3.2);
+      wrap(g, c.grip, -20, 26, 4);
+      for (const x of [30, 38, 46]) band(g, c.brass, x, 4.4, 3);
+      shape(g, 'M54,-6 L66,-4 L66,4 L54,6 Z', steelAcross(g, 6, c.iron), 1.2);
+      stroke(g, 'M-26,0 c-6,8 -2,9 -6,4', tone(DARKLEATHER, .2), 2);
+    },
+    link: linkArt(),
+    // Several barbs on a small weight.
+    ball: {
+      box: [-18, -18, 18, 18], turns: true,
+      draw(g, c) {
+        for (const a of [-1.2, -.4, .4, 1.2, 2.6, -2.6]) {
+          g.save();
+          g.rotate(a);
+          metal(g, 'M6,-3 C11,-3 14,0 17,5 C12,2 9,3 6,3 Z', 6, c.steel, 127);
+          g.restore();
+        }
+        disc(g, 0, 0, 8.6, gradient(g, -7, -7, 7, 7, c.iron, [.55, 0, -.5]), 1.3);
+        rivet(g, -2, -2, 2.2, c.brass);
+      }
+    }
+  };
 })();
