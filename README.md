@@ -77,7 +77,7 @@ Measured at phone size on a Mac (60 Hz), both renderers held 60 FPS with no drop
 
 ## 2D art proof of concept
 
-**Art 3D / Art 2D** switches the fighters between the 3D meshes (the default) and detailed 2D cut-out art (`fighter2d.js`). `?style=2d` or `?style=3d` sets it from the address bar, and `?cast=1` or `?cast=2` starts from a set matchup. Every weapon, special, shield and armor kit has 2D art (`weapons2d.js`, `armor2d.js`); a new item needs it too, or it keeps its 3D mesh there. It changes only the picture. Findings, measurements and the plan are in [docs/2d-art-poc.md](docs/2d-art-poc.md).
+**Art 3D / Art 2D** switches the fighters between the 3D meshes (the default) and detailed 2D cut-out art (`fighter2d.js`). `?style=2d` or `?style=3d` sets it from the address bar, and `?cast=1` or `?cast=2` starts from a set matchup. Every weapon, special, shield, armor kit and venue has 2D art (`weapons2d.js`, `armor2d.js`, `venues2d.js`); a new item needs it too, or it keeps its 3D mesh there. It changes only the picture. Findings, measurements and the plan are in [docs/2d-art-poc.md](docs/2d-art-poc.md).
 
 ## Armor geometry
 

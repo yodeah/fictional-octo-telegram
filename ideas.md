@@ -23,11 +23,10 @@ Fights stay fully idle (see README): ideas must not add in-fight input.
 | 11 | **Bout summary card** | 3 | 50k | 0.6 | After the bout: damage dealt, blocks, perfect blocks, specials used and the turning point. |
 | 12 | **Wall hazards per venue** | 3 | 55k | 0.5 | Build on wall slams: spikes in the Sand Pit, thorns in Fernwood, crumbling stone in the Ruins, each adding a small effect. |
 | 13 | **Seeded replays** | 3 | 70k | 0.4 | Route every simulation roll through one seeded generator so a bout can be replayed exactly. Needed later for offline results. |
-| 14 | **2D venues** | 3 | 80k | 0.4 | If 2D is chosen: redraw the three venues and crowds to match the fighters. See the [2D art plan](docs/2d-art-poc.md). |
-| 15 | **Crowd hype meter** | 3 | 90k | 0.3 | Rises with perfect blocks, specials, staggers and comebacks; a full meter makes the crowd roar and drops a small cosmetic reward. |
-| 16 | **Fighter personalities** | 4 | 120k | 0.3 | Traits such as reckless, patient or showman that shift AI choices (aggression, blocking, sand throws). |
-| 17 | **Weapon attack modes** | 5 | 180k | 0.3 | Give the idle AI cheap and committed attacks, staff range choices and a spear throw finisher. See the [weapon plan](docs/weapon-attack-modes.md). |
-| 18 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
+| 14 | **Crowd hype meter** | 3 | 90k | 0.3 | Rises with perfect blocks, specials, staggers and comebacks; a full meter makes the crowd roar and drops a small cosmetic reward. |
+| 15 | **Fighter personalities** | 4 | 120k | 0.3 | Traits such as reckless, patient or showman that shift AI choices (aggression, blocking, sand throws). |
+| 16 | **Weapon attack modes** | 5 | 180k | 0.3 | Give the idle AI cheap and committed attacks, staff range choices and a spear throw finisher. See the [weapon plan](docs/weapon-attack-modes.md). |
+| 17 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
 
 ## Adding ideas
 

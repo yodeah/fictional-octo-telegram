@@ -1,6 +1,6 @@
 # Detailed 2D art: investigation, proof of concept and plan
 
-Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Measured 2026-11-26. Every weapon, shield and armor kit now has 2D art.
+Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Measured 2026-11-26. Every weapon, shield, armor kit and venue now has 2D art.
 
 ## Answer
 
@@ -42,6 +42,16 @@ Everything a fighter can carry or wear:
 ![All armor kits](art2d/armor.jpg)
 
 Each blade and head covers the stretch that `weaponSegments()` hit-tests, and flail chains hang on the same curves as the hit test. Nothing in the simulation changed, so timing, hit detection and **Hitboxes** are unaffected. A sweep of 66 bouts (every finisher and 60 random matchups) drew no 3D mesh in 2D mode.
+
+### Venues
+
+`venues2d.js` redraws the Sand Pit, Fernwood Clearing and Moonlit Ruins. The still art is painted into the cached backdrop, so it adds nothing per frame, and the crowd and wildlife are sprites on the same paths as before, so their click targets still work. **Art 3D** keeps the original venues unchanged.
+
+![Fernwood Clearing](art2d/venue-fernwood.jpg)
+
+![Moonlit Ruins](art2d/venue-ruins.jpg)
+
+With 20 full redraws per frame on the desktop size, 2D held about 17 ms in all three venues, against 88–97 ms for 3D.
 
 ### Adding an item
 
@@ -95,7 +105,7 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 - One side-on drawing per part, so there is no true twist or turn of the torso or shield.
 - Specials do not change their art with their state (Last Oath's blade does not brighten when sworn; the aura still shows it).
 - Sprites do not interleave by depth between the two fighters. The attacker is drawn on top.
-- The backdrop and crowd are still flat, softer art, so the fighters stand out more than the scenery.
+- The Quality setting changes nothing in 2D mode.
 - The Polys and WebGL benchmark toggles do nothing to the sprites.
 
 ## Plan to finish
@@ -105,7 +115,7 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 | 1 | Look at the 2D art, test on the phone, and decide | — | **Open** |
 | 2 | Joint polish and cloth swing | 40k | Done |
 | 3 | All weapons, shields, specials and armor kits, with a first polish pass | 370k | Done |
-| 4 | Matching backdrop and crowd art for the three venues | 80k | Next if 2D is chosen |
-| 5 | Make 2D the default, remove the 3D painter, WebGL path and Quality setting, update docs | 40k | After 4 |
+| 4 | Matching backdrop and crowd art for the three venues | 80k | Done |
+| 5 | Make 2D the default, remove the 3D painter, WebGL path and Quality setting, update docs | 40k | Waiting for the decision in step 1 |
 
 If 2D is chosen, stop adding 3D mesh detail, because step 5 deletes it. A new weapon or armor kit now needs 2D art too.
