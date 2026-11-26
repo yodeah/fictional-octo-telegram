@@ -18,6 +18,9 @@ const ArenaBench = (() => {
     polygons: Number(query.get('polygons') || saved.polygons || 1),
     open: query.has('bench') || !!saved.open
   };
+  // Diagnostic toggles are deliberately not saved: a fighter-less arena must not survive a reload.
+  const probe = { lowRes: query.get('res') === '1', fighters: true, scene: true, effects: true };
+  let onResolution = () => {};
   const store = () => {
     try { localStorage.setItem('arena-bench', JSON.stringify(settings)); } catch { /* private mode */ }
   };
@@ -43,7 +46,8 @@ const ArenaBench = (() => {
     stats = {
       start: now, last: null, frames: 0, time: 0, worst: 0, drops: 0, recent: [],
       drawSum: 0, drawMax: 0, windowStart: null, windowFrames: 0, windowDraw: 0, windowDrawMax: 0,
-      current: null, min: null, windowDrawAvg: null
+      current: null, min: null, windowDrawAvg: null,
+      parts: [0, 0, 0], partFrames: 0
     };
   }
   resetStats();
@@ -67,8 +71,16 @@ const ArenaBench = (() => {
     return true;
   }
 
+  // Main-thread ms for [backdrop and scenery, fighters, effects] in the frame being drawn.
+  let pendingParts = null;
+  function parts(scene, fighters, effects) {
+    pendingParts = [scene, fighters, effects];
+  }
+
   // `now` is the animation frame timestamp; drawMs is how long draw() took on the main thread.
   function record(now, drawMs, paused) {
+    const split = pendingParts;
+    pendingParts = null;
     if (paused || document.hidden || now - stats.start < WARMUP) {
       stats.last = null;
       stats.windowStart = null;
@@ -90,6 +102,10 @@ const ArenaBench = (() => {
     stats.worst = Math.max(stats.worst, interval);
     stats.drawSum += drawMs;
     stats.drawMax = Math.max(stats.drawMax, drawMs);
+    if (split) {
+      for (let i = 0; i < 3; i++) stats.parts[i] += split[i];
+      stats.partFrames++;
+    }
     if (interval > expected() * 1.5) {
       stats.drops++;
       stats.recent.unshift({ at: (now - stats.start) / 1000, fps: 1000 / interval, ms: interval });
@@ -127,14 +143,30 @@ const ArenaBench = (() => {
   text.className = 'bench-text';
   const row = document.createElement('div');
   row.className = 'bench-buttons';
-  const button = (label, onClick) => {
+  const probes = document.createElement('div');
+  probes.className = 'bench-buttons';
+  const button = (label, onClick, into = row) => {
     const element = document.createElement('button');
     element.type = 'button';
     element.textContent = label;
     element.addEventListener('click', onClick);
-    row.append(element);
+    into.append(element);
     return element;
   };
+  const probeButton = (key, title) => {
+    const element = button('', () => {
+      probe[key] = !probe[key];
+      labels();
+      if (key === 'lowRes') onResolution();
+      resetStats();
+    }, probes);
+    element.title = title;
+    return element;
+  };
+  const resolutionButton = probeButton('lowRes', 'Draw the arena at full sharpness (up to 2 pixels per CSS pixel) or at 1, to test fill rate');
+  const fighterButton = probeButton('fighters', 'Skip building, sorting and painting the fighters, to test their cost');
+  const sceneButton = probeButton('scene', 'Skip the animated crowd and wildlife, to test their cost');
+  const effectsButton = probeButton('effects', 'Skip dust, trails, blood, sparks, magic, bolts and damage numbers, to test their cost');
   const resetButton = button('Reset', () => { resetStats(); render(performance.now()); });
   const rendererButton = button('', () => {
     settings.renderer = settings.renderer === 'webgl' ? 'canvas' : 'webgl';
@@ -151,7 +183,7 @@ const ArenaBench = (() => {
   button('Close', () => toggle(false));
   rendererButton.title = 'Switch between the Canvas 2D and WebGL fighter painters';
   polygonButton.title = 'Draw each fighter once or three times over (same picture, 3× the polygons)';
-  panel.append(text, row);
+  panel.append(text, row, probes);
   const opener = document.createElement('button');
   opener.type = 'button';
   opener.className = 'bench-open';
@@ -166,6 +198,13 @@ const ArenaBench = (() => {
   function labels() {
     rendererButton.textContent = settings.renderer === 'webgl' ? 'WebGL' : 'Canvas';
     polygonButton.textContent = 'Polys ' + settings.polygons + '×';
+    resolutionButton.textContent = probe.lowRes ? 'Res 1×' : 'Res full';
+    fighterButton.textContent = probe.fighters ? 'Fighters' : 'No fighters';
+    sceneButton.textContent = probe.scene ? 'Scenery' : 'No scenery';
+    effectsButton.textContent = probe.effects ? 'Effects' : 'No effects';
+    for (const [element, on] of [[resolutionButton, !probe.lowRes], [fighterButton, probe.fighters], [sceneButton, probe.scene], [effectsButton, probe.effects]]) {
+      element.setAttribute('aria-pressed', String(!on));
+    }
   }
   labels();
 
@@ -189,16 +228,19 @@ const ArenaBench = (() => {
     const avg = stats.frames ? stats.frames * 1000 / stats.time : null;
     const drawAvg = stats.frames ? stats.drawSum / stats.frames : null;
     const warming = now - stats.start < WARMUP;
+    const part = i => f(stats.partFrames ? stats.parts[i] / stats.partFrames : null, 1);
     const status = warming ? ' · warming up' : stats.last === null ? ' · paused or hidden' : '';
     const lines = [
       'FPS ' + f(stats.current) + ' now · ' + f(avg, 1) + ' avg · ' + f(stats.min) + ' min',
       'Worst ' + f(stats.frames ? stats.worst : null, 1) + ' ms · Draw ' + f(stats.windowDrawAvg, 1) + ' now / '
         + f(drawAvg, 1) + ' avg / ' + f(stats.frames ? stats.drawMax : null, 1) + ' max ms',
+      'Scene ' + part(0) + ' · Fighters ' + part(1) + ' · FX ' + part(2) + ' ms',
       'Drops ' + stats.drops + ' (>' + f(expected() * 1.5, 1) + ' ms)'
         + (stats.recent.length ? ': ' + stats.recent.map(drop => f(drop.at, 1) + 's ' + f(drop.fps) + 'fps').join(', ') : ''),
       (active === 'webgl' ? 'WebGL' : 'Canvas 2D') + (settings.renderer !== active ? ' (WebGL unavailable)' : '')
         + ' · ' + info.polygons + ' polys · ' + info.pixels + ' · ' + f(hz) + ' Hz' + (forcedHz ? '' : ' est.')
         + ' · cap ' + CAP_FPS + status
+        + (probe.lowRes || !probe.fighters || !probe.scene || !probe.effects ? ' · TEST TOGGLE ON' : '')
     ];
     text.textContent = lines.join('\n');
   }
@@ -214,6 +256,12 @@ const ArenaBench = (() => {
     record,
     get renderer() { return settings.renderer; },
     get polygons() { return settings.polygons; },
+    get lowResolution() { return probe.lowRes; },
+    get drawFighters() { return probe.fighters; },
+    get drawScenery() { return probe.scene; },
+    get drawEffects() { return probe.effects; },
+    parts,
+    onResolutionChange(callback) { onResolution = callback; },
     // Read-only copy of the statistics for scripted comparisons.
     snapshot() {
       return { ...stats, recent: stats.recent.slice(), avg: stats.frames ? stats.frames * 1000 / stats.time : null,

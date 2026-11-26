@@ -48,6 +48,19 @@ What it suggests, to be confirmed:
 - WebGL cut painting about fourfold on the Mac yet did not help here, so painting the fighter polygons is probably not this phone's main cost. Candidates to test next: canvas resolution (fill rate at device pixel ratio 2), the full-canvas backdrop copies, animated scenery and effects, and building and sorting on a slower processor.
 - With both renderers far below 60 FPS, 3× detail is out of reach on this phone. The rework plan now targets 2× with a Quality setting.
 
+### Next phone test: find the bottleneck
+
+The overlay now has a second row of test toggles and a per-part timing line (see the README section "Renderers and benchmark"). On the phone, with Canvas, Polys 1× and the same fighters, tap Reset and run 20 seconds for each of:
+
+1. Everything on (baseline)
+2. **Res 1×**: if FPS jumps, filling pixels is the limit, and a lower-resolution Quality level will help more than fewer polygons.
+3. **No fighters**: if FPS jumps, the fighters' build, sort and paint are the limit, and polygon detail is what Quality must control.
+4. **No scenery**, then **No effects**: if either jumps, that part needs a cheaper version at low Quality.
+
+If nothing moves FPS much, read the **Scene · Fighters · FX** line. It shows main-thread time per part; if the parts add up to far less than the frame interval, the limit is elsewhere (simulation, browser compositing, or the device's graphics chip). Note each run's FPS line, Draw line, Scene · Fighters · FX line and Drops, plus phone model and browser.
+
+On the Mac (60 Hz, phone-size view, WebGL) the split was about 0.4 ms scene, 2–3 ms fighters and 0.1–0.4 ms effects in a normal fight. The worst frame in a run can include a bout ending or a rematch starting, and switching **Res** reallocates the canvases, so tap Reset after changing it.
+
 ## What this means for adding detail
 
 - Painting scales worst on Canvas 2D: about 0.75 µs per face, and its worst frames spike (25 ms at 3×). WebGL paints at about 0.2 µs per face with far smaller spikes.

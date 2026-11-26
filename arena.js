@@ -1881,7 +1881,7 @@ function drawBolt(action) {
 
 function resize() {
   const rect = canvas.getBoundingClientRect();
-  const density = Math.min(window.devicePixelRatio || 1, 2);
+  const density = ArenaBench.lowResolution ? 1 : Math.min(window.devicePixelRatio || 1, 2);
   width = rect.width;
   height = rect.height;
   scale = Math.min(width / 8.3, height / 4.02);
@@ -1914,6 +1914,8 @@ function paintFaces() {
 // (build → sort → paintFaces), then effects and labels on top. Keep fighter faces in one
 // contiguous paintFaces() call so either renderer can paint them without breaking layering.
 function draw() {
+  // The benchmark times three sections and can skip each one; skipping only changes the picture.
+  const startedAt = performance.now();
   // The still backdrop underneath fills the edges that a shake uncovers.
   ctx.drawImage(backdrop, 0, 0, width, height);
   const [shakeX, shakeY] = ArenaEffects.offset();
@@ -1922,10 +1924,12 @@ function draw() {
     ctx.translate(shakeX * scale, shakeY * scale);
     ctx.drawImage(backdrop, 0, 0, width, height);
   }
-  scenery.draw(width, height, sceneryClock);
-  ArenaEffects.drawStains(ctx, project, scale);
+  if (ArenaBench.drawScenery) scenery.draw(width, height, sceneryClock);
+  const sceneDone = performance.now();
+  if (ArenaBench.drawEffects) ArenaEffects.drawStains(ctx, project, scale);
+  const stainsDone = performance.now();
   const poses = fighters.map(fighter => fighter.ragdoll?.pose || displayPose(fighter));
-  fighters.forEach((fighter, index) => {
+  if (ArenaBench.drawFighters) fighters.forEach((fighter, index) => {
     const pose = poses[index];
     const hips = pose.joints.hips;
     const down = fighter.ragdoll ? clamp(1 - hips[1] / 1.1, 0, 1) : 0;
@@ -1945,10 +1949,22 @@ function draw() {
   faces.sort((a, b) => a.depth - b.depth);
   paintFaces();
   faces.length = 0;
-  ArenaEffects.drawDust(ctx, project, scale);
-  ArenaEffects.drawTrails(ctx, project);
+  const fightersDone = performance.now();
+  const effects = ArenaBench.drawEffects;
+  if (effects) {
+    ArenaEffects.drawDust(ctx, project, scale);
+    ArenaEffects.drawTrails(ctx, project);
+  }
   // Hitboxes show the combat pose that checkContact actually tests.
   if (showHitboxes) fighters.forEach(fighter => drawHitboxes(fighter, fighter.ragdoll?.pose || fighterPose(fighter)));
+  if (effects) drawEffects();
+  ctx.restore();
+  if (effects) ArenaEffects.drawLabels(ctx, project, width, height);
+  ArenaBench.parts(sceneDone - startedAt, fightersDone - stainsDone, stainsDone - sceneDone + performance.now() - fightersDone);
+}
+
+// Magic, bolts, particles, blood and sparks, drawn over the fighters and hitboxes.
+function drawEffects() {
   drawMagic();
   drawBolts();
   for (const particle of particles) {
@@ -1966,8 +1982,6 @@ function draw() {
   }
   ArenaEffects.drawBlood(ctx, project, scale);
   ArenaEffects.drawSparks(ctx, project, scale);
-  ctx.restore();
-  ArenaEffects.drawLabels(ctx, project, width, height);
 }
 
 function logEvent(message) {
@@ -2697,6 +2711,7 @@ scenery = ArenaVenues.create(ctx, document.getElementById('venue'),
 startBout();
 resize();
 new ResizeObserver(resize).observe(canvas);
+ArenaBench.onResolutionChange(resize);
 let lastFrame = performance.now();
 function frame(now) {
   // Rendering is capped at 120 FPS. A skipped frame leaves lastFrame alone, so the next frame's
