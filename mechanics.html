@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171512">
+  <meta name="description" content="How duels work in Arena Ledger, and what could make them better.">
+  <title>Arena Ledger — Mechanics</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="guide">
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true">Λ</span> ARENA<span class="brand-accent">LEDGER</span></div>
+    <a class="top-label" href="./index.html">BACK TO THE ARENA</a>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">FIELD MANUAL</p><h1>Mechanics</h1></div>
+    </section>
+    <nav class="toc" aria-label="Sections">
+      <a href="#bout">The bout</a><a href="#stats">Stats and resources</a><a href="#choice">Decisions</a><a href="#hits">Hits and damage</a><a href="#stance">Stance</a><a href="#gear">Gear</a><a href="#spells">Spells</a><a href="#ideas">Improvements</a>
+    </nav>
+
+    <section class="record" id="bout">
+      <h2>The bout</h2>
+      <p>Two fighters duel until one reaches 0 HP. They fight on their own; you choose their gear and control the playback. There is no time limit.</p>
+      <ul>
+        <li><b>Before a bout:</b> pin any gear slot, or leave it on Auto to reroll it for the next bout. Changes made mid-bout apply next time.</li>
+        <li><b>Playback:</b> pause, or run at 1×, 2× or 4×.</li>
+        <li><b>Rematch:</b> new levels and stats, keeping pinned gear.</li>
+        <li><b>Generate matchup and Auto-rematch:</b> two new builds, no more than nine levels apart, with all gear rerolled. Builds are vanguard, duelist, spellblade, marksman, outrider, arcanist and battlemage.</li>
+        <li><b>Arena:</b> the Sand Pit, Fernwood Clearing and Moonlit Ruins rotate every one to three bouts. They are cosmetic, including the clickable crowd and wildlife.</li>
+        <li><b>Record:</b> win totals last until the page is closed or reloaded.</li>
+      </ul>
+    </section>
+
+    <section class="record" id="stats">
+      <h2>Stats and resources</h2>
+      <table>
+        <tr><th>Stat</th><th>What it does</th></tr>
+        <tr><td>Attack</td><td>Only influences which weapon the fighter picks. It does not change hit chance or damage.</td></tr>
+        <tr><td>Strength</td><td>Melee and bash damage. Above 66, shortens recovery after heavy swings (full effect at 95).</td></tr>
+        <tr><td>Ranged</td><td>Bolt damage and accuracy.</td></tr>
+        <tr><td>Magic</td><td>Spell damage.</td></tr>
+        <tr><td>Defense</td><td>Includes shield and armor. Raises block chance, reduces physical damage above 45, and raises the stance limit.</td></tr>
+        <tr><td>Health</td><td>Damage taken before defeat.</td></tr>
+      </table>
+      <table>
+        <tr><th>Resource</th><th>Start</th><th>Recovery</th><th>Spent on</th></tr>
+        <tr><td>Mana</td><td>60 of 100</td><td>3.6 per second</td><td>Spells</td></tr>
+        <tr><td>Energy</td><td>100</td><td>5 per second (4.65 with a spare weapon)</td><td>Attacks, blocks (9–22, +7 against heavy), dodges (11), bashes (14), weapon swaps (7)</td></tr>
+      </table>
+      <p>Low energy makes weapon attacks up to 24% slower and 33% weaker. Spells cost no energy.</p>
+    </section>
+
+    <section class="record" id="choice">
+      <h2>How fighters decide</h2>
+      <p>When free, a fighter scores each option and takes the best one. The score weighs damage, the target’s armor, skill, speed, reach, energy, and a penalty for repeating the same weapon.</p>
+      <ul>
+        <li>Support spells come first when needed: heal at 61% HP or less, ward at 77% or less, Blood Pact at 24 mana or less (with at least 41% HP), Tailwind at 40 energy or less.</li>
+        <li>Without a staff in hand, attack spells are only considered some of the time. A staff can always cast, with a free Staff Spark as a fallback. Staves never swing in melee.</li>
+        <li>Fighters press crossbow users at close range. A crowded shot loses up to 53% damage and much of its accuracy.</li>
+        <li>Fighters move and act independently, so attacks can overlap. They hold back while the opponent’s shield is raised against them.</li>
+      </ul>
+    </section>
+
+    <section class="record" id="hits">
+      <h2>Hits and damage</h2>
+      <ul>
+        <li><b>Melee:</b> the moving weapon has to touch the shield or body. Head hits deal 124%, body 100%, arm 88%, leg 85%.</li>
+        <li><b>Ranged:</b> an accuracy roll, reduced at close range.</li>
+        <li><b>Spells:</b> can be resisted. Mana is paid partway through the cast, so an early interruption costs nothing.</li>
+        <li><b>Block:</b> chance depends on the attack and the defender’s Defense. It needs a one-handed weapon (shield in use) and enough energy.</li>
+        <li><b>Dodge:</b> a chance to step back from weapon attacks, improved by mobility. Frozen fighters cannot dodge.</li>
+        <li><b>Damage modifiers:</b> weapon roll, skill, armor matchup, armor type defense, Defense (physical only), wards, and +14% against a staggered target.</li>
+      </ul>
+      <table>
+        <tr><th>Damage taken by</th><th>Melee</th><th>Ranged</th><th>Magic</th></tr>
+        <tr><td>Plate</td><td>96%</td><td>75%</td><td class="weak">129%</td></tr>
+        <tr><td>Leather</td><td class="weak">123%</td><td>96%</td><td>76%</td></tr>
+        <tr><td>Robes</td><td>110%</td><td class="weak">128%</td><td>96%</td></tr>
+      </table>
+    </section>
+
+    <section class="record" id="stance">
+      <h2>Stance, stagger and counters</h2>
+      <ul>
+        <li>Hits and blocks fill a hidden pressure total; the stance bar shows what is left. The limit rises with Defense.</li>
+        <li>Heavy swings and bashes apply the most pressure. Head hits add 25%; blocked hits apply about half.</li>
+        <li>Stance recovers after 1.35 seconds without a hit.</li>
+        <li>A break staggers the fighter for about 1.2 seconds. Blocking with almost no energy left also staggers.</li>
+        <li>A shield bash can follow a block or interrupt a nearby heavy windup. It has a 2.8 second cooldown.</li>
+      </ul>
+    </section>
+
+    <section class="record" id="gear">
+      <h2>Gear</h2>
+      <p>Each fighter carries a main weapon, an optional backup, a shield, armor and a spellbook. Variants shift their family’s numbers.</p>
+      <table>
+        <tr><th>Weapon family</th><th>Damage</th><th>Reach</th><th>Energy</th><th>Variants</th></tr>
+        <tr><td>Sword</td><td>13</td><td>2.4</td><td>20</td><td>Rapier, Falchion</td></tr>
+        <tr><td>Greatsword (two-handed)</td><td>23</td><td>2.9</td><td>34</td><td>Claymore, Executioner blade</td></tr>
+        <tr><td>Spear</td><td>10</td><td>3.1</td><td>18</td><td>Trident, Halberd</td></tr>
+        <tr><td>Axe</td><td>17</td><td>2.1</td><td>29</td><td>Bearded axe, Crescent axe</td></tr>
+        <tr><td>Mace</td><td>15</td><td>2.0</td><td>24</td><td>Morningstar, Bronzewood club</td></tr>
+        <tr><td>War maul (two-handed)</td><td>26</td><td>2.4</td><td>39</td><td>War pick, Stone sledge</td></tr>
+        <tr><td>Flail</td><td>14</td><td>2.5</td><td>26</td><td>Chain scourge, Twin flail</td></tr>
+        <tr><td>Crossbow</td><td>14</td><td>4.6</td><td>16</td><td>Windlass arbalest, Repeating bow</td></tr>
+        <tr><td>Staff</td><td>Spells</td><td>—</td><td>—</td><td>Ash scepter, Sun staff</td></tr>
+      </table>
+      <p>These are base values. Heavy two-handed melee weapons gain 21% damage and cost 20% more energy.</p>
+      <ul>
+        <li><b>Shields:</b> Buckler (+11 Defense, faster), Round (+20), Tower (+34, much slower).</li>
+        <li><b>Plate:</b> sturdy and slow. Plate, Bronze lorica, Blackiron harness, Gilded parade plate.</li>
+        <li><b>Leather:</b> boosts ranged. Leather, Dune scout, Crimson brigandine, Nightstalker hide.</li>
+        <li><b>Robes:</b> boost magic. Robes, Tideweave, Cinder, Astral.</li>
+      </ul>
+    </section>
+
+    <section class="record" id="spells">
+      <h2>Spells</h2>
+      <table>
+        <tr><th>Book</th><th>Spell (mana, cooldown)</th><th>Effect</th></tr>
+        <tr><td rowspan="3">General</td><td>Ember Bolt (26, 4.5s)</td><td>19 base damage</td></tr>
+        <tr><td>Iron Ward (27, 19s)</td><td>Absorbs 15 for 5s</td></tr>
+        <tr><td>Second Wind (31, 22s)</td><td>Heals 16</td></tr>
+        <tr><td rowspan="3">Vampiric</td><td>Crimson Drain (23, 5s)</td><td>14 damage, heals 52% of it</td></tr>
+        <tr><td>Scarlet Surge (38, 8.5s)</td><td>26 damage, heals 27% of it</td></tr>
+        <tr><td>Blood Pact (6, 12s)</td><td>9 HP for 25 mana</td></tr>
+        <tr><td rowspan="3">Glacial</td><td>Frost Lance (21, 4.5s)</td><td>15 damage, slows attacks for 3.5s</td></tr>
+        <tr><td>Winter Barrage (37, 10.5s)</td><td>22 damage, stops movement for 2.4s</td></tr>
+        <tr><td>Glacial Shell (22, 11s)</td><td>Absorbs 13 for 4s</td></tr>
+        <tr><td rowspan="3">Storm</td><td>Arc Flash (20, 4s)</td><td>13 damage, drains 14 energy</td></tr>
+        <tr><td>Thunderclap (41, 10s)</td><td>30 damage</td></tr>
+        <tr><td>Tailwind (23, 11s)</td><td>27 energy and faster movement for 4.5s</td></tr>
+      </table>
+      <p>Damage, healing and wards scale with the staff and robes. Damage also scales with Magic.</p>
+    </section>
+
+    <section class="record" id="ideas">
+      <h2>Improvement opportunities</h2>
+      <p>These come from reading the code. They have not been playtested or balance-simulated. Size is a rough estimate: S, M or L.</p>
+
+      <h3>Make hits feel bigger</h3>
+      <ul>
+        <li><b>Sound (S–M):</b> the game is silent. Add clangs, thuds, spell cues and crowd reactions.</li>
+        <li><b>Impact (S):</b> add screen shake, longer freezes on big hits, weapon trails and larger damage numbers.</li>
+        <li><b>Finishers (M):</b> slow motion and a camera push on the killing blow.</li>
+        <li><b>Crowd (M):</b> a hype meter that rises with counters, staggers and comebacks.</li>
+        <li><b>Arena first (M):</b> move gear and stats into a drawer so the fight fills the screen, with health bars close to it.</li>
+      </ul>
+
+      <h3>Make fights more dramatic</h3>
+      <ul>
+        <li><b>Signature moves (M):</b> one build-defining move per weapon family, charged by a visible meter.</li>
+        <li><b>Readable reactions (M):</b> parries, ripostes, knockback and knockdowns.</li>
+        <li><b>Personality (M):</b> traits such as reckless, patient or showman that change decisions.</li>
+        <li><b>Pacing (S):</b> a sudden-death rule so two defensive builds cannot drag on.</li>
+      </ul>
+
+      <h3>Fix what undercuts choices</h3>
+      <ul>
+        <li><b>Attack stat (S):</b> give it an effect on accuracy or block penetration.</li>
+        <li><b>Sword special case (S):</b> only the plain Sword gets the rush against crossbows. Apply it to other quick weapons.</li>
+        <li><b>Frost wording (S):</b> Frost Lance says it slows the target, but it slows attacks, not movement. Freeze stops movement, not attacks. Make the behavior and text match.</li>
+        <li><b>Balance runner (M):</b> simulate thousands of bouts without drawing, then report win rates by weapon, armor and spellbook.</li>
+        <li><b>Shared data and tests (M–L):</b> separate combat rules from drawing. This page’s numbers are typed by hand and could then be generated.</li>
+      </ul>
+
+      <h3>Idle game or active duels?</h3>
+      <p><b>Suggestion:</b> try a hands-on corner coach first. You watch an automatic fight and make a few timed calls. Idle progression can be added around it later.</p>
+      <ul>
+        <li><b>Test it (M):</b> add two or three calls with cooldowns, such as Press, Guard and Unleash.</li>
+        <li><b>Judge it:</b> play ten bouts. If the calls change outcomes and you want another bout, keep building. If you would rather just watch, lean idle.</li>
+        <li><b>Either way (M–L):</b> persistent fighters, saving, rewards, injuries and rivalries give a bout stakes.</li>
+        <li><b>Replays (M):</b> use seeded randomness so offline or notable fights can be watched again.</li>
+      </ul>
+      <p><b>Start with:</b> sound and impact, then the corner-coach test.</p>
+    </section>
+  </main>
+</body>
+</html>

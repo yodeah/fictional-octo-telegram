@@ -8,6 +8,7 @@ button{font:inherit;cursor:pointer}
 .mark{width:32px;height:32px;display:grid;place-items:center;border:1px solid #7e5b3e;color:var(--gold);margin-right:10px;font:bold 21px Georgia,serif}
 .top-label,.eyebrow,.bout-number,.stage-status,.result span{font-size:13px;letter-spacing:.14em;font-weight:750}
 .top-label,.bout-number{color:var(--muted)}
+a.top-label{color:var(--gold)}
 main{max-width:1088px;padding:30px 24px 40px;margin:auto}
 .intro{display:flex;align-items:end;justify-content:space-between;margin-bottom:20px}
 .eyebrow{margin:0 0 5px;color:var(--gold)}
@@ -111,7 +112,7 @@ li{font-size:14px;padding:5px 0;color:var(--ink);border-top:1px solid var(--line
 li time{color:var(--muted);margin-right:10px;font-variant-numeric:tabular-nums}
 li.empty{color:var(--muted)}
 @media(max-width:560px){
-  .topbar{height:52px;padding:0 12px}.top-label{display:none}
+  .topbar{height:52px;padding:0 12px}
   main{padding:24px 10px}.intro{margin-bottom:14px}
   .scoreboard{grid-template-columns:1fr 29px 1fr;padding:10px 8px}
   .fighter h2{font-size:22px}.fighter span{font-size:13px}
@@ -127,3 +128,14 @@ li.empty{color:var(--muted)}
 @media(max-width:850px){.loadout{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.spell-kit,.blue .spell-kit{display:grid}.book-picker{max-width:155px}.blue .book-picker{justify-self:end;width:100%}}
 @media(max-width:460px){.spells{grid-template-columns:1fr}.fighter-info,.blue .fighter-info{display:grid;justify-content:stretch;gap:3px}.loadout{column-gap:4px}.loadout select{padding-right:15px;background-position:calc(100% - 9px) 55%,calc(100% - 4px) 55%}}
+.guide a{color:var(--gold)}
+.toc{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px}
+.guide .record{line-height:1.55;overflow-x:auto}
+.guide .record>p,.guide .record>ul,.guide .record>table{margin:10px 0 0}
+.guide h3{margin:20px 0 0;color:var(--gold);font-size:15px}
+.guide ul{padding:0;list-style:none}
+.guide table{width:100%;border-collapse:collapse;font-size:14px}
+.guide th,.guide td{padding:5px 12px 5px 0;text-align:left;vertical-align:top;border-top:1px solid var(--line)}
+.guide th{color:var(--muted)}
+.guide .weak{color:var(--gold);font-weight:700}
+@media(max-width:560px){.guide table{font-size:12px}.guide th,.guide td{padding-right:6px;overflow-wrap:anywhere}}

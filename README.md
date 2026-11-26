@@ -37,6 +37,8 @@ Pause or change speed during a bout. Auto-rematch runs back-to-back bouts until 
 
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Every **Auto-rematch** uses the same generator. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. Use the manual **Rematch** button to retain pinned equipment.
 
+The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and lists improvement ideas. Its numbers are written by hand, so update it when combat values change.
+
 ## Armor geometry
 
 The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents, leather submits 853, and robes submit 695. The nine original weapons each submit at least twice as many triangle equivalents as before the armory expansion. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
