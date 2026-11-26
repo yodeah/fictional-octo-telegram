@@ -235,4 +235,20 @@
       band(g, c.brass, -28, 4.8);
     }
   };
+
+  art.beardedAxe = {
+    box: [-34, -54, 114, 20],
+    draw(g, c) {
+      haft(g, c.wood, -29, 106, 3.2);
+      wrap(g, c.grip, -24, 8, 4.1);
+      // A long beard drops back toward the hand.
+      metal(g, 'M86,6 L100,6 C104,-8 106,-14 107,-20 C100,-34 88,-45 68,-50 C55,-52 45,-47 38,-41 C52,-38 62,-30 64,-22 C70,-12 80,-8 86,-6 Z', 52, c.steel, 59);
+      stroke(g, 'M42,-42 C56,-50 86,-48 104,-22', 'rgba(255,255,255,.85)', 1.6);
+      stroke(g, 'M70,-28 C80,-34 90,-30 96,-20 C86,-22 80,-20 76,-14', tone(c.iron, -.2), 1.1);
+      shape(g, 'M82,-8 L102,-8 L102,7 L82,7 Z', steelAcross(g, 8, c.iron), 1.2);
+      for (const x of [87, 97]) rivet(g, x, 0, 1.4, c.brass);
+      for (const x of [20, 62]) band(g, c.brass, x, 4.4);
+      band(g, c.iron, -28, 4.8);
+    }
+  };
 })();
