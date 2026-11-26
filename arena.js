@@ -336,48 +336,75 @@ function surface(points, color, light, transform) {
   faces.push({ projected, depth, fill });
 }
 
-function prism(from, to, base, tip, color, transform, sides = 4, roll = Math.PI / 4) {
-  const length = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1;
-  const perpendicular = [(to[1] - from[1]) / length, (from[0] - to[0]) / length];
-  function ring(point, radii) {
-    return Array.from({ length: sides }, (_, i) => {
-      const angle = i * 2 * Math.PI / sides + roll;
-      const radial = Math.cos(angle) * radii[0];
-      return [point[0] + perpendicular[0] * radial, point[1] + perpendicular[1] * radial, point[2] + Math.sin(angle) * radii[1]];
-    });
+const ringAngles = new Map();
+function circleProfile(sides, roll = 0) {
+  const key = sides + ':' + roll;
+  if (!ringAngles.has(key)) {
+    ringAngles.set(key, Array.from({ length: sides }, (_, index) => {
+      const angle = index * 2 * Math.PI / sides + roll;
+      return { cosine: Math.cos(angle), sine: Math.sin(angle), angle };
+    }));
   }
-  const a = ring(from, base);
-  const b = ring(to, tip);
+  return ringAngles.get(key);
+}
+
+function prism(from, to, base, tip, color, transform, sides = 4, roll = Math.PI / 4) {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const length = Math.hypot(dx, dy) || 1;
+  const angles = circleProfile(sides, roll);
+  const bevel = Math.min(.23, Math.max(...base, ...tip) * .65 / length);
+  const sections = [[0, .74], [bevel, 1.04], [1 - bevel, 1], [1, .76]];
+  const profiles = sections.map(([t, bevelScale]) => {
+    const [x, y, z] = pointBetween(from, to, t);
+    const radialWidth = mix(base[0], tip[0], t) * bevelScale;
+    const radialDepth = mix(base[1], tip[1], t) * bevelScale;
+    return angles.map(({ cosine, sine }) => [
+      x + dy / length * cosine * radialWidth,
+      y - dx / length * cosine * radialWidth,
+      z + sine * radialDepth
+    ]);
+  });
   for (let i = 0; i < sides; i++) {
     const j = (i + 1) % sides;
-    if (a[i][2] + a[j][2] < from[2] * 2 - .001) continue;
-    const light = .91 + .24 * Math.cos((i + .5) * 2 * Math.PI / sides + roll);
-    surface([a[i], a[j], b[j], b[i]], color, light, transform);
+    if (angles[i].sine + angles[j].sine < -.01) continue;
+    const direction = angles[i].angle + Math.PI / sides;
+    const light = .84 + .26 * Math.cos(direction - .26) + .15 * Math.sin(direction);
+    for (let row = 1; row < profiles.length; row++) {
+      const a = profiles[row - 1];
+      const b = profiles[row];
+      const face = row === 3 && tip[0] === 0 && tip[1] === 0 ? [a[i], a[j], b[i]] : [a[i], a[j], b[j], b[i]];
+      surface(face, color, light * (row === 1 ? .85 : row === 3 ? 1.18 : 1), transform);
+    }
   }
-  surface(b, color, 1.19, transform);
+  if (tip[0] > 0 || tip[1] > 0) surface(profiles[3], color, 1.16, transform);
 }
 
 function shield(cx, cy, z, fighter, transform) {
   const gear = shields[fighter.gear.shield];
   const contour = value => Math.sign(value) * Math.pow(Math.abs(value), gear.shape);
-  const ring = (radius, depth) => Array.from({ length: 8 }, (_, i) => {
-    const angle = (i + .5) * Math.PI / 4;
-    return [cx + contour(Math.cos(angle)) * radius * gear.width, cy + contour(Math.sin(angle)) * radius * gear.height, depth];
-  });
+  const sides = gear.shape < .9 ? 16 : 20;
+  const ring = (radius, depth) => circleProfile(sides, Math.PI / sides).map(({ cosine, sine }) =>
+    [cx + contour(cosine) * radius * gear.width, cy + contour(sine) * radius * gear.height, depth]);
   const rim = ring(1, z);
-  const panel = ring(.81, z + .035);
-  const boss = ring(.27, z + .12);
-  for (let i = 0; i < 8; i++) {
-    const j = (i + 1) % 8;
-    surface([rim[i], rim[j], panel[j], panel[i]], armor, i < 4 ? 1.36 : .75, transform);
-    surface([panel[i], panel[j], boss[j], boss[i]], fighter.color, .85 + i * .07, transform);
-    const [rx, ry] = panel[i];
-    const rivet = [mix(cx, rx, 1.08), mix(cy, ry, 1.08), z + .05];
-    surface([[rivet[0], rivet[1] + .034, rivet[2]], [rivet[0] + .024, rivet[1], rivet[2]],
-      [rivet[0], rivet[1] - .034, rivet[2]], [rivet[0] - .024, rivet[1], rivet[2]]], metal, 1.06, transform);
+  const bead = ring(.91, z + .047);
+  const panel = ring(.80, z + .034);
+  const boss = ring(.29, z + .10);
+  const crown = ring(.22, z + .158);
+  for (let i = 0; i < sides; i++) {
+    const j = (i + 1) % sides;
+    const light = 1 + Math.cos((i + .5) * Math.PI * 2 / sides - .60) * .26;
+    surface([rim[i], rim[j], bead[j], bead[i]], darkSteel, light * .97, transform);
+    surface([bead[i], bead[j], panel[j], panel[i]], bronze, light * 1.21, transform);
+    surface([panel[i], panel[j], boss[j], boss[i]], fighter.color, light, transform);
+    surface([boss[i], boss[j], crown[j], crown[i]], armor, light, transform);
+    if (i % 2 === 0) {
+      const [rx, ry] = bead[i];
+      surface([[rx, ry + .017, z + .07], [rx + .014, ry, z + .07], [rx, ry - .018, z + .07], [rx - .014, ry, z + .07]], metal, 1.11, transform);
+    }
   }
-  surface(boss, bronze, 1, transform);
-  surface(ring(.16, z + .143), metal, 1.12, transform);
+  surface(crown, metal, 1.09, transform);
+  surface(ring(.131, z + .168), bronze, 1.23, transform);
   for (const side of [-1, 1]) {
     const y = cy + gear.height * side * .47;
     surface([[cx - gear.width * .36, y, z + .093], [cx, y + side * .034, z + .097],
@@ -595,17 +622,16 @@ const darkSteel = [72, 72, 65];
 const clothLining = [64, 48, 75];
 const soleColor = [49, 36, 29];
 
-function loft(rings, color, transform, sides = 10) {
-  const vertices = rings.map(([y, width, depth]) => Array.from({ length: sides }, (_, index) => {
-    const angle = Math.PI * index * 2 / sides;
-    return [Math.cos(angle) * width, y, Math.sin(angle) * depth];
-  }));
+function loft(rings, color, transform, sides = 24) {
+  const profile = circleProfile(sides).slice(0, sides / 2 + 1);
+  const vertices = rings.map(([y, width, depth]) => profile.map(({ cosine, sine }) => [cosine * width, y, sine * depth]));
   for (let row = 1; row < vertices.length; row++) {
     for (let i = 0; i < sides / 2; i++) {
       const a = vertices[row - 1];
       const b = vertices[row];
       const angle = (i + .5) * Math.PI * 2 / sides;
-      const light = .74 + Math.sin(angle) * .24 + Math.cos(angle - .30) * .16;
+      const light = .64 + Math.sin(angle) * .32 + Math.cos(angle - .42) * .22
+        + Math.max(0, Math.cos(angle - 1.11)) ** 13 * .08;
       surface([a[i], a[i + 1], b[i + 1], b[i]], color, light, transform);
     }
   }
@@ -620,7 +646,8 @@ function armorTorso(fighter, pose, transform) {
   const skirt = pose.cloth;
   const beltColor = kit.style === 'magic' ? fighter.color : leather;
 
-  loft([[-.10, .285, .30], [.13, .32, .34], [.43, .41, .38], [.57, .38, .34], [.64, .23, .25]], kit.color, transform);
+  loft([[-.12, .262, .257], [-.055, .287, .305], [.13, .32, .34], [.32, .375, .379],
+    [.43, .411, .385], [.55, .395, .359], [.60, .33, .323], [.645, .224, .253]], kit.color, transform);
 
   if (kit.style === 'melee') {
     loft([[.14, .327, .35], [.23, .348, .37], [.44, .40, .386], [.57, .38, .35]], metal, transform);
@@ -666,6 +693,7 @@ function armorTorso(fighter, pose, transform) {
           [x + .011, y - .053, z + .008], [x - .047, y - .028, z + .004]], [130, 82, 52], .88 + (column + 1) * .10);
         panel([[x - .057, y + .025, z + .006], [x + .042, y + .025, z + .006],
           [x + .042, y + .011, z + .007], [x - .05, y + .011, z + .007]], [201, 149, 88], .94);
+        stud(x - .027, y + .008, z + .012, darkSteel);
       }
     }
     piece([-.24, .15, .334], [.22, .57, .365], [.063, .043], [.073, .044], darkSteel, 6);
@@ -680,6 +708,19 @@ function armorTorso(fighter, pose, transform) {
     for (const [x, z] of [[-.22, .332], [-.12, .385], [.17, .372]]) {
       panel([[x, .06, z + .023], [x - .043 + skirt, -.52, z], [x + .028 + skirt, -.54, z],
         [x + .028, .06, z + .025]], kit.color, x < -.15 ? .82 : 1.21);
+    }
+    const cape = [[-.30, .58, -.13], [-.36, .27, -.14], [-.38 + skirt * .52, -.07, -.13],
+      [-.44 + skirt, -.34, -.14], [-.40 + skirt, -.63, -.10]];
+    for (let index = 1; index < cape.length; index++) {
+      const start = cape[index - 1];
+      const end = cape[index];
+      const innerStart = shifted(start, .19, .005, .078);
+      const innerEnd = shifted(end, .19, .007, .078);
+      const seamStart = shifted(start, .073, 0, .045);
+      const seamEnd = shifted(end, .075, 0, .042);
+      panel([start, seamStart, seamEnd, end], kit.color, .74);
+      panel([seamStart, innerStart, innerEnd, seamEnd], kit.color, .94);
+      panel([start, shifted(start, .025, 0, .012), shifted(end, .026, 0, .012), end], bronze, .92);
     }
     panel([[-.20 + skirt, -.505, .315], hem(-.17), hem(.10), [.24 + skirt, -.49, .31],
       [.21 + skirt, -.444, .316], [.08 + skirt, -.53, .316], [-.16 + skirt, -.54, .316]], bronze, 1.1);
@@ -700,6 +741,7 @@ function armorTorso(fighter, pose, transform) {
   loft([[.023, .32, .36], [.093, .333, .372]], beltColor, transform);
   piece([-.062, .056, .393], [.074, .061, .403], [.054, .028], [.054, .028], bronze, 6);
   panel([[-.029, .035, .433], [.043, .035, .433], [.043, .078, .433], [-.029, .078, .433]], darkSteel, .95);
+  for (const x of [-.255, -.169, .159, .244]) stud(x, .058, .365 - Math.abs(x) * .12, bronze);
 }
 
 function armorHelmet(fighter, kit, transform) {
@@ -745,6 +787,9 @@ function armorHelmet(fighter, kit, transform) {
     panel([[.108, .051, .294], [.141, .049, .294], [.136, .037, .296], [.111, .037, .296]], [222, 188, 151], 1);
     panel([[.176, .054, .287], [.227, .009, .257], [.173, -.012, .278]], face, 1.20);
     panel([[.128, -.063, .283], [.188, -.055, .268], [.174, -.077, .273], [.131, -.078, .281]], face, .65);
+    panel([[.073, .017, .291], [.128, .025, .31], [.20, .005, .272], [.149, -.038, .30], [.086, -.027, .291]], face, 1.10);
+    panel([[.078, -.083, .286], [.142, -.104, .287], [.183, -.066, .265], [.16, -.127, .249],
+      [.085, -.128, .234]], face, .79);
   } else {
     panel([[.094, .034, .304], [.154, .031, .29], [.151, .012, .292], [.097, .013, .306]], face, .81);
   }
@@ -781,6 +826,11 @@ function drawGladiator(fighter, pose) {
     limb(shifted(heel, -.008, -.045, .019), shifted(toe, .012, -.044, .019), [.035, .145], [.031, .124], soleColor, 8);
     if (plated) {
       limb(shifted(ankle, .024, -.020, .072), shifted(toe, .008, .036, .044), [.067, .10], [.048, .105], armor, 8);
+    }
+    for (const t of [.42, .62, .80]) {
+      const instep = pointBetween(heel, toe, t);
+      limb(shifted(instep, -.011, .044, .083), shifted(instep, .012, .052, .106),
+        [.015, .018], [.014, .018], plated ? bronze : fighter.trim, 6);
     }
   }
 
@@ -834,6 +884,12 @@ function drawGladiator(fighter, pose) {
       [.105, .105], [.086, .086], plated ? armor : robed ? fighter.color : leather, 8);
     limb(pointBetween(elbow, hand, .83), pointBetween(elbow, hand, .91), [.092, .097], [.092, .097], bronze, 8);
     limb(pointBetween(elbow, hand, .90), pointBetween(elbow, hand, 1.14), [.082, .091], [.067, .075], robed ? skin : leather, 8);
+    const knuckles = pointBetween(elbow, hand, 1.05);
+    for (let index = -1; index <= 1; index++) {
+      const finger = shifted(knuckles, index * .035, -.012, .072);
+      limb(shifted(finger, -.008, -.036), shifted(finger, .009, .023), [.014, .012], [.017, .014],
+        plated ? armor : robed ? skin : leather, 6);
+    }
   }
 
   weaponModel(fighter, j.weaponHand, pose.angle, pose.windup, pose.strike, weaponClock(), limb, world);
@@ -1255,7 +1311,7 @@ function resize() {
   const density = Math.min(window.devicePixelRatio || 1, 2);
   width = rect.width;
   height = rect.height;
-  scale = Math.min(width / 8.3, height / 4.35);
+  scale = Math.min(width / 8.3, height / 3.88);
   canvas.width = Math.round(width * density);
   canvas.height = Math.round(height * density);
   ctx.setTransform(density, 0, 0, density, 0, 0);

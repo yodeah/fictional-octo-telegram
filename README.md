@@ -33,7 +33,7 @@ Pause or change speed during a bout. Auto-rematch runs back-to-back bouts until 
 
 ## Armor geometry
 
-The prototype projects procedural 3D shapes onto Canvas 2D. In the fixed idle pose, the plate torso and helmet submit 407 triangle equivalents, leather submits 310, and robes submit 171. These counts triangulate the polygons sent by the torso and helmet renderers and exclude weapons, shields, and other character parts. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
+The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the plate torso and helmet submit 943 triangle equivalents, leather submits 694, and robes submit 431. They previously submitted 407, 310, and 171. The nine original weapons each submit at least twice as many triangle equivalents as before. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
 
 ## Development plan
 
