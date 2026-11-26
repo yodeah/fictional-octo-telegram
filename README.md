@@ -16,7 +16,7 @@ This replaces the earlier idea of a "corner coach" with timed calls.
 
 Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
 
-Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. Pin any selection for future bouts or leave the slot on **Auto** to reroll it when the next bout starts. New bouts also roll fresh fighter levels and stats. Hover over a selector or focus it with the keyboard to read details. Gear is locked while a bout is in progress.
+Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. Pin any selection for future bouts or leave the slot on **Auto** to keep what the last matchup chose. Fighters keep their levels, stats, and gear until you select **Generate matchup**. Hover over a selector or focus it with the keyboard to read details. Gear is locked while a bout is in progress.
 
 Armor has separate attack and defense bonuses for stab, slash, crush, magic, and ranged. The greatsword and war maul trade slower, more expensive swings for higher accuracy and damage. They use both hands, so the shield moves to the back and stops providing defense or blocks until a one-handed weapon is drawn.
 
@@ -45,7 +45,7 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
-**Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Every **Auto-rematch** uses the same generator. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. Use the manual **Rematch** button to retain pinned equipment.
+**Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
 
 The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and lists improvement ideas. Its numbers are written by hand, so update it when combat values change.
 

@@ -100,7 +100,7 @@ function armorDetails(detail, kit, automatic) {
   const other = document.createElement('div');
   other.textContent = style + ' power +' + Math.round((kit.power - 1) * 100) + '%';
   detail.replaceChildren(name, table, power, other);
-  if (automatic) detail.append(document.createTextNode('Rerolls this slot each new bout.'));
+  if (automatic) detail.append(document.createTextNode('Kept until you generate a new matchup.'));
 }
 const spells = {
   ember: { name: 'Ember Bolt', icon: '✦', cost: 26, cooldown: 4.5, damage: 19, color: '#ffab64', effect: 'Reliable fire projectile', block: .12 },
@@ -194,7 +194,7 @@ function equipmentPicker(fighter, prefix, type, choices) {
       lines.push('Defense +' + item.defense, 'Speed ' + Math.round(item.mobility * 100) + '% · ' + item.energy + ' energy per block');
       lines.push('14 energy per shield bash · Active with one-handed weapons');
     }
-    if (select.value === 'auto') lines.push('Rerolls this slot each new bout.');
+    if (select.value === 'auto') lines.push('Kept until you generate a new matchup.');
     detail.textContent = lines.join('\n');
   };
   select.addEventListener('change', () => {
@@ -304,15 +304,15 @@ const armorPower = (fighter, style) => {
 const closeRange = distance => 1 - smooth((distance - 1.8) / 1.30);
 const canPress = fighter => weaponKeys(fighter).some(key => weaponClass(key) === 'melee');
 
-function applyGear(fighter, reroll = false) {
+function applyGear(fighter) {
   const previous = fighter.gear;
   const gear = {};
   const { reserve } = fighter.loadout;
   const assign = (type, excluded, differentStyle) => {
     const picker = fighter.loadout[type];
     if (picker.value !== 'auto' && picker.value !== excluded) return picker.value;
-    if (!reroll && previous[type] !== excluded) return previous[type];
-    const available = Object.keys(gearChoices[type]).filter(key => key !== excluded && key !== previous[type] && key !== 'none');
+    if (previous[type] !== excluded) return previous[type];
+    const available = Object.keys(gearChoices[type]).filter(key => key !== excluded && key !== 'none');
     if (differentStyle && excluded && weapons[excluded]) {
       const alternatives = available.filter(key => weaponClass(key) !== weaponClass(excluded));
       if (alternatives.length) return choose(alternatives);
@@ -328,18 +328,6 @@ function applyGear(fighter, reroll = false) {
   fighter.weapon = gear.weapon;
   applySpellbook(fighter);
   Object.values(fighter.loadout).forEach(picker => picker.describe());
-}
-
-function rollLevels(fighter) {
-  const level = 33 + Math.floor(Math.random() * 40);
-  fighter.level = level === fighter.level ? level + 1 : level;
-  const roll = base => clamp(Math.round(base + fighter.level * .56 + (Math.random() - .5) * 31), 1, 99);
-  fighter.attack = roll(32);
-  fighter.strength = roll(35);
-  fighter.magic = roll(38);
-  fighter.ranged = roll(36);
-  fighter.defense = roll(0);
-  fighter.maxHP = 78 + Math.round(fighter.level * .44 + Math.random() * 12);
 }
 
 function updateStats(fighter) {
@@ -1939,7 +1927,7 @@ function showCurrentAction() {
   }
 }
 
-function startBout(reroll = false, generated = null) {
+function startBout(generated = null) {
   elapsed = 0;
   fall = 0;
   hitPause = 0;
@@ -1955,10 +1943,8 @@ function startBout(reroll = false, generated = null) {
     if (generated) {
       Object.assign(fighter, generated[index]);
       Object.values(fighter.loadout).forEach(picker => { picker.value = 'auto'; });
-    } else if (reroll) {
-      rollLevels(fighter);
     }
-    applyGear(fighter, reroll && !generated);
+    applyGear(fighter);
     fighter.hp = fighter.maxHP;
     fighter.mp = 60;
     fighter.energy = 100;
@@ -2228,10 +2214,9 @@ function nextBoutNumber() {
   scenery.nextBout();
 }
 
-function beginRematch(automatic = false) {
-  const generated = automatic ? freshMatchup() : null;
+function beginRematch() {
   nextBoutNumber();
-  startBout(true, generated);
+  startBout();
   runBout();
 }
 
@@ -2322,7 +2307,7 @@ function update(dt, realTime) {
       }
     }
     if (elements.repeat.checked) rematchDelay -= realTime;
-    if (rematchDelay <= 0) beginRematch(true);
+    if (rematchDelay <= 0) beginRematch();
     return;
   }
   if (state !== 'running') return;
@@ -2372,7 +2357,7 @@ elements.reset.addEventListener('click', () => {
   if (state !== 'finished') return;
   nextBoutNumber();
   state = 'ready';
-  startBout(true);
+  startBout();
   updateControls();
 });
 
@@ -2381,7 +2366,7 @@ elements.generate.addEventListener('click', () => {
   const generated = freshMatchup();
   if (state === 'finished') nextBoutNumber();
   state = 'ready';
-  startBout(false, generated);
+  startBout(generated);
   updateControls();
 });
 
