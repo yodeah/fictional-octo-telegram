@@ -95,4 +95,20 @@
       rivet(g, -30, 0, 1.6, c.brass);
     }
   };
+
+  art.falchion = {
+    box: [-34, -38, 134, 24],
+    draw(g, c) {
+      // A heavy blade that widens and curves up toward a clipped point.
+      const blade = 'M17,-8.6 C34,-14 56,-18 88,-24 C102,-27 116,-27 128,-22 C124,-18 120,-11 117,-6 C108,2 94,5 88,4.6 C66,4 46,6 17,8.6 Z';
+      metal(g, blade, 24, c.steel, 13);
+      stroke(g, 'M20,-2 C46,-6 70,-9 100,-17', tone(c.iron, -.1), 2.4);
+      stroke(g, 'M20,-3.2 C46,-7.2 70,-10.2 100,-18.2', 'rgba(255,255,255,.7)', .7);
+      for (let i = 0; i < 4; i++) disc(g, 34 + i * 9, 2 - i * .6, 1.2, tone(c.iron, -.35), .5);
+      wrap(g, c.grip, -20, 13, 4);
+      shape(g, 'M13,-17 L20,-15 L19,-6 L22,0 L19,6 L20,15 L13,17 L14,0 Z', steelAcross(g, 17, c.brass), 1.2);
+      disc(g, 17, 0, 2.2, c.teamCss, .6);
+      shape(g, 'M-20,-5 C-27,-8 -33,-4 -31,2 C-31,7 -25,8 -20,5 Z', gradient(g, -32, -6, -20, 6, c.brass, [.6, 0, -.45]), 1.2);
+    }
+  };
 })();
