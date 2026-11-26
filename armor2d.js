@@ -190,4 +190,40 @@
       stroke(g, 'M-4,-6 C-3,4 2,10 8,13', tone(c.main, -.35), 2.2);
     }
   });
+
+  sets.nightHide = derive('leather', { brass: [146, 164, 96], steel: [150, 160, 150] }, {
+    box: { head: [-36, -38, 30, 32], torso: [-34, -84, 32, 34] },
+    torso(g, c, base) {
+      base(g, c);
+      // Leaf-shaped hide scales over the shoulders and chest.
+      for (let row = 0; row < 3; row++) {
+        for (let i = 0; i < 6 - row; i++) {
+          const x = -17 + i * 6.8 + row * 3.4;
+          const y = -72 + row * 8;
+          shape(g, `M${x},${y} C${x + 7},${y + 2} ${x + 6},${y + 11} ${x + 1.5},${y + 15} C${x - 4},${y + 10} ${x - 4},${y + 2} ${x},${y} Z`,
+            clothFill(g, x - 4, x + 6, row % 2 ? c.light : c.main), 1.1);
+          stroke(g, `M${x},${y + 2} L${x + 1.4},${y + 13}`, tone(c.main, -.5), .8);
+        }
+      }
+      stroke(g, 'M-13,-44 L14,-20', tone(DARKLEATHER, -.2), 4);
+      for (let i = 0; i < 4; i++) shape(g, `M${-10 + i * 6},${-43 + i * 6} l3,-6 l2,1 l-1,7 Z`, tone([170, 178, 186], .1), .8);
+    },
+    head(g, c) {
+      shape(g, 'M-4,-24 C-22,-26 -30,-8 -24,8 C-24,18 -29,22 -34,28 C-16,30 -6,22 -3,12 L6,-18 Z', gradient(g, -30, 0, 0, -10, c.dark, [-.35, .1, -.2]));
+      face(g);
+      // Deep peaked hood, shadowed eyes and a half mask.
+      clipped(g, 'M-9,-8 C-8,-16 6,-18 11,-9 L13,1 L-9,2 Z', () => {
+        g.fillStyle = 'rgba(8,16,10,.62)';
+        g.fillRect(-12, -18, 28, 22);
+      });
+      disc(g, 8.4, -2.1, 1.3, '#d6f06a', 0);
+      shape(g, 'M-8,3 C2,0 10,3 17,4 L13,6 L13,13 C10,21 -2,22 -9,15 Z', clothFill(g, -9, 17, c.dark), 1.2);
+      stroke(g, 'M-7,9 Q3,12 13,9', tone(c.trim, 0), 1.2);
+      const hood = 'M-8,16 C-14,6 -12,-8 -2,-14 C4,-18 12,-14 18,-6 L22,-4 C22,-18 12,-32 -2,-34 L-14,-36 C-12,-32 -12,-30 -10,-28 C-24,-22 -28,-8 -24,4 C-22,14 -16,18 -8,16 Z';
+      shape(g, hood, gradient(g, -24, 10, 10, -30, c.main, [-.45, -.15, .2, -.1]), 1.3);
+      wear(g, hood, [-28, -36, 22, 18], 70, 'rgba(200,255,190,.18)', 'rgba(5,14,8,.3)', 179, 2);
+      stitches(g, 'M-12,13 C-18,3 -16,-10 -4,-18 C4,-22 12,-18 17,-11', 'rgba(170,196,110,.85)', .8);
+      shape(g, 'M-14,-24 C-26,-30 -32,-40 -30,-46 C-24,-40 -16,-38 -8,-30 Z', clothFill(g, -30, -8, c.team), 1.1);
+    }
+  });
 })();
