@@ -39,8 +39,7 @@ const armors = {
     melee: 1.10, ranged: 1.28, magic: .96, attackBonus: [-2, -2, 0, 18, -6], defenseBonus: [3, 4, 5, 17, -5]
   }
 };
-const gearChoices = { weapon: weapons, reserve: weapons, shield: shields, armor: armors };
-const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor' };
+const gearLabels = { weapon: 'Main', reserve: 'Backup', shield: 'Shield', armor: 'Armor', spellbook: 'Spellbook' };
 const signed = value => value > 0 ? '+' + value : String(value);
 
 function armorDetails(detail, kit, automatic) {
@@ -67,16 +66,33 @@ function armorDetails(detail, kit, automatic) {
   if (automatic) detail.append(document.createTextNode('Rerolls this slot each new bout.'));
 }
 const spells = {
-  ember: { name: 'Ember Bolt', icon: '✦', cost: 28, cooldown: 5, damage: 19, color: '#ffab64', effect: 'Fire projectile', block: .12 },
-  ward: { name: 'Iron Ward', icon: '◆', cost: 32, cooldown: 10, absorb: 18, color: '#ffda84', effect: 'Absorbs up to 18 damage for 6 seconds' },
-  frost: { name: 'Frost Lance', icon: '❄', cost: 30, cooldown: 5, damage: 15, color: '#a9e6ff', effect: 'Ice projectile that slows the target', block: .15 },
-  heal: { name: 'Second Wind', icon: '✚', cost: 34, cooldown: 12, heal: 21, color: '#c2eca1', effect: 'Restores up to 21 HP' }
+  ember: { name: 'Ember Bolt', icon: '✦', cost: 26, cooldown: 4.5, damage: 19, color: '#ffab64', effect: 'Reliable fire projectile', block: .12 },
+  ward: { name: 'Iron Ward', icon: '◆', cost: 27, cooldown: 19, absorb: 15, duration: 5, color: '#ffda84' },
+  heal: { name: 'Second Wind', icon: '✚', cost: 31, cooldown: 22, heal: 16, color: '#c2eca1' },
+  drain: { name: 'Crimson Drain', icon: '✦', cost: 23, cooldown: 5, damage: 14, lifesteal: .52, color: '#f18b91', effect: 'Restores 52% of damage dealt as health', block: .11 },
+  surge: { name: 'Scarlet Surge', icon: '✹', cost: 38, cooldown: 8.5, damage: 26, lifesteal: .27, color: '#ff9784', effect: 'Restores 27% of damage dealt as health', block: .10 },
+  pact: { name: 'Blood Pact', icon: '◆', cost: 6, cooldown: 12, hpCost: 9, manaRestore: 25, color: '#e98baf', effect: 'Trade 9 HP for 25 mana' },
+  frost: { name: 'Frost Lance', icon: '❄', cost: 21, cooldown: 4.5, damage: 15, chill: 3.5, ice: true, color: '#a9e6ff', effect: 'Slows the target for 3.5 seconds', block: .15 },
+  barrage: { name: 'Winter Barrage', icon: '❅', cost: 37, cooldown: 10.5, damage: 22, freeze: 2.4, ice: true, color: '#c5eaff', effect: 'Immobilizes the target for 2.4 seconds', block: .10 },
+  shell: { name: 'Glacial Shell', icon: '⬡', cost: 22, cooldown: 11, absorb: 13, duration: 4, color: '#b5ebf5' },
+  arc: { name: 'Arc Flash', icon: 'ϟ', cost: 20, cooldown: 4, damage: 13, energyDrain: 14, lightning: true, color: '#d3c6ff', effect: 'Drains up to 14 energy from the target', block: .12 },
+  thunder: { name: 'Thunderclap', icon: '✹', cost: 41, cooldown: 10, damage: 30, lightning: true, color: '#edd8ff', effect: 'Heavy burst damage', block: .14 },
+  tailwind: { name: 'Tailwind', icon: '✧', cost: 23, cooldown: 11, energyRestore: 27, haste: 4.5, color: '#cce8a0', effect: 'Restores energy and speeds movement for 4.5 seconds' },
+  spark: { name: 'Staff Spark', damage: 8, cost: 0, cooldown: 0, color: '#d1b7ff', block: .10 }
 };
+const spellbooks = {
+  general: { name: 'General', focus: 'Reliable damage, protection, and recovery.', spells: ['ember', 'ward', 'heal'] },
+  vampiric: { name: 'Vampiric', focus: 'Sustain through damage and trade health for mana.', spells: ['drain', 'surge', 'pact'] },
+  glacial: { name: 'Glacial', focus: 'Slow, freeze, and hold opponents at range.', spells: ['frost', 'barrage', 'shell'] },
+  storm: { name: 'Storm', focus: 'Burst damage and energy control for aggressive fighters.', spells: ['arc', 'thunder', 'tailwind'] }
+};
+const gearChoices = { weapon: weapons, reserve: { ...weapons, none: { name: 'None' } }, shield: shields, armor: armors, spellbook: spellbooks };
 const manaRegen = 3.6;
 const energyRegen = 5;
+const switchCost = 7;
 const fighters = [
-  { name: 'Varro', gear: { weapon: 'sword', reserve: 'staff', shield: 'round', armor: 'plate' }, level: 54, attack: 69, magic: 68, defense: 25, strength: 73, ranged: 54, maxHP: 108, spells: ['ember', 'ward'], direction: 1, color: [157, 62, 42], trim: [242, 143, 96], wins: 0 },
-  { name: 'Cassian', gear: { weapon: 'spear', reserve: 'crossbow', shield: 'round', armor: 'leather' }, level: 57, attack: 64, magic: 80, defense: 28, strength: 63, ranged: 76, maxHP: 100, spells: ['frost', 'heal'], direction: -1, color: [49, 102, 110], trim: [143, 208, 202], wins: 0 }
+  { name: 'Varro', gear: { weapon: 'sword', reserve: 'staff', shield: 'round', armor: 'plate', spellbook: 'general' }, level: 54, attack: 69, magic: 68, defense: 25, strength: 73, ranged: 54, maxHP: 108, direction: 1, color: [157, 62, 42], trim: [242, 143, 96], wins: 0 },
+  { name: 'Cassian', gear: { weapon: 'spear', reserve: 'crossbow', shield: 'round', armor: 'leather', spellbook: 'glacial' }, level: 57, attack: 64, magic: 80, defense: 28, strength: 63, ranged: 76, maxHP: 100, direction: -1, color: [49, 102, 110], trim: [143, 208, 202], wins: 0 }
 ];
 
 function equipmentPicker(fighter, prefix, type, choices) {
@@ -107,13 +123,18 @@ function equipmentPicker(fighter, prefix, type, choices) {
       return;
     }
     const lines = [item.name];
-    if (type === 'weapon' || type === 'reserve') {
+    if (type === 'spellbook') {
+      lines.push(item.focus, ...item.spells.map(key => spells[key].name + ' · ' + spells[key].cost + ' MP'));
+    } else if (type === 'reserve' && select.value === 'none') {
+      lines.push('Travel lighter with one weapon');
+    } else if (type === 'weapon' || type === 'reserve') {
       lines.push('Base damage ' + item.damage + ' · Reach ' + item.range.toFixed(1),
         'Speed ' + Math.round(item.tempo * 100) + '% · ' + item.energy + ' energy per attack');
-      if (item.spellPower) lines.push('+30% spell power');
+      if (item.spellPower) lines.push('+30% spell power · Free Staff Spark');
       if (item.style === 'ranged') lines.push('Ranged bolts · Strong against robes', 'Reduced damage and accuracy up close');
       if (item.twoHanded) lines.push('+' + item.accuracy + ' ' + bonusTypes[meleeType[select.value === 'auto' ? fighter.gear[type] : select.value]]
         + ' attack · Uses both hands', 'Shield is stowed while wielding');
+      if (type === 'reserve') lines.push('Carrying a spare lowers speed by 4% · Swaps cost ' + switchCost + ' energy');
     } else if (type === 'shield') {
       lines.push('Defense +' + item.defense, 'Speed ' + Math.round(item.mobility * 100) + '% · ' + item.energy + ' energy per block');
       lines.push('Active with one-handed weapons');
@@ -132,13 +153,13 @@ function equipmentPicker(fighter, prefix, type, choices) {
     updateGearNote(fighter);
   });
   wrapper.append(label, select, detail);
-  fighter.hud.loadout.append(wrapper);
+  fighter.hud[type === 'spellbook' ? 'book' : 'loadout'].append(wrapper);
   return select;
 }
 
 fighters.forEach((fighter, index) => {
   const prefix = index === 0 ? 'red-' : 'blue-';
-  fighter.hud = Object.fromEntries(['hp', 'meter', 'mp', 'mana', 'ep', 'energy', 'stats', 'loadout', 'queued', 'spells', 'level', 'active']
+  fighter.hud = Object.fromEntries(['hp', 'meter', 'mp', 'mana', 'ep', 'energy', 'stats', 'loadout', 'book', 'queued', 'spells', 'level', 'active']
     .map(key => [key, document.getElementById(prefix + key)]));
   fighter.loadout = Object.fromEntries(Object.entries(gearChoices)
     .map(([type, choices]) => [type, equipmentPicker(fighter, prefix, type, choices)]));
@@ -151,12 +172,18 @@ fighters.forEach((fighter, index) => {
     fighter.hud.stats.append(group);
     return [name, value];
   }));
-  fighter.spellBadges = Object.fromEntries(fighter.spells.map(key => {
+});
+
+function applySpellbook(fighter) {
+  const keys = spellbooks[fighter.gear.spellbook].spells;
+  if (fighter.spells === keys) return;
+  fighter.spells = keys;
+  fighter.hud.spells.replaceChildren();
+  fighter.spellBadges = Object.fromEntries(keys.map(key => {
     const spell = spells[key];
     const badge = document.createElement('div');
     badge.className = 'spell';
     badge.style.setProperty('--spell-color', spell.color);
-    badge.title = spell.effect + ' · ' + spell.cost + ' MP';
     const icon = document.createElement('i');
     icon.setAttribute('aria-hidden', 'true');
     icon.textContent = spell.icon;
@@ -166,7 +193,7 @@ fighters.forEach((fighter, index) => {
     fighter.hud.spells.append(badge);
     return [key, badge];
   }));
-});
+}
 const particles = [];
 const labels = [];
 const stains = [];
@@ -205,8 +232,11 @@ const smooth = value => {
 };
 const choose = options => options[Math.floor(Math.random() * options.length)];
 const weaponClass = key => weapons[key].spellPower ? 'magic' : weapons[key].style || 'melee';
+const weaponKeys = fighter => [fighter.gear.weapon, fighter.gear.reserve].filter(key => key !== 'none');
+const carriesSpare = fighter => fighter.gear.reserve !== 'none';
 const shieldReady = fighter => !weapons[fighter.weapon].twoHanded;
-const mobility = fighter => (shieldReady(fighter) ? shields[fighter.gear.shield].mobility : 1) * armors[fighter.gear.armor].mobility;
+const mobility = fighter => (shieldReady(fighter) ? shields[fighter.gear.shield].mobility : 1) * armors[fighter.gear.armor].mobility
+  * (carriesSpare(fighter) ? .96 : 1) * (fighter.hastedUntil > elapsed ? 1.12 : 1);
 const defense = fighter => fighter.defense + (shieldReady(fighter) ? shields[fighter.gear.shield].defense : 0) + armors[fighter.gear.armor].defense;
 const attackType = (style, key) => style === 'magic' ? 3 : style === 'ranged' ? 4 : meleeType[key];
 
@@ -220,29 +250,31 @@ const armorPower = (fighter, style) => {
   return armor.style === style ? armor.power : 1;
 };
 const closeRange = distance => 1 - smooth((distance - 1.8) / 1.30);
-const canPress = fighter => [fighter.gear.weapon, fighter.gear.reserve].some(key => weaponClass(key) === 'melee');
+const canPress = fighter => weaponKeys(fighter).some(key => weaponClass(key) === 'melee');
 
 function applyGear(fighter, reroll = false) {
   const previous = fighter.gear;
   const gear = {};
-  const { weapon, reserve } = fighter.loadout;
+  const { reserve } = fighter.loadout;
   const assign = (type, excluded, differentStyle) => {
     const picker = fighter.loadout[type];
     if (picker.value !== 'auto' && picker.value !== excluded) return picker.value;
     if (!reroll && previous[type] !== excluded) return previous[type];
-    const available = Object.keys(gearChoices[type]).filter(key => key !== excluded && key !== previous[type]);
-    if (differentStyle && excluded) {
+    const available = Object.keys(gearChoices[type]).filter(key => key !== excluded && key !== previous[type] && key !== 'none');
+    if (differentStyle && excluded && weapons[excluded]) {
       const alternatives = available.filter(key => weaponClass(key) !== weaponClass(excluded));
       if (alternatives.length) return choose(alternatives);
     }
     return choose(available);
   };
-  gear.weapon = assign('weapon', reserve.value === 'auto' ? null : reserve.value, true);
+  gear.weapon = assign('weapon', weapons[reserve.value] ? reserve.value : null, true);
   gear.reserve = assign('reserve', gear.weapon, true);
   gear.shield = assign('shield');
   gear.armor = assign('armor');
+  gear.spellbook = assign('spellbook');
   fighter.gear = gear;
   fighter.weapon = gear.weapon;
+  applySpellbook(fighter);
   Object.values(fighter.loadout).forEach(picker => picker.describe());
 }
 
@@ -265,14 +297,14 @@ function updateStats(fighter) {
   for (const [name, value] of Object.entries(stats)) fighter.stats[name].textContent = value;
   fighter.hud.level.textContent = 'Lv ' + fighter.level;
   const stowed = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
-  fighter.hud.active.textContent = weapons[fighter.weapon].name + ' held · ' + weapons[stowed].name + ' stowed'
+  fighter.hud.active.textContent = weapons[fighter.weapon].name + ' held' + (weapons[stowed] ? ' · ' + weapons[stowed].name + ' stowed' : ' · No spare')
     + (shieldReady(fighter) ? '' : ' · Shield on back');
   const power = (weapons[fighter.weapon].spellPower || 1) * armorPower(fighter, 'magic');
   for (const key of fighter.spells) {
     const spell = spells[key];
     let effect = spell.effect;
     if (spell.heal) effect = 'Restores up to ' + Math.round(spell.heal * power) + ' HP';
-    if (spell.absorb) effect = 'Absorbs up to ' + Math.round(spell.absorb * power) + ' damage for 6 seconds';
+    if (spell.absorb) effect = 'Absorbs up to ' + Math.round(spell.absorb * power) + ' damage for ' + spell.duration + ' seconds';
     if (spell.damage) effect += ' · ' + Math.round(spell.damage * power * (.76 + fighter.magic / 300)) + ' damage before armor';
     fighter.spellBadges[key].title = effect + ' · ' + spell.cost + ' MP';
   }
@@ -766,12 +798,14 @@ function drawGladiator(fighter, pose) {
   armorTorso(fighter, pose, point => world(torso(point)));
 
   const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
-  const long = spare === 'staff' || spare === 'spear' || spare === 'crossbow' || weapons[spare].twoHanded;
-  const mount = torso(long ? [-.43, .39, -.51] : [-.39, .03, -.43]);
-  const scaleStowed = long ? .80 : .69;
-  const stow = point => pointBetween(mount, point, scaleStowed);
-  const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
-  weaponModel(fighter, mount, torsoAngle + (long ? 2.0 : -2.34), 0, 0, 0, holder, point => world(stow(point)), spare);
+  if (weapons[spare]) {
+    const long = spare === 'staff' || spare === 'spear' || spare === 'crossbow' || weapons[spare].twoHanded;
+    const mount = torso(long ? [-.43, .39, -.51] : [-.39, .03, -.43]);
+    const scaleStowed = long ? .80 : .69;
+    const stow = point => pointBetween(mount, point, scaleStowed);
+    const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * scaleStowed), r2.map(r => r * scaleStowed), color, sides);
+    weaponModel(fighter, mount, torsoAngle + (long ? 2.0 : -2.34), 0, 0, 0, holder, point => world(stow(point)), spare);
+  }
 
   const neck = pointBetween(j.chest, j.head, .48);
   limb(j.chest, neck, [.12, .15], [.12, .15], robed ? clothLining : leather, 8);
@@ -1122,20 +1156,34 @@ function drawMagic() {
     if (fighter.ward > 0) {
       const [x, y] = project([fighter.x, 1.19, fighter.z + .35]);
       const radius = scale * (1.04 + Math.sin(visualClock * 5) * .025);
-      magicGlow(x, y, radius, spells.ward.color);
+      const color = fighter.wardColor;
+      magicGlow(x, y, radius, color);
       ctx.beginPath();
       ctx.ellipse(x, y, radius * .65, radius * 1.24, .08 * fighter.direction, 0, Math.PI * 2);
-      ctx.strokeStyle = '#ffdb818c';
+      ctx.strokeStyle = color + '8c';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
-    if (fighter.chilledUntil > elapsed) {
+    if (fighter.chilledUntil > elapsed || fighter.frozenUntil > elapsed) {
       const [x, y] = project([fighter.x, .23, fighter.z]);
       ellipse(x, y, scale * .52, scale * .13, '#b4e2f27a');
+      if (fighter.frozenUntil > elapsed) {
+        for (const [offset, height] of [[-.34, .45], [-.13, .64], [.13, .45], [.32, .36]]) {
+          const size = height * scale;
+          const cx = x + offset * scale;
+          polygon([[cx - 5, y + 4], [cx - 4, y - size * .32], [cx + 2, y - size], [cx + 7, y - size * .24],
+            [cx + 6, y + 4]], '#a5d8eea7');
+          polygon([[cx, y + 4], [cx + 2, y - size], [cx + 7, y - size * .24], [cx + 6, y + 4]], '#dfecf5a0');
+        }
+      }
+    }
+    if (fighter.hastedUntil > elapsed) {
+      const [x, y] = project([fighter.x, .15, fighter.z + .1]);
+      ellipse(x, y, scale * .57, scale * .11, '#d9ee9966');
     }
   }
   if (state === 'ready' || !exchange.spell || phase < .30 || phase > 1.10) return;
-  const { attacker, defender, spell, spellKey, hitAt } = exchange;
+  const { attacker, defender, spell, hitAt } = exchange;
   const pose = fighterPose(attacker);
   const staffTip = weaponAxis(pose.joints.weaponHand, pose.angle)(1.40);
   const start = attacker.weapon === 'staff' ? project(worldPoint(attacker, staffTip))
@@ -1148,13 +1196,23 @@ function drawMagic() {
   ctx.globalAlpha = phase > hitAt ? 1 - ease((phase - hitAt) / .16) : charge;
   const radius = Math.max(12, scale * .30);
   magicGlow(x, y, radius * 2.15, spell.color);
-  if (spellKey === 'ember' || spellKey === 'frost') {
+  if (spell.damage) {
     const d = attacker.direction;
     const tail = radius * (progress > 0 ? 2.1 : .7);
-    if (spellKey === 'frost') {
-      polygon([[x + radius * .75 * d, y], [x - radius * .22 * d, y - radius * .31], [x - tail * d, y + 3], [x - radius * .18 * d, y + radius * .29]], spell.color);
+    if (spell.ice) {
+      const shards = spell.freeze ? [-.48, 0, .48] : [0];
+      for (const offset of shards) {
+        const ty = y + offset * radius;
+        const tx = x - Math.abs(offset) * tail * d;
+        polygon([[tx + radius * .75 * d, ty], [tx - radius * .22 * d, ty - radius * .26], [tx - tail * d, ty + 3],
+          [tx - radius * .18 * d, ty + radius * .23]], spell.color);
+      }
+    } else if (spell.lightning) {
+      polygon([[x + radius * .76 * d, y - 3], [x, y + 6], [x - tail * .40 * d, y + 1],
+        [x - tail * .57 * d, y + 6], [x - tail * d, y - 7], [x - tail * .38 * d, y - 4],
+        [x - tail * .34 * d, y - 9]], spell.color);
     } else {
-      ellipse(x - tail * d * .42, y + 2, tail * .70, radius * .32, '#f4763acc');
+      ellipse(x - tail * d * .42, y + 2, tail * .70, radius * .32, spell.color + 'a0');
       ellipse(x, y, radius * .48, radius * .42, spell.color);
     }
     ellipse(x, y, radius * .23, radius * .20, '#fffbec');
@@ -1310,25 +1368,27 @@ function updateMana() {
   }
 }
 
-function chooseSpell(fighter) {
-  const [offensive, support] = fighter.spells;
-  const needsSupport = support === 'ward' ? fighter.hp <= fighter.maxHP * .84 && !fighter.ward : fighter.hp <= fighter.maxHP * .75;
-  if (needsSupport && canCast(fighter, support)) return support;
-  if (elapsed > 1.8 && canCast(fighter, offensive)) return offensive;
-  return null;
+function supportPriority(fighter, spell) {
+  const health = fighter.hp / fighter.maxHP;
+  if (spell.heal) return health <= .61 ? 45 : 0;
+  if (spell.absorb) return health <= .77 && !fighter.ward ? 28 : 0;
+  if (spell.manaRestore) return fighter.mp <= 24 && health >= .41 ? 32 : 0;
+  if (spell.energyRestore) return fighter.energy <= 40 && fighter.hastedUntil <= elapsed ? 31 : 0;
+  return 0;
 }
 
 function pickAction(attacker, defender) {
-  const keys = [attacker.gear.weapon, attacker.gear.reserve];
+  const keys = weaponKeys(attacker).filter(key => key === attacker.weapon || attacker.energy >= switchCost);
   const targetArmor = armors[defender.gear.armor];
   const distance = Math.abs(attacker.x - defender.x);
   const crowding = closeRange(distance);
   const opposingCrossbow = defender.weapon === 'crossbow';
-  const availableSpell = chooseSpell(attacker);
-  const spell = spells[availableSpell];
-  if (opposingCrossbow && keys.includes('sword') && attacker.energy >= 12 && distance > 1.95 && !spell?.heal && !spell?.absorb) {
+  const available = attacker.spells.filter(key => canCast(attacker, key));
+  const needsSupport = available.some(key => supportPriority(attacker, spells[key]) > 0);
+  if (opposingCrossbow && keys.includes('sword') && attacker.energy >= 12 && distance > 1.95 && !needsSupport) {
     return { key: 'sword', style: 'melee' };
   }
+  const useOffhandMagic = elapsed > 1.2 && (Math.random() < .51 || (crowding > .38 && attacker.weapon === 'crossbow'));
   const candidates = [];
   for (const key of keys) {
     const weapon = weapons[key];
@@ -1339,16 +1399,27 @@ function pickAction(attacker, defender) {
       ? (.95 + Math.min(distance, 4.7) * .075) * mix(1, .27, crowding)
       : 1 - Math.max(0, distance - weapon.range) * (opposingCrossbow ? .038 : .095);
     const repeat = key === attacker.lastWeapon ? Math.pow(.88, Math.min(attacker.weaponStreak, 4)) : 1;
+    const switchFactor = key === attacker.weapon ? 1 : .92;
     const pressure = opposingCrossbow && style === 'melee' ? (key === 'sword' ? 1.50 : 1.24) : 1;
     const score = (weapon.damage + 3) * targetArmor[style] * (.69 + level / 205)
       * weapon.tempo * mix(.68, 1, stamina) * reach * repeat * armorPower(attacker, style) * pressure
-      * (1 + accuracyBonus(attacker, defender, style, key) / 250);
-    candidates.push({ key, style, score });
-    if (spell && (weapon.spellPower || (key === attacker.weapon && (spell.heal || spell.absorb || Math.random() < .48)))) {
+      * (1 + accuracyBonus(attacker, defender, style, key) / 250) * switchFactor;
+    if (!weapon.spellPower) candidates.push({ key, style, score });
+    const choices = weapon.spellPower ? [...available, 'spark'] : key === attacker.weapon ? available : [];
+    for (const spellKey of choices) {
+      const spell = spells[spellKey];
+      const support = supportPriority(attacker, spell);
+      if (!support && (!spell.damage || !(weapon.spellPower || useOffhandMagic))) continue;
       const boost = weapon.spellPower || 1;
-      const spellScore = spell.damage ? spell.damage * targetArmor.magic * boost * (.69 + attacker.magic / 210)
-        * .88 * repeat * armorPower(attacker, 'magic') * (1 + accuracyBonus(attacker, defender, 'magic', key) / 250) : 100 * boost;
-      candidates.push({ key, style: 'magic', spellKey: availableSpell, score: spellScore });
+      const control = (spell.freeze && defender.frozenUntil <= elapsed ? 6 : 0)
+        + (spell.chill && defender.chilledUntil <= elapsed ? 2 : 0)
+        + (spell.energyDrain && defender.energy > 25 ? 3.5 : 0)
+        + (spell.lifesteal || 0) * (1 - attacker.hp / attacker.maxHP) * 12;
+      const efficiency = mix(.10, .63, 1 - attacker.mp / 100);
+      const spellScore = support || ((spell.damage + control) * targetArmor.magic * (.69 + attacker.magic / 210)
+        * .91 * repeat * armorPower(attacker, 'magic') * (1 + accuracyBonus(attacker, defender, 'magic', key) / 250)
+        - spell.cost * .21 * efficiency);
+      candidates.push({ key, style: 'magic', spellKey, score: spellScore * boost * switchFactor });
     }
   }
   return candidates.reduce((best, candidate) => candidate.score > best.score ? candidate : best);
@@ -1374,6 +1445,7 @@ function nextExchange() {
   const { key, style, spellKey } = pickAction(attacker, defender);
   const previousWeapon = attacker.weapon;
   const switched = previousWeapon !== key;
+  if (switched) spendEnergy(attacker, switchCost);
   attacker.weapon = key;
   attacker.weaponStreak = key === attacker.lastWeapon ? attacker.weaponStreak + 1 : 1;
   attacker.lastWeapon = key;
@@ -1390,7 +1462,8 @@ function nextExchange() {
   const equipmentAccuracy = accuracyBonus(attacker, defender, style, key);
   const baseEvasion = style === 'ranged' ? .18 - attacker.ranged / 1000 : .22 - attacker.attack / 850;
   const evasionChance = clamp(baseEvasion - equipmentAccuracy / 520, .03, .35) * mobility(defender);
-  const evade = !spell && !block && defender.energy >= 11 && Math.random() < evasionChance;
+  const defenderFrozen = defender.frozenUntil > elapsed;
+  const evade = !spell && !block && !defenderFrozen && defender.energy >= 11 && Math.random() < evasionChance;
   const aimRoll = Math.random();
   const aim = aimRoll < .22 ? -.96 : aimRoll > .70 ? .93 : .08;
   let distance = weapon.range - .23 - Math.abs(aim) * .26;
@@ -1401,7 +1474,8 @@ function nextExchange() {
   }
   const crowded = ranged ? closeRange(distance) : 0;
   const shift = castingRetreat ? -.49 : ranged ? -.44 : .20 + Math.random() * .23;
-  const center = clamp((attacker.x + defender.x) / 2 + attacker.direction * shift, -.83, .83);
+  const center = defenderFrozen ? defender.x + defender.direction * distance / 2
+    : clamp((attacker.x + defender.x) / 2 + attacker.direction * shift, -.83, .83);
   const depth = (Math.random() - .5) * .58;
   lastAttacker = attacker;
   phase = 0;
@@ -1415,7 +1489,7 @@ function nextExchange() {
   }
   if (switched) {
     updateStats(attacker);
-    logEvent(attacker.name + ' switches to ' + weapon.name + '.');
+    logEvent(attacker.name + ' switches to ' + weapon.name + ' for ' + switchCost + ' energy.');
   }
   const attackSkill = ranged ? attacker.ranged : attacker.strength;
   const damage = spell ? (spell.damage || 0) * (weapon.spellPower || 1) * (.76 + attacker.magic / 300)
@@ -1431,7 +1505,7 @@ function nextExchange() {
     duration: (spell || ranged ? 1.60 : 1.45) + (switched ? .12 : 0),
     positions: fighters.map(fighter => {
       const isAttacker = fighter === attacker;
-      const position = center - fighter.direction * distance / 2;
+      const position = clamp(center - fighter.direction * distance / 2, -3.3, 3.3);
       const speed = mobility(fighter);
       const hit = !isAttacker && evade ? position - fighter.direction * .62 * speed : position;
       return {
@@ -1463,6 +1537,7 @@ function startBout(reroll = false) {
     fighter.lastWeapon = null;
     fighter.weaponStreak = 0;
     fighter.ward = fighter.wardUntil = fighter.chilledUntil = 0;
+    fighter.frozenUntil = fighter.hastedUntil = 0;
     fighter.cooldowns = {};
     fighter.reaction = fighter.ragdoll = null;
     updateStats(fighter);
@@ -1513,23 +1588,70 @@ function payForSpell() {
   updateMana();
 }
 
-function impact(contact) {
-  const { attacker, defender, block, damage, spell, spellKey, style } = exchange;
-  const spellBoost = (weapons[attacker.weapon].spellPower || 1) * armorPower(attacker, 'magic');
-  if (spell?.heal || spell?.absorb) {
-    if (spell.heal) {
-      const amount = Math.min(Math.round(spell.heal * spellBoost), attacker.maxHP - attacker.hp);
-      attacker.hp += amount;
-      updateHealth();
-      floatLabel(attacker, '+' + amount + ' HP', spell.color);
-      logEvent(attacker.name + ' casts ' + spell.name + ' and restores ' + amount + ' HP.');
-    } else {
-      attacker.ward = Math.round(spell.absorb * spellBoost);
-      attacker.wardUntil = elapsed + 6;
-      floatLabel(attacker, 'WARDED', spell.color, true);
-      logEvent(attacker.name + ' casts ' + spell.name + ', absorbing up to ' + attacker.ward + ' damage.');
+function applySupportSpell(fighter, spell, power) {
+  let message;
+  let label;
+  if (spell.heal) {
+    const amount = Math.min(Math.round(spell.heal * power), fighter.maxHP - fighter.hp);
+    fighter.hp += amount;
+    updateHealth();
+    label = '+' + amount + ' HP';
+    message = 'restores ' + amount + ' HP';
+  } else if (spell.absorb) {
+    fighter.ward = Math.round(spell.absorb * power);
+    fighter.wardUntil = elapsed + spell.duration;
+    fighter.wardName = spell.name;
+    fighter.wardColor = spell.color;
+    label = 'WARDED';
+    message = 'wards against ' + fighter.ward + ' damage';
+  } else if (spell.manaRestore) {
+    const amount = Math.min(spell.manaRestore, 100 - fighter.mp);
+    fighter.mp += amount;
+    fighter.hp -= spell.hpCost;
+    updateMana();
+    updateHealth();
+    label = '+' + Math.round(amount) + ' MP';
+    message = 'trades ' + spell.hpCost + ' HP for ' + Math.round(amount) + ' MP';
+  } else {
+    const amount = Math.min(spell.energyRestore, 100 - fighter.energy);
+    fighter.energy += amount;
+    fighter.hastedUntil = elapsed + spell.haste;
+    updateEnergy(fighter);
+    label = '+' + Math.round(amount) + ' ENERGY';
+    message = 'recovers ' + Math.round(amount) + ' energy and gains haste';
+  }
+  floatLabel(fighter, label, spell.color, !spell.heal);
+  logEvent(fighter.name + ' casts ' + spell.name + ' and ' + message + '.');
+  burst(fighter, { colors: [spell.color, '#fff3d3'], count: 24, gravity: 2 });
+}
+
+function applySpellHit(attacker, defender, spell, damage) {
+  if (spell.chill) defender.chilledUntil = elapsed + spell.chill;
+  if (spell.freeze) {
+    defender.frozenUntil = elapsed + spell.freeze;
+    defender.freezeX = defender.x;
+    defender.freezeZ = defender.z;
+    logEvent(defender.name + ' is frozen in place.');
+  }
+  if (spell.lifesteal) {
+    const healing = Math.min(Math.round(damage * spell.lifesteal), attacker.maxHP - attacker.hp);
+    if (healing > 0) {
+      attacker.hp += healing;
+      floatLabel(attacker, '+' + healing + ' HP', spell.color, true);
+      logEvent(attacker.name + ' drains ' + healing + ' HP.');
     }
-    burst(attacker, { colors: [spell.color, '#fff3d3'], count: 24, gravity: 2 });
+  }
+  if (spell.energyDrain) {
+    const drained = Math.min(defender.energy, spell.energyDrain);
+    spendEnergy(defender, drained);
+    logEvent(defender.name + ' loses ' + Math.round(drained) + ' energy.');
+  }
+}
+
+function impact(contact) {
+  const { attacker, defender, block, damage, spell, style } = exchange;
+  if (spell && !spell.damage) {
+    applySupportSpell(attacker, spell, (weapons[attacker.weapon].spellPower || 1) * armorPower(attacker, 'magic'));
     return;
   }
 
@@ -1566,10 +1688,9 @@ function impact(contact) {
   const absorbed = Math.min(defender.ward, rolledDamage);
   defender.ward -= absorbed;
   const actualDamage = Math.min(rolledDamage - absorbed, defender.hp);
-  if (absorbed) logEvent(defender.name + '’s Iron Ward absorbs ' + absorbed + ' damage.');
-  if (spellKey === 'frost' && actualDamage) defender.chilledUntil = elapsed + 3.5;
+  if (absorbed) logEvent(defender.name + '’s ' + defender.wardName + ' absorbs ' + absorbed + ' damage.');
   const blood = actualDamage > 0 && !spell;
-  const color = absorbed && !actualDamage ? spells.ward.color : spell?.color || '#ffd0ba';
+  const color = absorbed && !actualDamage ? defender.wardColor : spell?.color || '#ffd0ba';
   burst(defender, {
     point,
     offset: -attacker.direction * .29,
@@ -1584,13 +1705,13 @@ function impact(contact) {
   defender.reaction = { zone, time: elapsed };
   hitPause = zone === 'head' ? .066 : .045;
   defender.hp -= actualDamage;
-  updateHealth();
   if (actualDamage) {
     const weaponName = spell ? spell.name : 'the ' + weapons[action].name.toLowerCase();
     logEvent(attacker.name + ' hits ' + defender.name + (contact ? '’s ' + zone : '') + ' with ' + weaponName + ' for '
       + actualDamage + ' damage.' + (matchup >= 1.2 ? ' Armor weakness.' : ''));
-    if (spellKey === 'frost') logEvent(defender.name + ' is chilled.');
+    if (spell) applySpellHit(attacker, defender, spell, actualDamage);
   }
+  updateHealth();
   if (defender.hp > 0) return;
   defender.ragdoll = makeRagdoll(defender, zone);
   attacker.wins++;
@@ -1655,7 +1776,8 @@ function update(dt, realTime) {
   elapsed += dt;
   for (const fighter of fighters) {
     fighter.mp = Math.min(100, fighter.mp + dt * manaRegen);
-    fighter.energy = Math.min(100, fighter.energy + dt * energyRegen);
+    const recovery = energyRegen - (carriesSpare(fighter) ? .35 : 0);
+    fighter.energy = Math.min(100, fighter.energy + dt * recovery);
     updateEnergy(fighter);
     if (fighter.wardUntil <= elapsed) fighter.ward = 0;
   }
@@ -1667,8 +1789,13 @@ function update(dt, realTime) {
     const approach = smooth(phase * mobility(fighter) / .47);
     const lunge = ease((phase - .52) / (exchange.hitAt - .52));
     const recover = smooth((phase - exchange.hitAt - .14) / .47);
-    const x = mix(mix(mix(start, brace, approach), hit, lunge), retreat, recover);
-    const z = mix(startZ, depth, approach);
+    let x = mix(mix(mix(start, brace, approach), hit, lunge), retreat, recover);
+    let z = mix(startZ, depth, approach);
+    if (fighter.frozenUntil > 0 && elapsed < fighter.frozenUntil + .26) {
+      const thaw = smooth((elapsed - fighter.frozenUntil) / .26);
+      x = mix(fighter.freezeX, x, thaw);
+      z = mix(fighter.freezeZ, z, thaw);
+    }
     const movement = Math.hypot(x - fighter.x, z - fighter.z);
     fighter.stride += (x - fighter.x) * fighter.direction / .96;
     const speed = movement / dt;

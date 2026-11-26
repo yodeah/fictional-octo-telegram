@@ -60,7 +60,12 @@ meter::-moz-meter-bar{background:var(--accent)}
 .mana meter,.energy meter,.mana meter::-webkit-meter-bar,.energy meter::-webkit-meter-bar{height:5px}
 .blue .mana,.blue .energy{flex-direction:row-reverse}
 .blue .mana span,.blue .energy span{text-align:left}
-.spells{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.spell-kit{display:flex;align-items:end;gap:7px;margin-top:8px}
+.blue .spell-kit{flex-direction:row-reverse}
+.loadout.book-picker{display:block;flex:0 0 122px}
+.book-picker .gear label{text-align:left}
+.blue .book-picker .gear label{text-align:right}
+.spells{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
 .blue .spells{justify-content:flex-end}
 .spell{display:inline-flex;align-items:center;gap:6px;min-height:27px;padding:3px 7px;background:#2a241e;border:1px solid #4c3c2c;color:var(--spell-color);font-size:13px}
 .spell i{font-style:normal}.spell small{font-size:12px;color:var(--muted)}
@@ -114,4 +119,5 @@ li.empty{color:var(--muted)}
   .result{top:47px}
 }
 @media(max-width:850px){.loadout{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.spell-kit,.blue .spell-kit{display:grid}.book-picker{max-width:155px}.blue .book-picker{justify-self:end;width:100%}}
 @media(max-width:460px){.spells{grid-template-columns:1fr}.fighter-info,.blue .fighter-info{display:grid;justify-content:stretch;gap:3px}.loadout{column-gap:4px}.loadout select{padding-right:15px;background-position:calc(100% - 9px) 55%,calc(100% - 4px) 55%}}

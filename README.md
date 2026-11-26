@@ -6,7 +6,7 @@ A browser prototype for an idle gladiator manager. The first milestone is an aut
 
 Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
 
-Each fighter has a main weapon, backup weapon, shield, and armor. Pick any item to keep it for future bouts, or leave the slot on **Auto** to reroll it when the next bout starts. New bouts also roll fresh fighter levels and stats. Hover over a selector or focus it with the keyboard to read item details. Changes made during a bout apply at the next one.
+Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. Pin any selection for future bouts or leave the slot on **Auto** to reroll it when the next bout starts. New bouts also roll fresh fighter levels and stats. Hover over a selector or focus it with the keyboard to read details. Changes made during a bout apply at the next one.
 
 Armor has separate attack and defense bonuses for stab, slash, crush, magic, and ranged. The greatsword and war maul trade slower, more expensive swings for higher accuracy and damage. They use both hands, so the shield moves to the back and stops providing defense or blocks until a one-handed weapon is drawn.
 
@@ -14,14 +14,16 @@ Fighters automatically switch between their two weapons based on distance, skill
 
 Melee fighters press crossbow users at close range. A crowded shot loses damage and accuracy, so the shooter favors a melee backup or retreats while casting when a spell is available.
 
-Both fighters start with 60 mana and regenerate 3.6 mana per simulated second, up to 100. They start with 100 energy and recover 5 per simulated second. Physical attacks, blocks, and dodges use energy. Low energy reduces attack speed and damage, and heavier shields cover more area while slowing movement.
+Both fighters start with 60 mana and 100 energy. They recover 3.6 mana and 5 energy per simulated second. Physical attacks, blocks, and dodges use energy. Swapping weapons costs 7 energy. Carrying a spare reduces movement speed by 4% and energy recovery by 0.35 per simulated second. Low energy reduces attack speed and damage. Heavier shields cover more area while slowing movement.
 
-| Fighter | Spell | Cost | Base effect |
-| --- | --- | --- | --- |
-| Varro | Ember Bolt | 28 MP | Throws a fire projectile with 19 base damage. |
-| Varro | Iron Ward | 32 MP | Absorbs up to 18 damage for 6 seconds. |
-| Cassian | Frost Lance | 30 MP | Throws an ice projectile with 15 base damage and briefly slows the opponent. |
-| Cassian | Second Wind | 34 MP | Restores up to 21 health. |
+| Spellbook | Role | Spells |
+| --- | --- | --- |
+| General | Balanced damage and protection | Ember Bolt, Iron Ward, Second Wind |
+| Vampiric | Damage that heals and trades health for mana | Crimson Drain, Scarlet Surge, Blood Pact |
+| Glacial | Fight at range with slows, a freeze, and shielding | Frost Lance, Winter Barrage, Glacial Shell |
+| Storm | Burst damage and energy control | Arc Flash, Thunderclap, Tailwind |
+
+Equip a staff and select **None** for the backup to run a dedicated mage. Staff Spark gives that build a weak free spell when mana runs out. A staff and another weapon form a hybrid. A melee weapon, crossbow, and spellbook let the fighter use all three styles in one bout. The Vampiric and Glacial books draw inspiration from the healing and freezing effects of [Old School RuneScape’s Ancient Magicks](https://oldschool.runescape.wiki/w/Ancient_Magicks).
 
 Melee swings check the moving weapon against the shield and body regions. Head, body, arm, and leg hits deal different damage and produce different reactions. The defeated fighter falls with a jointed ragdoll. Toggle **Hitboxes** to see collision shapes.
 
