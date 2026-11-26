@@ -375,4 +375,26 @@
       band(g, c.brass, -60, 5, 4);
     }
   };
+
+  art.sledge = {
+    box: [-66, -42, 108, 42],
+    draw(g, c) {
+      haft(g, c.wood, -61, 80, 4);
+      wrap(g, c.grip, -52, -20, 5);
+      wrap(g, c.grip, -8, 22, 5);
+      // A rough-cut block lashed to the haft.
+      const stone = [130, 115, 100].map((v, i) => Math.round(v * c.iron[i] / IRON_REF[i]));
+      const block = 'M74,-35 L88,-39 L102,-33 L105,-14 L101,4 L105,22 L100,36 L84,39 L72,33 L70,14 L74,-2 L69,-18 Z';
+      shape(g, block, gradient(g, 70, -30, 106, 30, stone, [.4, .1, -.1, -.45]), 1.5);
+      wear(g, block, [69, -39, 106, 39], 150, 'rgba(255,240,210,.3)', 'rgba(30,18,8,.45)', 113, 3.5);
+      stroke(g, 'M88,-39 L84,-24 L90,-16 M105,22 L94,20 L92,28 M70,14 L78,16 L80,26', 'rgba(35,22,12,.7)', 1);
+      stroke(g, 'M75,-33 L87,-36 L101,-31', 'rgba(255,240,215,.7)', 1.4);
+      for (const y of [-13, 12]) {
+        shape(g, `M68,${y - 4} L106,${y - 3} L106,${y + 4} L68,${y + 3} Z`, steelAcross(g, 20, c.iron), 1.1);
+        for (const x of [73, 87, 101]) rivet(g, x, y, 1.4, c.brass);
+      }
+      stroke(g, 'M60,-4 L72,-22 M60,4 L72,22 M60,-4 L72,20 M60,4 L72,-20', tone(DARKLEATHER, .15), 2.2);
+      band(g, c.iron, 60, 6, 6);
+    }
+  };
 })();
