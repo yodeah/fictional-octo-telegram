@@ -503,4 +503,27 @@
       band(g, c.brass, 74, 6, 5);
     }
   };
+
+  art.ashScepter = {
+    box: [-72, -26, 152, 26],
+    glow: { x: 130, color: 'teal' },
+    draw(g, c) {
+      const ash = [150, 156, 150].map((v, i) => Math.round(v * c.wood[i] / WOOD_REF[i]));
+      haft(g, ash, -66, 112, 3.2);
+      wrap(g, c.grip, -18, 14, 4.2);
+      for (const x of [-39, -22, 18, 85, 104]) band(g, c.iron, x, 4.8);
+      shape(g, 'M-70,0 L-66,-3.6 L-60,-3.6 L-60,3.6 L-66,3.6 Z', steelAcross(g, 4, c.iron), 1);
+      for (const s of [-1, 1]) {
+        shape(g, `M106,${s * 3} C108,${s * 14} 116,${s * 19} 132,${s * 15} L128,${s * 10} C119,${s * 13} 115,${s * 9} 114,${s * 3} Z`,
+          steelAcross(g, 19, c.iron), 1.2);
+      }
+      const crystal = [89, 190, 183];
+      shape(g, 'M112,-6 L128,-13 L148,-3 L146,5 L128,13 L112,6 Z', gradient(g, 114, 10, 144, -10, crystal, [-.35, .05, .55, .1]), 1.2);
+      shape(g, 'M112,-6 L128,-13 L132,-1 Z', 'rgba(235,255,250,.55)', 0);
+      stroke(g, 'M112,-6 L132,-1 L148,-3 M128,-13 L132,-1 L128,13', 'rgba(235,255,250,.8)', .7);
+      disc(g, 108, 0, 4.6, gradient(g, 104, -4, 112, 4, c.iron, [.55, -.35]), 1);
+      stroke(g, 'M96,5 q-2,9 -7,12', tone(DARKLEATHER, .2), 1);
+      shape(g, 'M86,16 c6,-1 7,7 0,9 c-5,-2 -5,-7 0,-9 Z', '#d9d3c4', .8);
+    }
+  };
 })();
