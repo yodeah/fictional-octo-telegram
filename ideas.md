@@ -25,7 +25,8 @@ Fights stay fully idle (see README): ideas must not add in-fight input.
 | 13 | **Seeded replays** | 3 | 70k | 0.4 | Route every simulation roll through one seeded generator so a bout can be replayed exactly. Needed later for offline results. |
 | 14 | **Crowd hype meter** | 3 | 90k | 0.3 | Rises with perfect blocks, specials, staggers and comebacks; a full meter makes the crowd roar and drops a small cosmetic reward. |
 | 15 | **Fighter personalities** | 4 | 120k | 0.3 | Traits such as reckless, patient or showman that shift AI choices (aggression, blocking, sand throws). |
-| 16 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
+| 16 | **Weapon attack modes** | 5 | 180k | 0.3 | Give the idle AI cheap and committed attacks, staff range choices and a spear throw finisher. See the [weapon plan](docs/weapon-attack-modes.md). |
+| 17 | **Saved stable** | 5 | 250k | 0.2 | Persist fighters, records, injuries and earnings in local storage. Start of the management layer. |
 
 ## Adding ideas
 
