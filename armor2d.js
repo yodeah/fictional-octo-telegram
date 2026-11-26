@@ -130,4 +130,32 @@
       plate(g, 'M-4,2 C-2,8 2,13 8,15 L5,19 C-2,17 -7,10 -6,3 Z', plateFill(g, -7, 8, c.steel));
     }
   });
+
+  sets.scout = derive('leather', {}, {
+    box: { head: [-40, -32, 30, 44], torso: [-34, -82, 30, 34] },
+    torso(g, c, base) {
+      base(g, c);
+      // A sand mantle thrown over the shoulders.
+      const mantle = 'M-12,-73 C2,-76 15,-70 19,-60 L13,-44 L8,-50 L2,-40 L-4,-48 L-11,-38 L-18,-46 C-24,-60 -22,-70 -12,-73 Z';
+      shape(g, mantle, clothFill(g, -22, 19, [221, 188, 116]), 1.25);
+      for (const d of ['M-14,-68 C-16,-58 -14,-50 -11,-41', 'M-3,-70 C-2,-60 0,-52 2,-43', 'M10,-68 C13,-60 13,-52 12,-47']) stroke(g, d, 'rgba(90,60,25,.45)', 1.6);
+      stroke(g, 'M19,-60 L13,-44 L8,-50 L2,-40 L-4,-48 L-11,-38 L-18,-46', tone(c.team, 0), 2.2);
+      wear(g, mantle, [-22, -75, 19, -38], 60, 'rgba(255,240,200,.3)', 'rgba(90,60,20,.3)', 173, 2);
+    },
+    head(g, c) {
+      // Wrapped desert turban with a trailing tail and a face veil.
+      shape(g, 'M-14,-8 C-30,2 -30,20 -38,40 C-28,36 -22,30 -20,22 C-14,12 -8,6 -6,2 Z', clothFill(g, -38, -6, [214, 176, 108]), 1.3);
+      face(g);
+      const veil = 'M-9,5 C0,2 9,4 16,5 L14,16 C8,26 -4,26 -11,18 Z';
+      shape(g, veil, clothFill(g, -11, 16, c.team), 1.2);
+      stroke(g, 'M-8,11 Q3,15 14,11 M-7,17 Q2,21 11,17', 'rgba(20,5,8,.35)', 1);
+      const turban = 'M-18,4 C-24,-12 -14,-27 1,-27 C14,-27 20,-17 17,-7 C8,-11 -2,-9 -6,-5 L-8,8 Z';
+      shape(g, turban, clothFill(g, -22, 19, [228, 196, 128]), 1.3);
+      for (const d of ['M-19,-6 C-8,-20 6,-22 17,-14', 'M-20,0 C-12,-12 2,-16 16,-9', 'M-14,-17 C-4,-24 6,-24 13,-20']) stroke(g, d, 'rgba(110,76,30,.55)', 1.2);
+      stroke(g, 'M-19,-9 C-8,-22 6,-24 17,-16', tone(c.team, .1), 2.6);
+      disc(g, 9, -13, 3, gradient(g, 6, -16, 12, -10, c.brass, [.6, -.3]), 1);
+      disc(g, 9, -13, 1.3, c.teamCss, .5);
+    },
+    cape: null
+  });
 })();
