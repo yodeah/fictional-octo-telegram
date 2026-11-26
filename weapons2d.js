@@ -748,4 +748,13 @@
     stroke(g, 'M26,0 a8,5 0 1 1 8,0 a8,5 0 1 0 8,0', '#eadcff', 1.5);
     disc(g, 57, 0, 3.6, '#c79cff', 1);
   }, { glow: { x: 58, color: 'blue' } });
+
+  special('headsmansVerdict', 'executioner', { steel: [206, 202, 194], grip: [30, 28, 32], brass: [92, 84, 78], iron: [42, 40, 46], teamCss: '#8a1c1c' }, g => {
+    // A tally of past verdicts and a black tassel.
+    for (let i = 0; i < 5; i++) stroke(g, `M${88 + i * 4},5 l-1,6`, '#2a2228', 1);
+    stroke(g, 'M85,10 L107,6', '#2a2228', 1);
+    stroke(g, 'M40,9.6 L150,9.6', 'rgba(120,20,20,.75)', 2);
+    for (let i = 0; i < 6; i++) stroke(g, `M-62,6 q${-3 + i * 1.4},8 ${-8 + i * 2.6},${17 + (i % 3) * 3}`, i % 2 ? '#2a1e24' : '#6a1a20', 1.7);
+    disc(g, -62, 6, 2.8, '#4a3a34', .9);
+  }, { box: [-74, -36, 162, 36] });
 })();
