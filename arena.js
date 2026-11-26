@@ -1183,6 +1183,23 @@ function drawGladiator(fighter, pose) {
     sz + z
   ]);
   shield(0, 0, .11, fighter, shieldTransform);
+  stuckBolts(fighter, shieldTransform);
+}
+
+function stuckBolts(fighter, transform) {
+  const { width: halfWidth, height: halfHeight } = shields[fighter.gear.shield];
+  const piece = (a, b, radius, tip, color) => prism(a, b, [radius, radius], [tip, tip], color, transform, 6);
+  for (const bolt of ArenaEffects.stuckBolts(fighter.name)) {
+    // The shaft leans out of the shield face toward the shooter and the viewer.
+    const head = [bolt.x * halfWidth, bolt.y * halfHeight, .25];
+    const tail = shifted(head, .36, bolt.tilt * .36, .22);
+    piece(head, tail, .019, .019, [226, 196, 142]);
+    for (const side of [-1, 1]) {
+      const vane = pointBetween(head, tail, .72);
+      surface([vane, shifted(tail, -.02, side * .065), shifted(tail, .035, side * .06), tail], [222, 214, 190], 1, transform);
+    }
+    piece(shifted(head, -.012, 0, -.01), pointBetween(head, tail, .1), .036, .024, darkSteel);
+  }
 }
 
 function worldPoint(fighter, [x, y, z]) {
@@ -1640,7 +1657,7 @@ function drawBolts() {
 
 function drawBolt(action) {
   const { attacker, defender, missedShot, hitAt, phase } = action;
-  if (phase > 1.02) return;
+  if (phase > 1.02 || action.lodged) return;
   const pose = fighterPose(attacker);
   const tip = weaponAxis(pose.joints.weaponHand, pose.angle)(.79, .05);
   const from = worldPoint(attacker, tip);
@@ -2174,6 +2191,11 @@ function impact(action, contact) {
   const stopped = style === 'melee' ? contact.zone === 'shield' : isGuarding(action);
   const point = style === 'ranged' ? boltTarget(defender, stopped) : contact?.point;
   if (stopped) {
+    if (style === 'ranged') {
+      // The bolt now lives in the shield, so stop drawing it in flight.
+      action.lodged = true;
+      ArenaEffects.stick(defender.name);
+    }
     spendEnergy(defender, action.guardCost);
     defender.counterUntil = elapsed + (action.heavy ? .95 : .56);
     defender.reaction = { zone: 'arm', time: elapsed };

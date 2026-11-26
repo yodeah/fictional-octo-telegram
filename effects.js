@@ -8,6 +8,7 @@ const ArenaEffects = (() => {
   const labelLife = 1.3;
   const labels = [];
   const trails = [];
+  const stuck = new Map();
   const drops = [];
   const stains = [];
   const bloodColors = ['#8e1f1c', '#b0281f', '#c93a2a'];
@@ -141,6 +142,17 @@ const ArenaEffects = (() => {
       }
       ctx.restore();
     },
+    // Leaves a bolt in the holder's shield until the next bout. Positions are
+    // fractions of the shield's half width and height, so any shield size fits.
+    stick(holder) {
+      const bolts = stuck.get(holder) || [];
+      const turn = random() * Math.PI * 2;
+      const reach = Math.sqrt(random()) * .62;
+      bolts.push({ x: Math.cos(turn) * reach, y: Math.sin(turn) * reach, tilt: (random() - .5) * .5 });
+      if (bolts.length > 7) bolts.shift();
+      stuck.set(holder, bolts);
+    },
+    stuckBolts: holder => stuck.get(holder) || [],
     // A flash at the contact point and sparks thrown mostly in the blow's direction.
     strike(point, direction, color, count, size = 1) {
       flashes.push({ point: point.slice(), color, size, angle: random() * Math.PI, age: 0, life: .13 });
@@ -295,6 +307,7 @@ const ArenaEffects = (() => {
       trauma = 0;
       labels.length = trails.length = sparks.length = flashes.length = puffs.length = drops.length = stains.length = 0;
       contacts.clear();
+      stuck.clear();
     }
   };
 })();
