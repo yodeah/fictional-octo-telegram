@@ -717,4 +717,10 @@
     }
     disc(g, 144, 0, 3.4, '#fff2b0', .9);
   }, { box: [-124, -28, 184, 28], glow: { x: 150, color: 'sun' } });
+
+  special('tidecaller', 'trident', { steel: [112, 204, 218], brass: [232, 220, 186], wood: [46, 96, 112], grip: [32, 74, 92], teamCss: '#9ff4ff' }, g => {
+    for (let x = 36; x < 120; x += 12) stroke(g, `M${x},0 q3,-5 6,0 q3,5 6,0`, '#a8eef8', 1.1);
+    shape(g, 'M124,5 C116,8 114,20 122,22 C132,22 136,12 132,6 Z', gradient(g, 116, 6, 132, 22, [246, 224, 206], [.3, 0, -.25]), 1.1);
+    for (let i = 0; i < 4; i++) stroke(g, `M128,6 L${117 + i * 4.4},${20 - Math.abs(i - 1.5)}`, 'rgba(160,100,90,.7)', .7);
+  }, { glow: { x: 164, color: 'teal' } });
 })();
