@@ -530,8 +530,11 @@
       shape(g, 'M112,-6 L128,-13 L132,-1 Z', 'rgba(235,255,250,.55)', 0);
       stroke(g, 'M112,-6 L132,-1 L148,-3 M128,-13 L132,-1 L128,13', 'rgba(235,255,250,.8)', .7);
       disc(g, 108, 0, 4.6, gradient(g, 104, -4, 112, 4, c.iron, [.55, -.35]), 1);
-      stroke(g, 'M96,5 q-2,9 -7,12', tone(DARKLEATHER, .2), 1);
-      shape(g, 'M86,16 c6,-1 7,7 0,9 c-5,-2 -5,-7 0,-9 Z', '#d9d3c4', .8);
+      // A bone charm tied under the head.
+      stroke(g, 'M98,3 Q95,12 90,16', OUTLINE, 2.4);
+      stroke(g, 'M98,3 Q95,12 90,16', tone(DARKLEATHER, .25), 1.1);
+      shape(g, 'M90,14 C96,15 96,23 89,25 C83,23 83,16 90,14 Z', '#d9d3c4', 1);
+      disc(g, 89.4, 19.6, 1.6, '#4a8f88', 0);
     }
   };
 
