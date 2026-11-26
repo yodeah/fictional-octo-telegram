@@ -139,3 +139,6 @@ li.empty{color:var(--muted)}
 .guide th{color:var(--muted)}
 .guide .weak{color:var(--gold);font-weight:700}
 @media(max-width:560px){.guide table{font-size:12px}.guide th,.guide td{padding-right:6px;overflow-wrap:anywhere}}
+.loadout select:disabled{opacity:.6;cursor:default;border-color:#544333}
+.venue-control:disabled{cursor:default;border-color:#e1b48855;color:#f7d6a4}
+.scenery-target:disabled{visibility:hidden}

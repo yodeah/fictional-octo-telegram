@@ -2,11 +2,21 @@
 
 A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters use low-poly 3D geometry rendered on Canvas 2D with a perspective camera.
 
+## Design decision: fights are fully idle
+
+**Decided 2026-11-26.** Once a fight starts, the player cannot interact with it. All choices happen between fights, and the fighters decide everything until one falls.
+
+- **Locked during a fight, including while paused:** gear and spellbook pickers, Reset, Generate matchup, the venue selector and the scene markers.
+- **Still available, because they only change how you watch:** Pause/Resume, playback speed, Hitboxes and Auto-rematch.
+- **For future features:** do not add in-fight commands, abilities, cheers or other inputs. Put player choices in preparation and progression between fights.
+
+This replaces the earlier idea of a "corner coach" with timed calls.
+
 ## Run locally
 
 Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
 
-Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. Pin any selection for future bouts or leave the slot on **Auto** to reroll it when the next bout starts. New bouts also roll fresh fighter levels and stats. Hover over a selector or focus it with the keyboard to read details. Changes made during a bout apply at the next one.
+Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. Pin any selection for future bouts or leave the slot on **Auto** to reroll it when the next bout starts. New bouts also roll fresh fighter levels and stats. Hover over a selector or focus it with the keyboard to read details. Gear is locked while a bout is in progress.
 
 Armor has separate attack and defense bonuses for stab, slash, crush, magic, and ranged. The greatsword and war maul trade slower, more expensive swings for higher accuracy and damage. They use both hands, so the shield moves to the back and stops providing defense or blocks until a one-handed weapon is drawn.
 
@@ -31,9 +41,9 @@ Melee swings check the moving weapon against the shield and body regions. Head, 
 
 Fighters move and act on independent clocks, so windups can overlap and either fighter can land a follow-up. Heavy two-handed melee weapons hit harder, use more energy, and recover more slowly. Very high Strength shortens their recovery. Hits and blocks can wear down the stance meter. A stance break lowers the fighter into a vulnerable stagger. Shields can bash after a block or interrupt a nearby heavy windup. [Elden Ring combat guide](https://www.bandainamcoent.com/es_mx/news/elden-ring-introduction-part-4-combat-guide)
 
-The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three completed bouts. Select the venue name to preview the next one. Select a marker in the scene to cheer with spectators, startle wildlife, or stir the ruins’ birds and fireflies.
+The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three completed bouts. Between bouts, select the venue name to preview the next one, or select a marker in the scene to cheer with spectators, startle wildlife, or stir the ruins’ birds and fireflies.
 
-Pause or change speed during a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
+Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Every **Auto-rematch** uses the same generator. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. Use the manual **Rematch** button to retain pinned equipment.
 

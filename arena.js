@@ -1816,8 +1816,19 @@ function updateControls() {
     finished: ['Bout complete', 'Rematch']
   };
   [elements.status.textContent, elements.play.textContent] = ui[state];
-  elements.reset.disabled = state === 'ready';
-  elements.generate.disabled = state === 'running' || state === 'paused';
+  // Fights are fully idle: once one starts, nothing may change it until it ends.
+  const locked = state === 'running' || state === 'paused';
+  elements.reset.disabled = state !== 'finished';
+  elements.generate.disabled = locked;
+  document.querySelectorAll('.venue-control, .scenery-target').forEach(button => { button.disabled = locked; });
+  for (const fighter of fighters) {
+    for (const picker of Object.values(fighter.loadout)) {
+      picker.disabled = locked;
+      // Keeps item details reachable by keyboard while the picker is locked.
+      if (locked) picker.parentElement.tabIndex = 0;
+      else picker.parentElement.removeAttribute('tabindex');
+    }
+  }
   fighters.forEach(updateGearNote);
 }
 
@@ -2358,10 +2369,10 @@ elements.play.addEventListener('click', () => {
 });
 
 elements.reset.addEventListener('click', () => {
-  const reroll = state === 'finished';
-  if (reroll) nextBoutNumber();
+  if (state !== 'finished') return;
+  nextBoutNumber();
   state = 'ready';
-  startBout(reroll);
+  startBout(true);
   updateControls();
 });
 
