@@ -8,6 +8,7 @@ const ArenaVenues2D = (() => {
   // Softer than the fighters' outline, so scenery stays behind them.
   const LINE = 'rgba(38,20,12,.62)';
   const scenes = [];
+  const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 
   // ---------------------------------------------------------------- sprites
   const cache = new Map();
@@ -300,6 +301,193 @@ const ArenaVenues2D = (() => {
         ctx.fillRect(0, (172 + 18 * row) * height / 420, width, 1.2);
       }
       return [[.50, .332]];
+    }
+  };
+
+  // ---------------------------------------------------------------- shared outdoor ground
+  function ground(ctx, random, colors) {
+    const d = 'M0,225 L108,190 L254,197 L390,212 L516,192 L691,206 L825,192 L1000,216 L1000,420 L0,420 Z';
+    shape(ctx, d, gradient(ctx, 0, 185, 0, 420, colors, [.08, 0, -.3]), 1.2, LINE);
+    speckle(ctx, random, 1100, [0, 215, 1000, 420], 'rgba(255,230,170,.2)', 'rgba(20,30,16,.24)', 3.2);
+    for (const [grow, color, w] of [[1.02, 'rgba(30,24,14,.3)', 2.6], [1, 'rgba(240,222,160,.34)', 1.5]]) {
+      ctx.beginPath();
+      ctx.ellipse(500, 342, 365 * grow, 51 * grow, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
+      ctx.stroke();
+    }
+  }
+  const leafShape = (x, y, angle, length, width) => {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    const tx = x + c * length;
+    const ty = y + s * length;
+    const mx = x + c * length * .5;
+    const my = y + s * length * .5;
+    return `M${x},${y} Q${mx - s * width},${my + c * width} ${tx},${ty} Q${mx + s * width},${my - c * width} ${x},${y} Z`;
+  };
+  function leaves(ctx, random, count, [x, y, rx, ry], colors, length) {
+    for (let i = 0; i < count; i++) {
+      const a = random() * Math.PI * 2;
+      const r = Math.sqrt(random());
+      const px = x + Math.cos(a) * rx * r;
+      const py = y + Math.sin(a) * ry * r;
+      shape(ctx, leafShape(px, py, random() * Math.PI * 2, length * (.6 + random() * .8), length * .36),
+        tone(colors[i % colors.length], (y - py) / ry * .16), .5, 'rgba(20,34,18,.45)');
+    }
+  }
+
+  // ---------------------------------------------------------------- Fernwood Clearing
+  function trunk(ctx, random, x, floor, w, color, detail) {
+    const lean = (random() - .5) * 30;
+    // A tapering bough, rooted inside the trunk so the bark covers its base.
+    const side = random() > .5 ? 1 : -1;
+    const by = 78 + random() * 54;
+    const bx = x + lean * clamp((floor - by) / floor, 0, 1);
+    shape(ctx, `M${bx},${by - w * .35} Q${bx + side * w * 1.9},${by - w * .6} ${bx + side * w * 3.6},${by - 38} Q${bx + side * w * 1.8},${by + w * .1} ${bx},${by + w * .55} Z`,
+      tone(color, -.12), 1, LINE);
+    const d = `M${x - w * 1.7},${floor} C${x - w},${floor - 14} ${x - w},${floor - 40} ${x - w * .8 + lean * .3},${floor - 90} L${x - w * .55 + lean},-10 L${x + w * .55 + lean},-10 C${x + w * .7 + lean * .5},${floor - 110} ${x + w},${floor - 40} ${x + w * 1.1},${floor - 12} L${x + w * 1.8},${floor} Z`;
+    shape(ctx, d, gradient(ctx, x - w, 0, x + w, 0, color, [-.35, .05, .22, -.2]), 1.1, LINE);
+    if (!detail) return;
+    clipped(ctx, d, () => {
+      for (let i = 0; i < 26; i++) {
+        const bx = x - w + random() * w * 2 + lean * .4;
+        const by = random() * floor;
+        stroke(ctx, `M${bx},${by} q${random() * 4 - 2},${8 + random() * 10} ${random() * 5 - 2.5},${18 + random() * 22}`, i % 3 ? 'rgba(24,18,10,.45)' : 'rgba(240,220,160,.3)', .8 + random());
+      }
+      ctx.fillStyle = 'rgba(110,140,70,.4)';
+      ctx.fillRect(x - w * 2, floor - 24, w * 4, 24);
+    });
+  }
+  function fern(ctx, x, y, s, color) {
+    for (const [angle, reach] of [[-2.7, .8], [-2.2, 1], [-1.65, 1.1], [-1.1, 1], [-.5, .8]]) {
+      const tx = x + Math.cos(angle) * s * reach;
+      const ty = y + Math.sin(angle) * s * reach;
+      const mx = x + Math.cos(angle) * s * .5;
+      const my = y + Math.sin(angle) * s * .8;
+      stroke(ctx, `M${x},${y} Q${mx},${my} ${tx},${ty}`, tone(color, -.2), 1.4);
+      for (let i = 1; i < 7; i++) {
+        const t = i / 7;
+        const px = (1 - t) * (1 - t) * x + 2 * (1 - t) * t * mx + t * t * tx;
+        const py = (1 - t) * (1 - t) * y + 2 * (1 - t) * t * my + t * t * ty;
+        for (const side of [-1.25, 1.25]) {
+          shape(ctx, leafShape(px, py, angle + side, s * .22 * (1 - t * .5), s * .055), tone(color, side > 0 ? .12 : -.08), .4, 'rgba(16,30,14,.5)');
+        }
+      }
+    }
+  }
+
+  const squirrel = unit => sprite('squirrel', [-28, -30, 18, 10], unit, g => {
+    const fur = [174, 106, 62];
+    shape(g, 'M-7,2 C-26,4 -30,-18 -18,-26 C-10,-31 -2,-24 -6,-17 C-9,-22 -17,-20 -16,-13 C-15,-6 -8,-5 -4,-1 Z', gradient(g, -26, -26, -4, 2, fur, [.35, .05, -.3]), 1.1, LINE);
+    for (let i = 0; i < 7; i++) stroke(g, `M${-9 - i * 1.6},${-2 - i * 3.4} q-4,-1 -5,-4`, 'rgba(255,214,160,.55)', .7);
+    shape(g, 'M-10,2 C-11,-7 -1,-9 7,-4 C10,0 8,5 2,6 L-6,6 C-9,5 -10,4 -10,2 Z', gradient(g, 0, -8, 0, 6, fur, [.15, 0, -.25]), 1.1, LINE);
+    shape(g, 'M3,-3 C2,1 4,4 6,3 C9,1 8,-3 6,-4 Z', '#e8cba0', 0);
+    shape(g, 'M3,-8 C4,-14 12,-14 15,-8 C16,-5 14,-2 10,-2 C6,-2 3,-5 3,-8 Z', gradient(g, 3, -14, 15, -2, fur, [.25, 0, -.2]), 1.1, LINE);
+    shape(g, 'M5,-11 L5.4,-19 L9,-12.4 Z M9,-12.6 L12,-18 L12.6,-11.4 Z', tone(fur, -.1), 1, LINE);
+    disc(g, 11, -7.6, 1.5, '#1c120c', 0);
+    disc(g, 11.5, -8.1, .5, '#fff', 0);
+    disc(g, 15, -6, 1, '#3a2218', 0);
+    stroke(g, 'M-4,5 L0,8 M4,4 L8,7', tone(fur, -.4), 2.2);
+  });
+  const boarBody = unit => sprite('boar', [-46, -34, 48, 16], unit, g => {
+    const hide = [112, 86, 64];
+    stroke(g, 'M-35,-6 q-9,-2 -7,6', tone(hide, -.3), 2.2);
+    shape(g, 'M-36,-6 C-34,-24 -14,-28 4,-23 C16,-22 22,-16 20,-4 C18,6 6,10 -12,9 C-28,9 -37,5 -36,-6 Z', gradient(g, 0, -26, 0, 10, hide, [.2, -.02, -.35]), 1.3, LINE);
+    for (let i = 0; i < 17; i++) stroke(g, `M${-27 + i * 2.7},${-21 - Math.sin(i / 16 * Math.PI) * 4} l-2.4,-6`, i % 2 ? '#3c2c20' : '#6a503a', 1.2);
+    for (let i = 0; i < 22; i++) stroke(g, `M${-29 + (i % 8) * 6},${-14 + Math.floor(i / 8) * 7} l-4,2`, 'rgba(40,26,16,.5)', .8);
+    shape(g, 'M13,-19 C24,-19 34,-12 42,-4 C45,1 43,7 37,7 C28,10 17,6 12,0 Z', gradient(g, 12, -16, 40, 6, hide, [.1, -.05, -.25]), 1.3, LINE);
+    shape(g, 'M39,-5 C44,-4 45,5 40,7 C36,6 36,-3 39,-5 Z', '#8a6450', 1, LINE);
+    disc(g, 41, 0, .9, '#2a1810', 0);
+    shape(g, 'M33,4 C36,5 39,2 39,-3 C42,3 38,9 32,7 Z', '#eadfc4', .8, LINE);
+    shape(g, 'M15,-15 L13,-28 L23,-18 Z', tone(hide, -.1), 1.1, LINE);
+    disc(g, 27, -9, 2, '#e8cf96', .8);
+    disc(g, 27.6, -9, 1, '#20140c', 0);
+  });
+  const boarLeg = (unit, far) => sprite('leg' + far, [-6, -2, 6, 15], unit, g => {
+    shape(g, 'M-4,0 L4,0 L2.6,10 L-2.6,10 Z', tone([100, 76, 56], far ? -.35 : -.05), 1, LINE);
+    shape(g, 'M-3.4,9.6 L3.4,9.6 L3.8,13.6 L-3.8,13.6 Z', '#2c201a', .9, LINE);
+  });
+
+  scenes[1] = {
+    backdrop(ctx) {
+      const random = seeded(649);
+      ctx.lineJoin = ctx.lineCap = 'round';
+      ctx.fillStyle = gradient(ctx, 0, 0, 0, 240, [190, 188, 134], [.45, .1, -.2]);
+      ctx.fillRect(0, 0, 1000, 420);
+      const sun = ctx.createRadialGradient(535, 70, 0, 535, 70, 300);
+      sun.addColorStop(0, 'rgba(255,236,170,.75)');
+      sun.addColorStop(1, 'rgba(255,236,170,0)');
+      ctx.fillStyle = sun;
+      ctx.fillRect(0, 0, 1000, 300);
+      // Three ranks of trees, hazier the farther they stand.
+      for (const [count, color, w, floor, detail] of [[17, [136, 142, 112], 7, 186, false], [11, [102, 98, 70], 11, 198, true], [7, [92, 68, 44], 16, 212, true]]) {
+        for (let i = 0; i < count; i++) {
+          const x = (i + .2 + random() * .6) * (1000 / count);
+          if (detail && w > 12 && x > 420 && x < 600) continue;
+          trunk(ctx, random, x, floor + random() * 10, w + random() * 5, color, detail);
+        }
+        const green = w < 9 ? [[140, 158, 108], [158, 170, 118]] : w < 12 ? [[98, 126, 74], [122, 144, 82]] : [[66, 98, 56], [94, 124, 62], [52, 80, 48]];
+        for (let i = 0; i < 9; i++) leaves(ctx, random, w > 12 ? 90 : 55, [i * 125 + random() * 60, 6 + random() * (w > 12 ? 22 : 52), 88, 40], green, w > 12 ? 15 : 11);
+      }
+      // Shafts of light.
+      for (const [x, w] of [[300, 46], [470, 80], [640, 38]]) shape(ctx, `M${x},0 L${x + w},0 L${x + w - 110},230 L${x - 160},230 Z`, 'rgba(255,240,180,.11)', 0);
+      for (let i = 0; i < 22; i++) leaves(ctx, random, 34, [i * 48 + random() * 26, 192 + random() * 22, 36, 20], [[88, 118, 64], [66, 92, 54], [118, 134, 70]], 9);
+      ground(ctx, random, [150, 126, 82]);
+      // A fallen, mossy log.
+      shape(ctx, 'M166,217 C170,198 200,192 230,193 L356,196 C376,197 386,205 380,214 C372,224 340,222 300,222 L197,228 C180,229 164,226 166,217 Z', gradient(ctx, 0, 193, 0, 228, [104, 80, 52], [.2, -.05, -.4]), 1.4, LINE);
+      for (let i = 0; i < 26; i++) stroke(ctx, `M${176 + random() * 160},${198 + random() * 24} l${14 + random() * 26},${random() * 3 - 1.5}`, 'rgba(36,22,10,.55)', 1);
+      shape(ctx, 'M182,200 C200,190 240,192 262,195 C280,194 300,198 310,196 C300,204 268,202 250,206 C222,202 204,208 182,200 Z', '#71823f', 1, LINE);
+      shape(ctx, 'M358,197 C374,196 386,204 382,213 C378,222 362,224 356,217 C350,208 350,200 358,197 Z', '#b99564', 1.2, LINE);
+      for (const r of [9, 6, 3]) {
+        ctx.beginPath();
+        ctx.ellipse(367, 210, r, r * 1.1, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(80,52,26,.7)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      for (const [x, y, s] of [[214, 224, 6], [226, 227, 4], [790, 222, 7], [803, 226, 5], [96, 300, 9]]) {
+        box(ctx, x - s * .22, y - s * .8, s * .44, s * .9, '#e6d6b4', .8);
+        shape(ctx, `M${x - s},${y - s * .7} C${x - s},${y - s * 2} ${x + s},${y - s * 2} ${x + s},${y - s * .7} Z`, '#b4462e', 1, LINE);
+        for (const dx of [-.45, .2]) disc(ctx, x + s * dx, y - s * 1.15, s * .14, '#f4e6cc', 0);
+      }
+      for (let i = 0; i < 74; i++) {
+        const x = random() * 1000;
+        const side = x < 88 || x > 912;
+        const y = 214 + random() * 26 + (side ? random() * 190 : 0);
+        if (i % 4 === 0 || side) fern(ctx, x, y, 12 + random() * 16 + (side ? 12 : 0), [[84, 118, 58], [62, 98, 54], [106, 128, 62]][i % 3]);
+        else for (let k = -2; k <= 2; k++) stroke(ctx, `M${x + k},${y} q${k * 1.4},-6 ${k * 3.2},-${7 + random() * 6}`, i % 2 ? '#6d7c3e' : '#9a9650', 1.2);
+        if (i % 9 === 0) disc(ctx, x + 5, y - 8, 2, i % 18 ? '#e8d878' : '#d8cdea', .6);
+      }
+      vignette(ctx, 1000, 420, 'rgba(255,230,150,.1)', 'rgba(14,26,14,.42)');
+    },
+
+    // Same paths as the original animals, so their click targets follow them.
+    draw(ctx, width, height, clock, reactions) {
+      const view = stage(ctx, width, height);
+      const squirrelHop = Math.sin(reactions[0] * Math.PI / 2) ** 2;
+      const boarRun = Math.sin(reactions[1] * Math.PI / 2) ** 2;
+      const bob = Math.sin(clock * 4.4 + boarRun * 4);
+      const boarX = 744 + Math.sin(clock * .28) * 112 + boarRun * 58;
+      const boarY = 208 - Math.abs(bob) * (1.9 + boarRun * 3.8);
+      const way = Math.cos(clock * .28) > 0 || boarRun > .18 ? 1 : -1;
+      ctx.fillStyle = 'rgba(24,34,20,.3)';
+      ctx.beginPath();
+      ctx.ellipse(boarX * width / 1000, 225 * height / 420, 36 * view.size, 5 * view.size, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const leg = (x, i, far) => view.put(boarLeg(view.unit, far), boarX + x * way, boarY + 4, { angle: bob * (i % 2 ? -.3 : .3) });
+      leg(-23, 0, true);
+      leg(7, 2, true);
+      view.put(boarBody(view.unit), boarX, boarY, { flip: way });
+      leg(-13, 1, false);
+      leg(15, 3, false);
+
+      const squirrelX = 242 + Math.sin(clock * .75) * 61 + squirrelHop * 57;
+      const hop = Math.abs(Math.sin(clock * 5 + squirrelHop * 5)) * (3 + squirrelHop * 13);
+      const squirrelY = 195 - hop;
+      const facing = Math.cos(clock * .75) > 0 || squirrelHop > .18 ? 1 : -1;
+      view.put(squirrel(view.unit), squirrelX, squirrelY, { flip: facing, scale: 1.05 });
+      return [[squirrelX / 1000, (squirrelY - 12) / 420], [boarX / 1000, (boarY - 8) / 420]];
     }
   };
 
