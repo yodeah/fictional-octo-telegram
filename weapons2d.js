@@ -548,4 +548,40 @@
       disc(g, 126.4, -2.8, 2.6, 'rgba(255,255,235,.95)', 0);
     }
   };
+
+  shields.buckler = {
+    box: [-29, -33, 29, 33],
+    half: [21, 26],
+    draw(g, c) {
+      const oval = (x, rx, ry, fill, line = 1.3) => {
+        g.beginPath();
+        g.ellipse(x, 0, rx, ry, 0, 0, Math.PI * 2);
+        g.fillStyle = fill;
+        g.fill();
+        if (line) {
+          g.strokeStyle = OUTLINE;
+          g.lineWidth = line;
+          g.stroke();
+        }
+      };
+      // A small steel fist shield: fluted face, painted ring and a deep boss.
+      oval(-2.4, 24, 29, tone(c.iron, -.45));
+      oval(0, 24, 29, gradient(g, -20, 24, 20, -24, c.steel, [-.5, -.1, .2, .75, -.05]), 1.6);
+      oval(0, 19, 23, gradient(g, -16, 20, 16, -20, c.team, [-.4, -.1, .1, .25, -.1]), 1.1);
+      for (let i = 0; i < 12; i++) {
+        const a = i * Math.PI / 6;
+        stroke(g, `M${Math.cos(a) * 8},${Math.sin(a) * 9.6} L${Math.cos(a) * 18},${Math.sin(a) * 22}`, 'rgba(30,8,5,.55)', 1.6);
+        stroke(g, `M${Math.cos(a) * 8 + 1},${Math.sin(a) * 9.6} L${Math.cos(a) * 18 + 1},${Math.sin(a) * 22}`, tone(c.trim, .1), .8);
+      }
+      for (let i = 0; i < 10; i++) {
+        const a = i * Math.PI / 5 + .3;
+        rivet(g, Math.cos(a) * 21.6, Math.sin(a) * 26.2, 1.4, c.brass);
+      }
+      oval(0, 9.6, 11.6, gradient(g, -8, 10, 8, -10, c.brass, [-.45, 0, .45]));
+      oval(2, 6, 7.4, gradient(g, -5, 6, 6, -6, c.steel, [-.5, 0, .8]), 1);
+      disc(g, 4, -3, 1.7, 'rgba(255,255,255,.9)', 0);
+      wear(g, 'M-23,0 C-23,-38 23,-38 23,0 C23,38 -23,38 -23,0 Z', [-23, -28, 23, 28], 60, 'rgba(255,240,220,.35)', 'rgba(20,10,8,.35)', 157, 3);
+      stroke(g, 'M-16,-17 C-8,-26 5,-28 13,-22', 'rgba(255,252,240,.7)', 1.5);
+    }
+  };
 })();
