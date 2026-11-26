@@ -61,4 +61,40 @@
     },
     cape: null
   });
+
+  sets.fortress = derive('plate', { steel: [100, 118, 136], iron: [60, 70, 84], brass: [176, 170, 138] }, {
+    box: { head: [-40, -52, 30, 28], torso: [-34, -84, 34, 32], upperArm: [-24, -30, 24, 58] },
+    torso(g, c, base) {
+      base(g, c);
+      // A second riveted placard and a high bevor.
+      const placard = 'M-14,-56 L16,-58 L19,-34 L3,-12 L-13,-30 Z';
+      plate(g, placard, gradient(g, -14, -20, 19, -56, c.iron, [-.4, 0, .5, .1]));
+      stroke(g, 'M3,-57 L3,-15', 'rgba(255,255,255,.55)', 1.1);
+      for (const [x, y] of [[-10, -52], [13, -54], [15, -35], [-9, -32], [3, -17], [3, -50]]) rivet(g, x, y, 1.8, c.brass);
+      plate(g, 'M-17,-68 Q0,-56 17,-68 L15,-82 Q0,-76 -13,-81 Z', plateFill(g, -17, 17, c.steel));
+      stroke(g, 'M-15,-72 Q0,-63 15,-72', tone(c.brass, 0), 1.6);
+    },
+    upperArm(g, c, base) {
+      base(g, c);
+      for (const [x, h] of [[-9, 11], [0, 15], [9, 11]]) plate(g, `M${x - 4},-9 L${x},${-9 - h} L${x + 4},-9 Z`, plateFill(g, x - 4, x + 4, c.steel));
+      plate(g, 'M-18,-4 C-18,-18 18,-18 18,-4 L16,2 Q0,-6 -16,2 Z', plateFill(g, -18, 18, c.iron));
+      for (const x of [-11, 0, 11]) rivet(g, x, -8, 1.6, c.brass);
+    },
+    head(g, c) {
+      // Closed great helm with swept horns.
+      for (const [d, dim] of [['M-8,-18 C-24,-22 -34,-34 -33,-48 C-28,-36 -18,-30 -4,-26 Z', -.25], ['M6,-18 C20,-24 26,-36 22,-50 C16,-38 8,-32 -2,-27 Z', 0]]) {
+        shape(g, d, gradient(g, -30, -48, 10, -18, [214, 200, 172], [.3 + dim, dim, -.4]), 1.3);
+      }
+      const helm = 'M-19,16 L-21,-12 C-20,-22 -10,-27 2,-27 C14,-27 21,-20 22,-11 L24,6 L18,22 L2,24 L-8,17 Z';
+      plate(g, helm, gradient(g, -21, 6, 24, -14, c.steel, [-.5, -.15, .15, .65, -.05]));
+      wear(g, helm, [-21, -27, 24, 24], 50, 'rgba(255,255,255,.4)', 'rgba(20,20,30,.4)', 167, 3.5);
+      shape(g, 'M2,-5.4 L23,-7 L23,-2.4 L2,-1 Z', '#0b0708', 1);
+      disc(g, 15, -3.8, 1.1, '#ff9a5a', 0);
+      plate(g, 'M12,-26 L17,-24 L21,22 L15,23 Z', plateFill(g, 12, 21, c.brass));
+      for (let row = 0; row < 3; row++) for (let i = 0; i < 3; i++) disc(g, -1 + i * 4.4, 6 + row * 4.6, .9, '#0b0708', 0);
+      stroke(g, 'M-20,-11 Q2,-16 22,-11', tone(c.brass, 0), 2.4);
+      for (let i = 0; i < 5; i++) rivet(g, -17 + i * 6, -11.6 - Math.sin(i / 4 * Math.PI) * 2, 1.2, c.steel);
+      plate(g, 'M-21,10 L-27,20 L-7,20 L-6,14 Z', plateFill(g, -27, -6, c.iron));
+    }
+  });
 })();
