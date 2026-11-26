@@ -413,10 +413,14 @@ function polygon(points, color) {
 // whether or not it ends up visible, so skip faces that can never be seen (as prism() does for
 // back-facing sides). Measured costs per face are in docs/rendering-performance.md.
 function surface(points, color, light, transform) {
-  const projected = points.map(point => project(transform(point)));
-  const depth = projected.reduce((sum, point) => sum + point[2], 0) / projected.length;
+  projectedSurface(points.map(point => project(transform(point))), color, light);
+}
+
+function projectedSurface(projected, color, light) {
+  let depth = 0;
+  for (const point of projected) depth += point[2];
   const rgb = color.map(channel => clamp(Math.round(channel * light), 0, 255));
-  faces.push({ projected, depth, rgb });
+  faces.push({ projected, depth: depth / projected.length, rgb });
 }
 
 const ringAngles = new Map();
@@ -480,11 +484,11 @@ function prism(from, to, base, tip, color, transform, sides = 4, detail = 0) {
     const [x, y, z] = pointBetween(from, to, t);
     const radialWidth = mix(base[0], tip[0], t) * bevelScale;
     const radialDepth = mix(base[1], tip[1], t) * bevelScale;
-    return angles.map(({ cosine, sine }) => [
+    return angles.map(({ cosine, sine }) => project(transform([
       x + dy / length * cosine * radialWidth,
       y - dx / length * cosine * radialWidth,
       z + sine * radialDepth
-    ]);
+    ])));
   });
   const last = profiles.length - 1;
   const pointed = tip[0] === 0 && tip[1] === 0;
@@ -493,10 +497,10 @@ function prism(from, to, base, tip, color, transform, sides = 4, detail = 0) {
       const a = profiles[row - 1];
       const b = profiles[row];
       const face = row === last && pointed ? [a[i], a[j], b[i]] : [a[i], a[j], b[j], b[i]];
-      surface(face, color, light * sections[row][2], transform);
+      projectedSurface(face, color, light * sections[row][2]);
     }
   }
-  if (tip[0] > 0 || tip[1] > 0) surface(profiles[last], color, 1.16, transform);
+  if (tip[0] > 0 || tip[1] > 0) projectedSurface(profiles[last], color, 1.16);
 }
 
 function shield(cx, cy, z, fighter, transform) {
@@ -523,20 +527,22 @@ function shield(cx, cy, z, fighter, transform) {
     ...(detail ? [[ring(.252, z + .139), armor, .82]] : []),
     [crown, armor, 1]
   ];
+  const projected = bands.map(([points]) => points.map(point => project(transform(point))));
   for (let i = 0; i < sides; i++) {
     const j = (i + 1) % sides;
     const light = 1 + Math.cos((i + .5) * Math.PI * 2 / sides - .60) * .26;
     for (let row = 1; row < bands.length; row++) {
-      const [outer] = bands[row - 1];
-      const [inner, color, shade] = bands[row];
-      surface([outer[i], outer[j], inner[j], inner[i]], color, light * shade, transform);
+      const outer = projected[row - 1];
+      const inner = projected[row];
+      const [, color, shade] = bands[row];
+      projectedSurface([outer[i], outer[j], inner[j], inner[i]], color, light * shade);
     }
     if (i % 2 === 0) {
       const [rx, ry] = bead[i];
       surface([[rx, ry + .017, z + .07], [rx + .014, ry, z + .07], [rx, ry - .018, z + .07], [rx - .014, ry, z + .07]], metal, 1.11, transform);
     }
   }
-  surface(crown, metal, 1.09, transform);
+  projectedSurface(projected.at(-1), metal, 1.09);
   surface(ring(.131, z + .168), bronze, 1.23, transform);
   for (const side of [-1, 1]) {
     const y = cy + gear.height * side * .47;
@@ -1148,12 +1154,13 @@ function loft(rings, color, transform) {
     loftProfiles.set(sides, { angles, light });
   }
   const { angles, light } = loftProfiles.get(sides);
-  const vertices = rings.map(([y, width, depth]) => angles.map(({ cosine, sine }) => [cosine * width, y, sine * depth]));
+  const vertices = rings.map(([y, width, depth]) =>
+    angles.map(({ cosine, sine }) => project(transform([cosine * width, y, sine * depth]))));
   for (let row = 1; row < vertices.length; row++) {
     for (let i = 0; i < sides / 2; i++) {
       const a = vertices[row - 1];
       const b = vertices[row];
-      surface([a[i], a[i + 1], b[i + 1], b[i]], color, light[i], transform);
+      projectedSurface([a[i], a[i + 1], b[i + 1], b[i]], color, light[i]);
     }
   }
 }

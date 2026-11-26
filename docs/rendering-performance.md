@@ -96,6 +96,17 @@ Scenery counts at a 375 × 812 CSS-pixel viewport in the Mac browser, with no ac
 | Fernwood Clearing | 281 / 9 | 430 / 13 | 561 / 18 |
 | Moonlit Ruins | 97 / 4 | 144 / 6 | 191 / 8 |
 
+### High Quality after vertex reuse
+
+Mac browser spot checks at a 375 × 812 CSS-pixel viewport and 1× device scale (353 × 310 canvas pixels). The fixed idle Sand Pit fixture submitted the same 4,576 faces in all runs. The build now projects shared vertices once per primitive ring before assembling faces. The projection, colours and face order matched exactly for tested idle, striking and fallen poses.
+
+| Painter | Before reuse avg / worst draw | After reuse avg / worst draw |
+| --- | ---: | ---: |
+| Canvas 2D | 8.1 / 35.6 ms | 5.6 / 18.8 ms |
+| WebGL | 3.6 / 11.4 ms | 3.2 / 9.1 ms |
+
+A sweep of idle gear combinations found a maximum of 6,468 High faces with two Bronze lorica fighters carrying Sun staves, twin flails and bucklers. The maximum at Low was 3,308. Mid-bout props such as lodged bolts can add faces. The 6,468-face setup completed a Canvas bout at the same phone-size viewport with 7.9 ms average draw and 59.9 average FPS at 4× simulation speed. Physical phone testing of the new tiers remains open.
+
 See the README section "Renderers and benchmark". To measure: open `?bench`, pick a renderer and polygon multiplier, tap **Reset**, and let a fight run 15–20 seconds. Use Rematch or Auto-rematch (not Generate matchup) to keep the same fighters. To reproduce the tables above from the console, wrap `drawGladiator`, `faces.sort` and `paintFaces` with timers and read `ArenaBench.snapshot()`.
 
 The 120 FPS cap was checked with simulated timestamps: 60, 90 and 120 Hz screens draw every frame, and 144, 165 and 240 Hz screens average 120 FPS with no false drops.
