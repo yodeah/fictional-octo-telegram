@@ -584,4 +584,49 @@
       stroke(g, 'M-16,-17 C-8,-26 5,-28 13,-22', 'rgba(255,252,240,.7)', 1.5);
     }
   };
+
+  shields.tower = {
+    box: [-46, -68, 46, 68],
+    half: [38, 58],
+    draw(g, c) {
+      const board = 'M-39,-52 C-37,-62 -20,-65 0,-65 C20,-65 37,-62 39,-52 C42,-20 42,20 39,52 C37,62 20,65 0,65 C-20,65 -37,62 -39,52 C-42,20 -42,-20 -39,-52 Z';
+      g.save();
+      g.translate(-3.4, 0);
+      shape(g, board, tone(DARKLEATHER, -.15), 1.4);
+      g.restore();
+      shape(g, board, gradient(g, -40, 30, 40, -30, c.iron, [-.5, -.1, .2, .6, -.1]), 1.8);
+      const face = 'M-33,-49 C-31,-56 -17,-59 0,-59 C17,-59 31,-56 33,-49 C36,-20 36,20 33,49 C31,56 17,59 0,59 C-17,59 -31,56 -33,49 C-36,20 -36,-20 -33,-49 Z';
+      shape(g, face, gradient(g, -34, 0, 34, 0, c.team, [-.45, -.12, .1, .22, -.2]), 1.2);
+      clipped(g, face, () => {
+        // Spread wings, laurel and lightning in the legion style.
+        for (const sy of [-1, 1]) {
+          for (let i = 0; i < 5; i++) {
+            const y = sy * (16 + i * 6);
+            shape(g, `M${-3 - i * .5},${sy * 13} Q${-24 + i * 3},${y} ${-30 + i * 4},${y + sy * 8} Q${-14 + i * 2},${y + sy * 3} ${-3},${sy * 19} Z`, tone(c.brass, .2 - i * .08), .7);
+            shape(g, `M${3 + i * .5},${sy * 13} Q${24 - i * 3},${y} ${30 - i * 4},${y + sy * 8} Q${14 - i * 2},${y + sy * 3} ${3},${sy * 19} Z`, tone(c.brass, .2 - i * .08), .7);
+          }
+          stroke(g, `M-31,${sy * 51} H31`, tone(c.trim, .1), 2.4);
+          stroke(g, `M-31,${sy * 46} H31`, tone(c.trim, -.15), 1);
+        }
+        stroke(g, 'M0,-56 V-26 M0,26 V56', tone(c.brass, .1), 3);
+      });
+      wear(g, face, [-34, -58, 34, 58], 260, 'rgba(255,232,200,.26)', 'rgba(20,5,2,.32)', 163, 3.6);
+      stroke(g, 'M-24,18 L-6,36', 'rgba(35,10,5,.8)', 1.6);
+      stroke(g, 'M-23,17.2 L-5,35', 'rgba(255,225,190,.5)', .6);
+      for (let i = 0; i < 9; i++) {
+        const y = -48 + i * 12;
+        rivet(g, -36.6, y, 1.9, c.brass);
+        rivet(g, 36.6, y, 1.9, c.brass);
+      }
+      for (const x of [-18, 0, 18]) {
+        rivet(g, x, -61.6, 1.9, c.brass);
+        rivet(g, x, 61.6, 1.9, c.brass);
+      }
+      shape(g, 'M-15,-15 L15,-15 L15,15 L-15,15 Z', gradient(g, -15, 15, 15, -15, c.brass, [-.4, 0, .45]), 1.4);
+      for (const [x, y] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) rivet(g, x, y, 1.6, c.steel);
+      disc(g, 0, 0, 10, gradient(g, -8, 8, 8, -8, c.steel, [-.5, 0, .8]), 1.3);
+      disc(g, 2.8, -3.4, 2.2, 'rgba(255,255,255,.9)', 0);
+      stroke(g, 'M-31,-44 C-30,-54 -16,-56 -2,-57', 'rgba(255,250,235,.65)', 1.8);
+    }
+  };
 })();
