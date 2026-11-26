@@ -655,4 +655,16 @@
     // An oath ribbon tied at the guard.
     shape(g, 'M12,6 C6,16 -6,18 -12,30 L-7,27 L-4,32 C0,22 10,18 17,8 Z', tone([150, 30, 36], 0), 1);
   });
+
+  special('dawnMender', 'mace', { steel: [246, 220, 150], iron: [214, 190, 130], grip: [150, 106, 62], brass: [250, 230, 170] }, g => {
+    for (let i = -3; i <= 3; i++) {
+      g.save();
+      g.translate(80, 0);
+      g.rotate(i * .42);
+      shape(g, `M21,-2.2 L${i % 2 ? 29 : 35},0 L21,2.2 Z`, tone([255, 226, 130], .2), .8);
+      g.restore();
+    }
+    disc(g, 80, 0, 5, gradient(g, 76, -4, 84, 4, [255, 214, 110], [.7, 0]), 1);
+    disc(g, 80, 0, 2, '#fffbe8', 0);
+  }, { box: [-36, -30, 120, 30], glow: { x: 80, color: 'sun' } });
 })();
