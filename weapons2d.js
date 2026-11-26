@@ -75,6 +75,10 @@
       }
     };
   }
+  // A special is its base weapon in its own materials, with a few details painted on top.
+  function special(key, base, colors, extra, overrides) {
+    art[key] = { ...art[base], colors, extra, ...overrides };
+  }
 
   art.rapier = {
     box: [-34, -20, 142, 20],
@@ -629,4 +633,11 @@
       stroke(g, 'M-31,-44 C-30,-54 -16,-56 -2,-57', 'rgba(255,250,235,.65)', 1.8);
     }
   };
+
+  special('stormbrand', 'sword', { steel: [170, 198, 228], grip: [38, 50, 86], brass: [228, 200, 96], teamCss: '#7fd0ff' }, g => {
+    const bolt = 'M22,0 L36,-3.4 L42,1.6 L58,-3 L64,2.4 L80,-2 L86,2 L106,0';
+    stroke(g, bolt, 'rgba(90,190,255,.65)', 4.4);
+    stroke(g, bolt, '#e8fbff', 1.3);
+    stroke(g, 'M42,1.6 L48,6 L55,4.6 M64,2.4 L71,6.4 M58,-3 L62,-6.4', '#bfeaff', .9);
+  });
 })();
