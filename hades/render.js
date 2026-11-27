@@ -1474,6 +1474,32 @@
   function drawProjectile(p, duel) {
     const spell = spells[p.spellKey];
     const speed = Math.hypot(p.vx, p.vy), dx = p.vx / speed, dy = p.vy / speed;
+    if (!spell && (p.weapon === 'recurve' || p.weapon === 'pilum')) {
+      // A real arrow or javelin: shaft, head, fletching or weight, and a hot streak behind it.
+      const javelin = p.weapon === 'pilum', long = javelin ? 1.5 : .9, z = 1.25;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const tail = ctx.createLinearGradient(sx(p.x), sy(p.y, z), sx(p.x - dx * 2.6), sy(p.y - dy * 2.6, z));
+      tail.addColorStop(0, `rgba(${looks[p.owner].glow},.55)`);
+      tail.addColorStop(1, `rgba(${looks[p.owner].glow},0)`);
+      ctx.strokeStyle = tail;
+      ctx.lineWidth = unit * (javelin ? .16 : .12);
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx(p.x), sy(p.y, z)); ctx.lineTo(sx(p.x - dx * 2.6), sy(p.y - dy * 2.6, z)); ctx.stroke();
+      ctx.restore();
+      limb([[p.x - dx * long, p.y - dy * long, z], [p.x - dx * .1, p.y - dy * .1, z]], javelin ? .08 : .055, javelin ? '#7a432c' : '#d6b27a', false);
+      if (javelin) {
+        limb([[p.x - dx * .55, p.y - dy * .55, z], [p.x, p.y, z]], .045, '#8497a8', false);
+        orb([p.x - dx * .6, p.y - dy * .6, z], .06, '#5c7080', false);
+      } else {
+        for (const s of [1, -1]) {
+          shape([[p.x - dx * long, p.y - dy * long, z], [p.x - dx * (long - .22) + dy * .07 * s, p.y - dy * (long - .22) - dx * .07 * s, z + .04],
+            [p.x - dx * (long - .3), p.y - dy * (long - .3), z]], s > 0 ? '#c83b3b' : '#f2ead8');
+        }
+      }
+      shape([[p.x - dx * .14 + dy * .07, p.y - dy * .14 - dx * .07, z], [p.x + dx * .14, p.y + dy * .14, z], [p.x - dx * .14 - dy * .07, p.y - dy * .14 + dx * .07, z]], '#e8f3f8');
+      return;
+    }
     if (!spell) {
       limb([[p.x - dx * .65, p.y - dy * .65, 1.1], [p.x, p.y, 1.1]], .065, '#e8d3a0', false);
       limb([[p.x - dx * .1, p.y - dy * .1, 1.1], [p.x + dx * .12, p.y + dy * .12, 1.1]], .1, steel, false);
