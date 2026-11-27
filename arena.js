@@ -1556,7 +1556,8 @@ function flushFaces(frost) {
 const iced = (rgb, frost) => rgb.map((channel, axis) => Math.round(mix(channel, [196, 232, 250][axis] * (.55 + channel / 560), frost)));
 
 // Hands the posed skeleton to the sprite painter. Returns how many 3D faces the fallback gear used.
-function drawGladiator2D(fighter, pose) {
+// `target` is where to draw: the arena by default, or a still picture elsewhere.
+function drawGladiator2D(fighter, pose, target = null) {
   // A kit without its own 2D set uses its class's.
   const own = fighter.gear.armor;
   const set = ArenaArt2D.hasArmor(own) ? own : { melee: 'plate', ranged: 'leather', magic: 'robes' }[armors[own].style];
@@ -1581,13 +1582,13 @@ function drawGladiator2D(fighter, pose) {
   const thrown = finishingSpear(fighter, pose);
   const stowed = weapons[spare] ? stowedMount(pose, spare) : null;
   ArenaArt2D.draw({
-    ctx,
-    toScreen: point => {
+    ctx: target?.ctx || ctx,
+    toScreen: target ? point => target.toScreen(world(point)) : point => {
       const [x, y, depth] = project(world(point));
       return [x, y, scale * 12 / (12 - depth)];
     },
     direction: fighter.direction,
-    pixelsPerMetre: scale * canvas.width / width,
+    pixelsPerMetre: target ? target.pixelsPerMetre : scale * canvas.width / width,
     color: fighter.color,
     trim: fighter.trim,
     style: set,
@@ -1618,6 +1619,24 @@ function drawGladiator2D(fighter, pose) {
     }
   });
   return fallbackFaces;
+}
+
+// A fighter standing at ease, feet near the bottom of the picture.
+function drawStill(picture, fighter) {
+  const g = picture.getContext('2d');
+  // Tall enough for a raised greatsword.
+  const unit = picture.height / 3.1;
+  const floor = picture.height - unit * .16;
+  g.clearRect(0, 0, picture.width, picture.height);
+  g.fillStyle = 'rgba(0,0,0,.4)';
+  g.beginPath();
+  g.ellipse(picture.width * .45, floor, unit * .55, unit * .09, 0, 0, Math.PI * 2);
+  g.fill();
+  drawGladiator2D(fighter, fighterPose(fighter), {
+    ctx: g,
+    pixelsPerMetre: unit,
+    toScreen: ([x, y]) => [picture.width * .45 + (x - fighter.x) * unit, floor - y * unit, unit]
+  });
 }
 
 function drawGladiator(fighter, pose, parts) {

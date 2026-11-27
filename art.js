@@ -1,6 +1,6 @@
 'use strict';
 
-// Scenes seen through your own eyes, and champion portraits. Drawn as inline SVG: no image files.
+// Scenes seen through your own eyes, and the strangers who stop you. Drawn as inline SVG: no image files.
 const Art = (() => {
   const svg = (body, label) => '<svg viewBox="0 0 400 190" preserveAspectRatio="xMidYMid slice" role="img" aria-label="' + label + '">' + body + '</svg>';
   const rect = (x, y, w, h, fill, extra = '') => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + fill + '" ' + extra + '/>';
@@ -41,19 +41,6 @@ const Art = (() => {
       + circle(150, 156, 11, '#d8d0c0') + circle(146, 154, 2.5, '#1d130d') + circle(155, 154, 2.5, '#1d130d') + circle(238, 162, 20, '#6e1a16', 'opacity=".7"'), 'A grave marker under the moon')
   };
 
-  function portrait(color, trim, index = 0) {
-    const rgb = value => 'rgb(' + value.join(',') + ')';
-    const crest = [
-      path('M18 20 q22 -22 44 0', 'none', 'stroke="' + rgb(trim) + '" stroke-width="8"'),
-      path('M40 4 l8 16 h-16Z', rgb(trim)),
-      path('M16 26 l-8 -20 l18 12Z M64 26 l8 -20 l-18 12Z', rgb(trim)),
-      path('M20 22 l4 -18 l10 12 l6 -14 l6 14 l10 -12 l4 18Z', rgb(trim))
-    ][index % 4];
-    return '<svg viewBox="0 0 80 80" aria-hidden="true">' + rect(0, 0, 80, 80, '#17120d') + crest
-      + path('M18 46 a22 24 0 0 1 44 0 v20 h-12 l-4 -12 h-12 l-4 12 h-12Z', rgb(color)) + rect(24, 42, 32, 6, '#0c0806')
-      + rect(38, 36, 4, 30, rgb(trim)) + circle(32, 45, 2, '#ff7a4a') + circle(48, 45, 2, '#ff7a4a') + path('M8 80 q32 -22 64 0Z', rgb(color)) + '</svg>';
-  }
-
   // A hooded stranger seen across a barrel, tinted to tell them apart.
   function stranger(color, key) {
     const rgb = 'rgb(' + color.join(',') + ')';
@@ -70,5 +57,5 @@ const Art = (() => {
       + rect(0, 150, 400, 40, '#3a2618') + rect(0, 150, 400, 5, '#6b4a2a') + held + hands(), 'A stranger waiting for your answer');
   }
 
-  return { scene: name => scenes[name](), stranger, portrait };
+  return { scene: name => scenes[name](), stranger };
 })();

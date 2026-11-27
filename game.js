@@ -48,7 +48,7 @@ const Game = (() => {
     injury: ['Injuries', 'A wound costs you something until it heals. Resting heals it twice as fast, or pay the surgeon.'],
     tactics: ['Tactics', 'Pick a stance and a target before the bell. The trainer judges the fight with your choice.'],
     strangers: ['Strangers', 'Some days a stranger finds you. You see the price before you agree, and you may always say no.'],
-    stands: ['The stands', 'Watching takes the day and pays no wage. Watch the champion to learn their gear and habits. Bets are capped at a day’s wage, and the bookmaker keeps a cut.'],
+    stands: ['The stands', 'Watching takes the day and pays no wage. Watch the champion to learn their habits and weak points. Bets are capped at a day’s wage, and the bookmaker keeps a cut.'],
     spells: ['Spells', 'Your first spell wakes your mana. You can ready up to three. Before each bout you choose when each one is cast.'],
     triggers: ['Triggers', '“Their call” leaves the moment to your gladiator. Any other trigger holds the spell until it comes true, then casts it at once. If two come true together, the lower-numbered slot goes first.']
   };
@@ -327,25 +327,45 @@ const Game = (() => {
   }
 
   function wallPanel(run) {
+    const you = Rules.heroConfig(run);
     return '<h2>The wall of champions</h2>' + Rules.champions.map((champion, index) => {
       const state = index < run.act ? 'slain' : index === run.act ? 'next' : 'waiting';
-      // The glass eye shows every champion's gear; without it only the next one is sized up.
       const config = Rules.championConfig(index);
-      const eye = Rules.metOf(run).peddler;
+      const { gear } = config;
+      const stats = [['Health', 'maxHP'], ['Strength', 'strength'], ['Skill', 'attack'], ['Defense', 'defense']].map(([label, key]) =>
+        '<tr><th>' + label + '</th><td class="' + (config[key] > you[key] ? 'warn' : '') + '">' + config[key] + '</td><td>' + you[key] + '</td></tr>').join('');
+      const kit = [gear.special, gear.shield, gear.armor].filter(key => key !== 'none').map(itemName).join(' · ')
+        + (config.spellList.length ? ' · casts ' + config.spellList.map(key => spells[key].name).join(', ') : '');
+      // The next champion is sized up; the glass eye sizes up all of them; watching one teaches their habits.
       const seen = Rules.scoutedOf(run, index);
-      const kit = [config.gear.special, config.gear.armor, config.gear.shield].map(itemName).join(', ') + ', ' + config.maxHP + ' health.';
-      const sight = champion.hint + ' ' + weakness(config) + (eye || seen ? ' ' + kit : '')
-        + (seen ? '<br>Habits: ' + champion.habits + ' ' + specials[config.gear.special].effect + '.'
-          : index === run.act ? '<br>Watch their exhibition to learn their habits.' : '');
-      return '<div class="card champion ' + state + '">' + Art.portrait(champion.color, champion.trim, index) + '<div><p class="eyebrow">' + champion.title + '</p><h3>' + champion.name + '</h3><p class="small">'
-        + (state === 'slain' ? 'Slain. Their weapon hangs in your gear.' : state === 'next' || eye ? sight : 'You know only the name. Kill those before them.') + '</p></div></div>';
+      const known = state === 'next' || seen || Rules.metOf(run).peddler;
+      const notes = state === 'slain' ? 'Slain. Their weapon hangs in your gear.'
+        : (known ? champion.hint + ' ' + weakness(config) : 'Their weak points are not yet known.')
+          + (seen ? '<br>Habits: ' + champion.habits + ' ' + specials[gear.special].effect + '.'
+            : state === 'next' ? '<br>Watch their exhibition to learn their habits.' : '');
+      return '<div class="card champion ' + state + '"><p class="eyebrow">' + champion.title + '</p><h3>' + champion.name + '</h3><div class="sheet">'
+        + '<canvas data-champion="' + index + '" role="img" aria-label="' + champion.name + ', carrying ' + kit + '"></canvas>'
+        + '<table><tr><th></th><th>Them</th><th>You</th></tr>' + stats + '</table></div><p>' + kit + '</p><p class="small">' + notes + '</p></div>';
     }).join('');
+  }
+
+  // The champions stand in their own gear, drawn by the arena once the cards exist.
+  function drawChampions() {
+    const density = Math.min(2, window.devicePixelRatio || 1);
+    for (const picture of app.querySelectorAll('canvas[data-champion]')) {
+      picture.width = Math.round(picture.clientWidth * density);
+      picture.height = Math.round(picture.clientHeight * density);
+      ArenaDuel.portrait(Rules.championConfig(Number(picture.dataset.champion)), picture);
+    }
   }
 
   function render(keepScroll = false) {
     const y = window.scrollY;
     document.body.dataset.view = view === 'fight' ? 'fight' : 'menu';
-    if (view !== 'fight') app.innerHTML = (message ? '<p class="tip warn">' + escape(message) + '</p>' : '') + screens[view]();
+    if (view !== 'fight') {
+      app.innerHTML = (message ? '<p class="tip warn">' + escape(message) + '</p>' : '') + screens[view]();
+      drawChampions();
+    }
     message = '';
     window.scrollTo(0, keepScroll ? y : 0);
   }

@@ -6,7 +6,7 @@ A gory gladiator autobattler with permanent death, for phone and laptop. Static 
 
 - Dice-rolled stats and a race (human, elf or demon, each with a drawback).
 - Each day: fight, train, rest, work or watch. The debt falls due every fifth day.
-- In the stands, watch the champion’s exhibition to learn their gear and habits, or bet up to a day’s wage. The bookmaker keeps a cut.
+- The champion wall shows each champion in their gear, with their stats beside yours. In the stands, watch the champion’s exhibition to learn their habits, or bet up to a day’s wage. The bookmaker keeps a cut.
 - Sparring is safe from death; blood bouts and champions are not, apart from one mercy per champion.
 - Before each bout pick a stance (aggressive, balanced, defensive) and where to aim.
 - Ending a bout under a fifth of your health leaves a wound on the part that took the most damage: −10% to one thing for four days, unless you pay the surgeon.

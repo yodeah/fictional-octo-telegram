@@ -352,7 +352,7 @@ const Rules = (() => {
   function visitorTerms(run) {
     const offer = run.visitor;
     if (offer.key === 'crone') return { gain: '+3 ' + statNames[offer.up] + ', for good.', price: '−3 ' + statNames[offer.down] + ', for good.' };
-    if (offer.key === 'peddler') return { gain: '+16 melee skill, and every champion’s gear and weakness on the wall, though not their habits.', price: '−20 ranged skill, for good.' };
+    if (offer.key === 'peddler') return { gain: '+16 melee skill, and every champion’s weak points on the wall, though not their habits.', price: '−20 ranged skill, for good.' };
     if (offer.key === 'envoy') return { gain: 'Red Verdict, a heavy spell (34 damage, 18 mana). It takes ' + (run.spells.length < 3 ? 'a free slot.' : 'your third slot.'),
       price: 'Every cast costs you 11 health.' };
     if (offer.key === 'dealer') return { gain: 'One card in three is a fortune: ' + fortune(run) + ' gold.',
@@ -528,7 +528,7 @@ const Rules = (() => {
     }
     if (bout === 'champion' && !scoutedOf(run)) {
       run.scouted = { ...run.scouted, [run.act]: true };
-      events.push('You have studied ' + champions[run.act].name + '. The champion wall shows their gear and habits.');
+      events.push('You have studied ' + champions[run.act].name + '. The champion wall shows their habits.');
     }
     return endDay(run, events);
   }

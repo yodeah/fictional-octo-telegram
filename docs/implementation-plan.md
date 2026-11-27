@@ -31,7 +31,7 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - [x] **3. Tactics and injuries** (10, 11). Stance and target on the bout screen; wounds with a surgeon (2026-11-26). Each stance has a matchup only it wins, in `tests/tactics.test.mjs`.
 - [x] **4. Spellbook rework** (13). Market pages, three slots, a trigger per spell chosen on the bout screen (2026-11-26). `tests/spells.test.mjs` shows triggers changing win rates.
 - [x] **5. Strangers and bargains** (14). Five visitors between days, each with a shown price (2026-11-26). `tests/bargains.test.mjs` shows each one right in one situation and wrong in another, for the test bot and in measured odds.
-- [x] **6. Spectate and bet** (15). Watch the champion or an undercard for a day and bet up to a day’s wage; watching the champion reveals gear and habits (2026-11-27). `tests/stands.test.mjs` shows simple betting strategies losing gold.
+- [x] **6. Spectate and bet** (15). Watch the champion or an undercard for a day and bet up to a day’s wage; watching the champion reveals habits (2026-11-27). `tests/stands.test.mjs` shows simple betting strategies losing gold.
 - [ ] **7. Crowd and Charm** (16). Crowd favour changes pay and mercy; Charm changes prices.
 - [ ] **8. Shop and inventory depth** (17). Limited bag, repairs, trophies, champion specials with descriptions.
 - [ ] **9. Quests** (18). Eight to ten short goals.
@@ -88,7 +88,8 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - The bill depends only on `run.sands`, the day and the act, so it is rebuilt, not saved, and never touches `run.rng`. `run.sands` and `run.scouted` may be missing in old saves.
 - A watched bout is `run.pending` with `kind: 'watch'`; the two fighters sit in `hero` and `foe`, and `winner` is stored before anything is shown. `finishFight` hands it to `finishWatch`, which ignores the replayed result. An engine change between deploys could make a bout left mid-watch show a different winner than the stored one.
 - Odds: 40 trial bouts, 80% of a fair return, 4× at most, no bets under 1.1×. Champion challengers copy the champion's numbers with ordinary gear and no special, so one side is often too strong to bet on.
-- The Peddler shows all champions' gear at once but no habits; watching shows only the current champion, with habits and, on the bout screen, `study`'s stance and aim advice.
+- The wall shows every champion's fighter, gear and stats to everyone (asked for on 2026-11-27). The Peddler adds all champions' weak points at once; watching adds only the current champion's, with habits and, on the bout screen, `study`'s stance and aim advice.
+- The wall figures are `ArenaDuel.portrait(config, canvas)`: a real engine fighter drawn at ease by `drawStill` in `arena.js`. It resets the engine, so never call it during a bout.
 - Restoring a save code taken before a bet still shows who wins. Fights have the same hole.
 - The test bot never watches.
 
@@ -102,7 +103,7 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - The picture never changes the fight. A new script must also be listed in `sandbox.html` and `tests/harness.mjs`.
 
 **Deploying**
-- Every push to `swords-and-sandals` rebuilds https://yodeah.github.io/fictional-octo-telegram/. Check it with `gh api repos/yodeah/fictional-octo-telegram/pages/builds/latest --jq '.status + " " + .commit'`.
+- Every push to `swords-and-sandals` runs the **Deploy games to Pages** workflow for https://yodeah.github.io/fictional-octo-telegram/. Check it with `gh run list --branch swords-and-sandals`.
 
 **Working in the repository**
 - `swords-and-sandals` is usually checked out in another worktree. Branch from `origin/swords-and-sandals` under a new name and push with `git push origin HEAD:swords-and-sandals`.

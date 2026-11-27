@@ -92,8 +92,17 @@ const ArenaDuel = (() => {
     return result();
   }
 
+  // A still of one fighter for the menus. It leaves no bout running.
+  function portrait(config, picture) {
+    setup(1, [config, config]);
+    state = 'ready';
+    active = false;
+    drawStill(picture, fighters[0]);
+  }
+
   return {
     setup,
+    portrait,
     advance,
     resolve,
     result,
