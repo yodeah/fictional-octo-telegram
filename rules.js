@@ -10,7 +10,7 @@ const Rules = (() => {
   };
   const statNames = { str: 'Strength', agi: 'Agility', end: 'Endurance', mind: 'Mind', cha: 'Charm' };
   const drills = {
-    power: { name: 'Lift stones', text: 'Strength: harder hits, faster heavy swings.', gain: 6 },
+    power: { name: 'Lift stones', text: 'Strength: harder hits, faster heavy swings, kicks.', gain: 6 },
     skill: { name: 'Weapon forms', text: 'Weapon skill: better aim, more melee and ranged damage.', gain: 6 },
     guard: { name: 'Shield work', text: 'Defense: less damage, better blocks.', gain: 3 },
     toughness: { name: 'Run the beach', text: 'More health.', gain: 16 }

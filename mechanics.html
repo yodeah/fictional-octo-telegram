@@ -61,7 +61,7 @@
       <table>
         <tr><th>Stat</th><th>What it does</th></tr>
         <tr><td>Attack</td><td>Weapon skill: a third of melee damage scaling, and makes blows harder to dodge. Also guides weapon choice.</td></tr>
-        <tr><td>Strength</td><td>Melee and bash damage. Above 66, shortens recovery after heavy swings (full effect at 95).</td></tr>
+        <tr><td>Strength</td><td>Melee, bash and kick damage. 8 or more above the rival allows kicks. Above 66, shortens recovery after heavy swings (full effect at 95).</td></tr>
         <tr><td>Ranged</td><td>Bolt damage and accuracy.</td></tr>
         <tr><td>Magic</td><td>Spell damage.</td></tr>
         <tr><td>Defense</td><td>Includes shield and armor. Raises block chance, reduces physical damage above 45, and raises the stance limit.</td></tr>
@@ -70,7 +70,7 @@
       <table>
         <tr><th>Resource</th><th>Start</th><th>Recovery</th><th>Spent on</th></tr>
         <tr><td>Mana</td><td>60 of 100</td><td>3.6 per second</td><td>Spells</td></tr>
-        <tr><td>Energy</td><td>100</td><td>5 per second (4.65 with a spare weapon)</td><td>Attacks, blocks (9–22, +7 against heavy), dodges (11), bashes (14), weapon swaps (7)</td></tr>
+        <tr><td>Energy</td><td>100</td><td>5 per second (4.65 with a spare weapon)</td><td>Attacks, blocks (9–22, +7 against heavy), dodges (11), bashes (14), kicks (18), weapon swaps (7)</td></tr>
       </table>
       <p>Low energy makes weapon attacks up to 24% slower and 33% weaker. Spells cost no energy.</p>
     </section>
@@ -95,7 +95,7 @@
         <li><b>Spells:</b> can be resisted. Mana is paid partway through the cast, so an early interruption costs nothing.</li>
         <li><b>Block:</b> chance depends on the attack and the defender’s Defense. It needs a one-handed weapon (shield in use) and enough energy.</li>
         <li><b>Dodge:</b> a chance to step back from weapon attacks, improved by mobility. Frozen fighters cannot dodge.</li>
-        <li><b>Damage modifiers:</b> weapon roll, skill, armor matchup, armor type defense, Defense (physical only), wards, and +14% against a staggered target.</li>
+        <li><b>Damage modifiers:</b> weapon roll, skill, armor matchup, armor type defense, Defense (physical only), wards, and +60% against a staggered target.</li>
       </ul>
       <table>
         <tr><th>Damage taken by</th><th>Melee</th><th>Ranged</th><th>Magic</th></tr>
@@ -112,6 +112,7 @@
         <li>Heavy swings and bashes apply the most pressure. Head hits add 25%; blocked hits apply about half.</li>
         <li>Stance recovers after 1.35 seconds without a hit.</li>
         <li>A break staggers the fighter for about 1.2 seconds. Blocking with almost no energy left also staggers.</li>
+        <li><b>Kick:</b> a fighter holding a melee weapon with at least 8 more Strength than the rival sometimes kicks at close range. It ignores shields but can be dodged, deals little damage, always staggers for 1.5 seconds and knocks the target back about half a unit. Costs 18 energy, with a 6 second cooldown. A spell whose trigger is due is cast first.</li>
         <li>A shield bash can follow a block or interrupt a nearby heavy windup. It has a 2.8 second cooldown.</li>
         <li><b>Axe attacks:</b> The light chop has a compact wind-up and quick recovery. At close range, a fighter with enough energy can commit to an overhead cleave against a recovering, frozen, staggered or off-balance rival, or during a counter opening. The ordinary axe costs 16 energy for a chop and 36 for a cleave. A cleave spends its energy at wind-up and deals extra stance damage. Both moves wear down a shield on contact.</li>
         <li><b>Shield wear:</b> Blocking an axe or mace family melee strike consumes one durability, including on a perfect block. Bucklers break on the first such hit, round shields on the second, and tower shields on the third. The final block stops the hit and breaks the shield. Shield bonuses, blocks and bashes return with a fresh shield next bout.</li>

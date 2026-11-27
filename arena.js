@@ -917,7 +917,7 @@ function fighterPose(fighter) {
   const action = fighter.action;
   const incoming = otherFighter(fighter).action;
   const at = action?.phase ?? 0;
-  const swinging = action?.style === 'melee' && !action.bash;
+  const swinging = action?.style === 'melee' && !action.bash && !action.kick;
   const shooting = action?.style === 'ranged';
   const swingAt = action?.hitAt ?? .78;
   const release = smooth((at - .48) / (swingAt - .48));
@@ -941,11 +941,15 @@ function fighterPose(fighter) {
   const breath = Math.sin((state === 'ready' ? visualClock * 3 : 0) + fighter.direction) * .025;
   const stun = ease((elapsed - fighter.stunStarted) / .16) * ease((fighter.stunnedUntil - elapsed) / .24);
   const bash = action?.bash ? release * (1 - smooth((at - swingAt - .06) / .32)) : 0;
+  // A kick chambers the knee, drives the front foot out and sets it back down.
+  const chamber = action?.kick ? smooth((at - .16) / .3) * (1 - smooth((at - swingAt - .12) / .32)) : 0;
+  const thrustOut = action?.kick ? smooth((at - .52) / (swingAt - .52)) * (1 - smooth((at - swingAt - .07) / .24)) : 0;
   const drop = guard * .085 + strike * .065 + weightShift * .021 - casting * .08 + stun * .36 + (zone === 'leg' ? recoil * .16 : 0);
   const evasion = incoming?.evade && !action ? ease((incoming.phase - .40) / .29) * (1 - ease((incoming.phase - .92) / .43)) : 0;
-  const lean = strike * .23 - windup * .17 + casting * .13 - recoil * .25 + guard * .08 - evasion * .18 + aiming * .09 + stun * .20 + bash * .21;
+  const lean = strike * .23 - windup * .17 + casting * .13 - recoil * .25 + guard * .08 - evasion * .18 + aiming * .09 + stun * .20 + bash * .21
+    - chamber * .12 - thrustOut * .14;
   const twist = sway * .11 - windup * .12 + strike * .18 + guard * .05;
-  const hips = [-.10 + sway * .045, 1.095 + breath - drop, weightShift * .024];
+  const hips = [-.10 + sway * .045 + thrustOut * .12, 1.095 + breath - drop, weightShift * .024];
   const chest = [-.11 + lean + sway * .075, 1.72 + breath - drop, twist * .26];
   const head = shifted(chest, -.015 + strike * .055 - recoil * (zone === 'head' ? .27 : .09) - sway * .025,
     .33 - (zone === 'head' ? recoil * .055 : 0) - stun * .15, -twist * .16);
@@ -956,8 +960,12 @@ function fighterPose(fighter) {
     const plant = sign * (guard * .13 + strike * .20 + casting * .08 + stun * .12 + bash * .18);
     joints[side + 'Hip'] = shifted(hips, sign * .077, -.016, sign * .165);
     joints[side + 'Ankle'] = [sign * .355 + step.x * gait + plant, .157 + step.y * gait, sign * .22];
+    if (sign > 0 && chamber) {
+      const raised = [mix(.30, 1.12, thrustOut), mix(.62, 1.02, thrustOut), .16];
+      joints.frontAnkle = pointBetween(joints.frontAnkle, raised, chamber);
+    }
     joints[side + 'Knee'] = bendJoint(joints[side + 'Hip'], joints[side + 'Ankle'], .515, .505, 1);
-    const pitch = step.pitch * gait;
+    const pitch = step.pitch * gait + (sign > 0 ? chamber * .7 + thrustOut * .5 : 0);
     joints[side + 'Toe'] = shifted(joints[side + 'Ankle'], .19 * Math.cos(pitch), -.07 + .19 * Math.sin(pitch), .016);
   }
 
@@ -1019,11 +1027,13 @@ function actionMotion(fighter, action, memory) {
       const struck = (defender.reaction?.time ?? -10) >= action.created;
       memory.outcome = !struck ? 'miss' : defender.counterUntil > elapsed ? 'blocked' : 'hit';
     }
-    const heft = action.bash ? .9 : weapon.twoHanded || action.heavy ? 1.18 : action.key === 'rapier' ? .7 : 1;
-    const thrust = weaponFamily(action.key) === 'spear' && !action.bash;
+    const heft = action.kick ? 1 : action.bash ? .9 : weapon.twoHanded || action.heavy ? 1.18 : action.key === 'rapier' ? .7 : 1;
+    const thrust = weaponFamily(action.key) === 'spear' && !action.bash && !action.kick;
     // Coil before the swing, then let go before the contact window so the drawn weapon matches its hitbox.
     const coil = heft * smooth((at - .06) / .32) * (1 - smooth((at - .46) / .11));
-    if (action.bash) {
+    if (action.kick) {
+      add(coil, { hipX: -.04, drop: .06, leanX: -.06, handX: -.06, offX: -.04, twist: -.07 });
+    } else if (action.bash) {
       add(coil, { hipX: -.03, drop: .05, leanX: -.07, offX: -.16, offY: -.03, frontX: -.03, frontY: .02, twist: -.08, tilt: -.10 });
     } else if (thrust) {
       add(coil, { hipX: -.06, drop: .05, leanX: -.07, headX: -.01, handX: -.06, handY: .03, angle: .06, offX: .07,
@@ -1032,7 +1042,9 @@ function actionMotion(fighter, action, memory) {
       add(coil, { hipX: -.05, drop: .08, leanX: -.13, leanY: -.01, headX: -.03, handX: -.12, handY: .11, angle: .40,
         offX: .10, offY: .04, frontX: -.05, frontY: .045, twist: -.15, cloth: .05 });
     }
-    if (memory.connectedPhase !== null && memory.outcome === 'blocked' && !action.bash) {
+    if (action.kick) {
+      // The pose already carries the leg back down.
+    } else if (memory.connectedPhase !== null && memory.outcome === 'blocked' && !action.bash) {
       // A blocked weapon rebounds off the shield instead of carrying through.
       const t = at - memory.connectedPhase;
       add(heft * ease(t / .05) * (1 - smooth((t - .07) / .40)), { hipX: -.04, leanX: -.07, headX: -.02, handX: -.07, handY: .11,
@@ -1082,7 +1094,7 @@ function reactionMotion(fighter, memory, clock) {
     const blow = otherFighter(fighter).action;
     const share = Math.max(0, memory.hp - fighter.hp) / fighter.maxHP;
     const blocked = share === 0;
-    const force = (blow?.heavy ? 1.3 : 1) * (blow?.bash ? 1.2 : 1) * (blow?.style === 'ranged' ? .75 : blow?.spell ? .85 : 1);
+    const force = (blow?.heavy ? 1.3 : 1) * (blow?.bash ? 1.2 : blow?.kick ? 1.35 : 1) * (blow?.style === 'ranged' ? .75 : blow?.spell ? .85 : 1);
     memory.hit = reaction && {
       blocked, force,
       push: Math.min(.48, force * (blocked ? .06 : clamp(.10 + share * 1.4, .10, .36))),
@@ -1579,7 +1591,7 @@ function drawGladiator2D(fighter, pose, target = null) {
     : flailTrails(key, weaponAxis(hand, angle)(.61), windup, strike, weaponClock())
       .map(chain => fraction => mount ? pointBetween(mount, chain(fraction), size) : chain(fraction));
   const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
-  const thrown = finishingSpear(fighter, pose);
+  const thrown = looseWeapon(fighter, pose);
   const stowed = weapons[spare] ? stowedMount(pose, spare) : null;
   ArenaArt2D.draw({
     ctx: target?.ctx || ctx,
@@ -1600,12 +1612,12 @@ function drawGladiator2D(fighter, pose, target = null) {
     owner: fighter,
     forward: fighter.x * fighter.direction + pose.joints.chest[0],
     weapon: {
-      key: art(thrown ? 'spear' : fighter.weapon),
+      key: art(thrown?.key ?? fighter.weapon),
       chains: chains(fighter.weapon, pose.joints.weaponHand, pose.angle, pose.windup, pose.strike),
       twoHanded: weapons[fighter.weapon].twoHanded,
       thrown,
       draw: mesh(() => weaponModel(fighter, thrown?.hand || pose.joints.weaponHand, thrown?.angle ?? pose.angle,
-        pose.windup, pose.strike, weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon))
+        pose.windup, pose.strike, weaponClock(), limb, world, thrown?.key ?? fighter.weapon))
     },
     spare: stowed ? {
       key: art(spare), ...stowed, draw: mesh(() => stowedWeapon(fighter, pose, spare, limb, world)),
@@ -1744,9 +1756,9 @@ function drawGladiator(fighter, pose, parts) {
   }
 
   partStart = recordGeometry(parts, 'body', partStart);
-  const thrown = finishingSpear(fighter, pose);
+  const thrown = looseWeapon(fighter, pose);
   weaponModel(fighter, thrown?.hand || j.weaponHand, thrown?.angle ?? pose.angle, pose.windup, pose.strike,
-    weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon);
+    weaponClock(), limb, world, thrown?.key ?? fighter.weapon);
   partStart = recordGeometry(parts, 'held', partStart);
   if (fighter.shieldHitsLeft === 0) return;
   const shieldTransform = drawShieldModel(fighter, pose, world);
@@ -1818,7 +1830,7 @@ function weaponSegments(fighter, pose) {
 function sampleTrails() {
   for (const fighter of fighters) {
     const action = fighter.action;
-    if (action?.style !== 'melee' || action.bash || action.phase < .48 || action.phase > action.hitAt + .22) continue;
+    if (action?.style !== 'melee' || action.bash || action.kick || action.phase < .48 || action.phase > action.hitAt + .22) continue;
     const pose = displayPose(fighter);
     const hand = pose.joints.weaponHand;
     const reach = point => Math.hypot(point[0] - hand[0], point[1] - hand[1]);
@@ -1889,6 +1901,10 @@ function nearestPoint(point, from, to) {
 }
 
 function attackSegments(action, pose) {
+  if (action.kick) {
+    const { frontKnee, frontAnkle, frontToe } = pose.joints;
+    return [[pointBetween(frontKnee, frontAnkle, .6), frontAnkle, .13], [frontAnkle, frontToe, .15]];
+  }
   if (!action.bash) return weaponSegments(action.attacker, pose);
   const hand = shifted(pose.joints.shieldHand, .20, .02);
   return [[shifted(hand, 0, -.18), shifted(hand, 0, .20), .26]];
@@ -2410,6 +2426,8 @@ function draw() {
   if (artStyle.flat) {
     const rank = fighter => (fighter.ragdoll ? 0 : fighter.action?.style === 'melee' ? 2 : 1);
     order.sort((a, b) => rank(fighters[a]) - rank(fighters[b]));
+    // A lodged blade goes behind the body, which hides the part inside it.
+    if (finisher?.type === 'lodged') order.sort((a, b) => (fighters[a] === finisher.attacker ? 0 : 1) - (fighters[b] === finisher.attacker ? 0 : 1));
   }
   if (ArenaBench.drawFighters) order.forEach(index => {
     const fighter = fighters[index];
@@ -2671,7 +2689,7 @@ function canGuard(fighter) {
   const own = fighter.action;
   if (ownedSpecial(fighter)?.noGuard?.(fighter, fighter.special)) return false;
   return shieldReady(fighter) && fighter.stunnedUntil <= elapsed
-    && (!own || (own.connected && own.phase > own.hitAt + .12 && !own.bash));
+    && (!own || (own.connected && own.phase > own.hitAt + .12 && !own.bash && !own.kick));
 }
 
 function isGuarding(action) {
@@ -2689,9 +2707,23 @@ function shouldBash(attacker, defender, gap) {
     || (incoming?.heavy && !incoming.connected && incoming.phase < .53));
 }
 
-function startAction(attacker, defender, bash = false) {
+function shouldKick(attacker, defender, gap) {
+  const forceKick = forced.has('kick');
+  const edge = attacker.strength - defender.strength;
+  // Only a fighter with a melee weapon in hand kicks; archers and casters would use it to stall.
+  if (!forceKick && (edge < kickEdge || weaponClass(attacker.weapon) !== 'melee')) return false;
+  if (attacker.kickReady > elapsed || attacker.energy < kickCost || gap >= 2.4 || defender.stunnedUntil > elapsed) return false;
+  // A triggered spell whose moment has come is never delayed for a kick.
+  if (attacker.spells.some(key => canCast(attacker, key) && triggerOf(attacker, key)?.(attacker, defender)
+    && worthCasting(attacker, spells[key]))) return false;
+  return forceKick || Math.random() < clamp(.24 + (edge - kickEdge) / 80, .24, .55);
+}
+
+function startAction(attacker, defender, bash = false, kick = false) {
+  // Bashes and kicks use no weapon swing, spell or stance.
+  const strike = bash || kick;
   const gap = (defender.x - attacker.x) * attacker.direction;
-  const { key, style, spellKey, mode } = bash ? { key: attacker.weapon, style: 'melee' } : pickAction(attacker, defender);
+  const { key, style, spellKey, mode } = strike ? { key: attacker.weapon, style: 'melee' } : pickAction(attacker, defender);
   const previousPose = fighterPose(attacker);
   const previousWeapon = attacker.weapon;
   const switched = previousWeapon !== key;
@@ -2706,9 +2738,9 @@ function startAction(attacker, defender, bash = false) {
   const ranged = style === 'ranged';
   const tactic = tacticOf(attacker);
   const guarding = tacticOf(defender);
-  const profile = style === 'melee' && !bash ? powerProfile(item, attacker.strength, mode)
-    : { heavy: false, cost: bash ? 14 : item.energy, power: 1, recovery: .51 };
-  const handling = bash || spell ? profile : { ...profile, cost: Math.ceil(profile.cost * tactic.cost) };
+  const profile = style === 'melee' && !strike ? powerProfile(item, attacker.strength, mode)
+    : { heavy: false, cost: kick ? kickCost : bash ? 14 : item.energy, power: 1, recovery: kick ? .3 : .51 };
+  const handling = strike || spell ? profile : { ...profile, cost: Math.ceil(profile.cost * tactic.cost) };
   const fatigue = spell ? 1 : clamp(attacker.energy / handling.cost, 0, 1);
   const equipAccuracy = accuracyBonus(attacker, defender, style, key);
   const guard = shields[defender.gear.shield];
@@ -2716,48 +2748,52 @@ function startAction(attacker, defender, bash = false) {
   const blockChance = (bash ? .12 : spell ? spell.block || 0 : item.block)
     + clamp((defense(defender) - 56) / (spell ? 350 : 150), -.10, .20) + guarding.block;
   const guardCost = guard.energy + (handling.heavy ? 7 : 0);
-  const block = shieldReady(defender) && !ownedSpecial(defender)?.noGuard?.(defender, defender.special) && (!spell || spell.damage) && defender.energy >= guardCost
-    && (Math.random() < Math.max(.03, blockChance) || (forced.has('perfect') && style === 'melee' && !bash));
+  // A kick goes under or around a shield, so it can only be dodged.
+  const block = !kick && shieldReady(defender) && !ownedSpecial(defender)?.noGuard?.(defender, defender.special) && (!spell || spell.damage) && defender.energy >= guardCost
+    && (Math.random() < Math.max(.03, blockChance) || (forced.has('perfect') && style === 'melee' && !strike));
   // A well-timed block: easier against telegraphed heavy swings and for high Defense.
-  const perfect = block && style === 'melee' && !bash
+  const perfect = block && style === 'melee' && !strike
     && (forced.has('perfect') || Math.random() < clamp(.45 + (handling.heavy ? .15 : 0) + (defense(defender) - 56) / 250, .25, .70) + guarding.perfect);
   // A chosen target takes most swings. Bashes go where they always did.
-  const aimed = !bash && !spell && style === 'melee' ? aimZones[attacker.aimAt] : undefined;
+  const aimed = !strike && !spell && style === 'melee' ? aimZones[attacker.aimAt] : undefined;
   const mark = aimed?.aim;
-  const evade = !spell && !bash && !block && defender.frozenUntil <= elapsed && defender.energy >= 11
+  const evade = !spell && !bash && (!kick || !forced.has('kick')) && !block && defender.frozenUntil <= elapsed && defender.energy >= 11
     && Math.random() < (clamp(.18 - equipAccuracy / 520 - (attacker.attack - 55) / 600, .03, .32) + guarding.evade + (aimed?.dodge || 0)) * mobility(defender);
   const aimRoll = Math.random();
-  const aim = mark !== undefined && aimRoll < .75 ? mark
+  const aim = kick ? 0 : mark !== undefined && aimRoll < .75 ? mark
     : defender.stunnedUntil > elapsed ? -.64 : aimRoll < .19 ? -.96 : aimRoll > .69 ? .93 : .08;
-  const reach = bash ? 1.18 : item.range - .23 - Math.abs(aim) * .26;
-  const tempo = (bash ? 2.34 * ownShield.bashTempo : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16 * (mode?.tempo ?? 1) * tactic.tempo)
+  const reach = kick ? 1.2 : bash ? 1.18 : item.range - .23 - Math.abs(aim) * .26;
+  const tempo = (kick ? 1.7 : bash ? 2.34 * ownShield.bashTempo : spell ? .99 * (item.castTempo || 1) : item.tempo * 1.16 * (mode?.tempo ?? 1) * tactic.tempo)
     * mobility(attacker) * mix(.76, 1, fatigue) * (attacker.chilledUntil > elapsed ? .76 : 1);
   const attackSkill = ranged ? attacker.ranged : (attacker.strength * 2 + attacker.attack) / 3;
-  const damage = bash ? (5.5 + attacker.strength / 28) * fatigue * ownShield.bashPower
+  const damage = kick ? (4 + attacker.strength / 28) * fatigue
+    : bash ? (5.5 + attacker.strength / 28) * fatigue * ownShield.bashPower
     : spell ? (spell.damage || 0) * (item.spellPower || 1) * (.76 + attacker.magic / 300)
       : (item.damage + Math.floor(Math.random() * 7)) * (.73 + attackSkill / 245) * mix(.67, 1, fatigue) * handling.power;
   const hitAt = spell || ranged ? .94 : .78;
   const now = elapsed;
   attacker.action = {
-    attacker, defender, phase: 0, created: now, previousPose, bash, key, mode, label: mode?.name,
+    attacker, defender, phase: 0, created: now, previousPose, bash, kick, key, mode, label: mode?.name,
     block, guardCost, evade, spell, spellKey, aim, style, switched, perfect,
     riposte: bash && attacker.riposte && attacker.counterUntil > now, bashPower: bash ? ownShield.bashPower : 1,
-    damage: damage * (bash ? 1 : armorPower(attacker, style) * tactic.damage * (aimed?.swing ?? 1)),
+    damage: damage * (strike ? 1 : armorPower(attacker, style) * tactic.damage * (aimed?.swing ?? 1)),
     crowded: ranged ? closeRange(gap) : 0,
     shotRoll: Math.random(),
     shotAccuracy: .75 + attacker.ranged / 390 + equipAccuracy / 430,
     resistedSpell: spell?.damage && Math.random() > clamp(.95 + equipAccuracy / 410, .72, .99),
-    attackType: bash ? 2 : attackType(style, key),
+    attackType: strike ? 2 : attackType(style, key),
     heavy: handling.heavy, cost: handling.cost, tempo, hitAt, reach,
-    stanceDamage: bash ? 47 * ownShield.bashPower : spell ? 12 : (ranged ? 16 : mode?.stance ?? (handling.heavy ? 49 : 24 + item.damage * .36)) * tactic.breaking,
-    duration: hitAt + (bash ? .43 : handling.recovery) + (switched ? .13 : 0)
+    stanceDamage: kick ? 0 : bash ? 47 * ownShield.bashPower : spell ? 12 : (ranged ? 16 : mode?.stance ?? (handling.heavy ? 49 : 24 + item.damage * .36)) * tactic.breaking,
+    duration: hitAt + (kick ? handling.recovery : bash ? .43 : handling.recovery) + (switched ? .13 : 0)
   };
   if (mode?.heavy) spendEnergy(attacker, handling.cost);
-  if (!bash && !spell) specialOf(attacker, key)?.modifyAction?.(attacker, attacker.action, attacker.special);
+  if (!strike && !spell) specialOf(attacker, key)?.modifyAction?.(attacker, attacker.action, attacker.special);
   if (bash) {
     attacker.counterUntil = 0;
     attacker.riposte = false;
     attacker.bashReady = now + 2.8;
+  } else if (kick) {
+    attacker.kickReady = now + 6;
   } else {
     attacker.weaponStreak = key === attacker.lastWeapon ? attacker.weaponStreak + 1 : 1;
     attacker.lastWeapon = key;
@@ -2777,11 +2813,11 @@ function showCurrentAction() {
     return;
   }
   const current = fighters.map(fighter => fighter.action)
-    .filter(action => action && !action.connected && (action.spell || action.style === 'ranged' || action.bash || action.label))
+    .filter(action => action && !action.connected && (action.spell || action.style === 'ranged' || action.bash || action.kick || action.label))
     .sort((a, b) => b.created - a.created)[0];
   elements.cast.hidden = !current;
   if (!current) return;
-  const name = current.riposte ? 'Riposte bash' : current.bash ? 'Shield bash' : current.spell?.name
+  const name = current.kick ? 'Kick' : current.riposte ? 'Riposte bash' : current.bash ? 'Shield bash' : current.spell?.name
     ?? (current.label || (current.snare ? 'Snare bolt' : null)) ?? (current.crowded > .35 ? 'Crowded shot' : weaponName(current.attacker, current.key));
   const label = current.attacker.name + ' · ' + name;
   if (elements.cast.textContent !== label) {
@@ -2803,7 +2839,7 @@ function startBout(generated = null) {
     fighter.x = -fighter.direction * 2.6;
     fighter.z = fighter.gait = fighter.velocity = 0;
     fighter.action = null;
-    fighter.stance = fighter.stunnedUntil = fighter.stunStarted = fighter.counterUntil = fighter.bashReady = 0;
+    fighter.stance = fighter.stunnedUntil = fighter.stunStarted = fighter.counterUntil = fighter.bashReady = fighter.kickReady = 0;
     fighter.lastStanceHit = -10;
     fighter.readyAt = .14 + Math.random() * .24;
     fighter.stride = .13 + (fighter.direction < 0 ? .50 : 0);
@@ -2980,6 +3016,12 @@ function updateStance(fighter) {
   }
 }
 
+// Blows against a staggered fighter hurt this much more.
+const staggerDamage = 1.6;
+// A fighter this much stronger than the rival can kick them off balance.
+const kickEdge = 8;
+const kickCost = 18;
+
 function breakStance(fighter, duration) {
   fighter.stance = 0;
   fighter.stunStarted = elapsed;
@@ -3009,14 +3051,15 @@ function applyStanceDamage(action, scale, interrupt = false) {
 }
 
 function impact(action, contact) {
-  const { attacker, defender, damage, spell, style, bash } = action;
+  const { attacker, defender, damage, spell, style, bash, kick } = action;
+  const strike = bash || kick;
   if (spell && !spell.damage) {
     applySupportSpell(attacker, spell, (weapons[attacker.weapon].spellPower || 1) * armorPower(attacker, 'magic'));
     return;
   }
 
-  const special = !bash && !spell ? specialOf(attacker, action.key) : null;
-  const name = bash ? 'shield bash' : spell?.name || (special ? special.name : weapons[action.key].name.toLowerCase());
+  const special = !strike && !spell ? specialOf(attacker, action.key) : null;
+  const name = kick ? 'kick' : bash ? 'shield bash' : spell?.name || (special ? special.name : weapons[action.key].name.toLowerCase());
   const moveName = action.mode ? name + ' ' + action.mode.name.toLowerCase() : name;
   const usedName = spell || special ? moveName : 'the ' + moveName;
   if (attacker.blindUntil > elapsed && Math.random() < .45) {
@@ -3075,20 +3118,21 @@ function impact(action, contact) {
   }
 
   const zone = contact?.zone || 'body';
-  const struck = contact && !bash && !spell && zone === attacker.aimAt ? aimZones[zone] : null;
+  const struck = contact && !strike && !spell && zone === attacker.aimAt ? aimZones[zone] : null;
   const multiplier = { head: 1.24, body: 1, arm: .88, leg: .85 }[zone];
   const matchup = armors[defender.gear.armor][style];
   const absorption = style === 'magic' ? 1 : 1 - Math.max(0, defense(defender) - 45) / 275;
   const typeDefense = armors[defender.gear.armor].defenseBonus[action.attackType];
+  const staggered = defender.stunnedUntil > elapsed;
   const rolledDamage = Math.max(1, Math.round(damage * suddenDeath() * multiplier * matchup * absorption * (1 - typeDefense / 600)
-    * (defender.stunnedUntil > elapsed ? 1.14 : 1) * tacticOf(defender).taken
+    * (staggered ? staggerDamage : 1) * tacticOf(defender).taken
     // The Flagellant's edge: harder blows once below half health.
     * (attacker.zeal && attacker.hp < attacker.maxHP / 2 ? zealDamage : 1)));
   const absorbed = Math.min(defender.ward, rolledDamage);
   defender.ward -= absorbed;
   const actualDamage = survivable(defender, attacker, Math.min(rolledDamage - absorbed, defender.hp));
   if (absorbed) logEvent(defender.name + '’s ' + defender.wardName + ' absorbs ' + absorbed + ' damage.');
-  const blood = actualDamage > 0 && !spell && !bash;
+  const blood = actualDamage > 0 && !spell && !strike;
   const color = absorbed && !actualDamage ? defender.wardColor : spell?.color || '#ffd0ba';
   if (!blood) {
     burst(defender, { point, offset: -attacker.direction * .29, direction: attacker.direction, colors: [color, '#fff3d3'], count: 22 });
@@ -3103,7 +3147,7 @@ function impact(action, contact) {
   ArenaEffects.strike(flashPoint, attacker.direction, spell?.color || (clang ? '#ffb63f' : '#ffe0c2'),
     clang ? 12 : 4, action.heavy || zone === 'head' ? 1.35 : .9);
   if (action.heavy || actualDamage > defender.maxHP * .14) kickDust(defender, 1, 7);
-  const tag = [zone !== 'body' && contact ? zone.toUpperCase() : '', matchup >= 1.2 ? 'ARMOR WEAKNESS' : '',
+  const tag = [staggered ? 'STAGGERED' : '', zone !== 'body' && contact ? zone.toUpperCase() : '', matchup >= 1.2 ? 'ARMOR WEAKNESS' : '',
     absorbed ? absorbed + ' WARDED' : ''].filter(Boolean).join(' · ');
   if (actualDamage) {
     floatLabel(defender, '−' + actualDamage, spell?.color || (zone === 'head' ? '#ffd23f' : '#fff6ea'),
@@ -3118,7 +3162,7 @@ function impact(action, contact) {
   ArenaEffects.shake(defender.hp <= 0 ? 1 : actualDamage ? Math.min(.85, .22 + weight) : .15);
   if (actualDamage) {
     logEvent(attacker.name + ' hits ' + defender.name + (contact ? '’s ' + zone : '') + ' with ' + usedName + ' for '
-      + actualDamage + ' damage.' + (matchup >= 1.2 ? ' Armor weakness.' : ''));
+      + actualDamage + ' damage.' + (staggered ? ' Punished while staggered.' : '') + (matchup >= 1.2 ? ' Armor weakness.' : ''));
     if (spell) applySpellHit(attacker, defender, spell, actualDamage);
   }
   updateHealth();
@@ -3126,6 +3170,15 @@ function impact(action, contact) {
   // A special can end the bout itself (an execution), and then there is nothing left to resolve.
   if (state !== 'running') return;
   if (defender.hp > 0) {
+    if (kick) {
+      // A landed kick always breaks the stance and drives the defender back, into the wall if it is close.
+      if (defender.stunnedUntil <= elapsed) breakStance(defender, 1.5);
+      defender.shove = .5 * (forced.has('wall') ? 8 : 1);
+      ArenaEffects.shake(.6);
+      floatLabel(defender, 'KICKED', '#ffbe5c');
+      logEvent(attacker.name + '’s kick sends ' + defender.name + ' reeling.');
+      return;
+    }
     if (struck && actualDamage) {
       if (struck.drain) spendEnergy(defender, struck.drain);
       if (struck.hobble) defender.hobbledUntil = elapsed + struck.hobble;
@@ -3370,7 +3423,7 @@ function throwSand(fighter, rival) {
 }
 
 function resolved(action) {
-  if (state !== 'running' || action.bash || action.spell) return;
+  if (state !== 'running' || action.bash || action.kick || action.spell) return;
   specialOf(action.attacker, action.key)?.onResolved?.(action.attacker, action.defender, action, action.attacker.special);
 }
 
@@ -3406,7 +3459,8 @@ function advanceAction(action, dt) {
   }
   if (attacker.action === action && action.phase >= action.duration) {
     attacker.action = null;
-    const pause = (.08 + Math.random() * .29) * (attacker.energy < 18 ? 1.7 : 1) * tacticOf(attacker).pause;
+    // A kicker follows up at once, while the rival is still reeling.
+    const pause = action.kick ? 0 : (.08 + Math.random() * .29) * (attacker.energy < 18 ? 1.7 : 1) * tacticOf(attacker).pause;
     attacker.readyAt = elapsed + pause;
   }
 }
@@ -3463,14 +3517,15 @@ function update(dt, realTime) {
       burst(fighter, { point: worldPoint(fighter, fighterPose(fighter).joints.head), colors: sandColors, count: 3, gravity: 1.2 });
     }
     const own = fighter.action;
-    const recoveryCounter = own?.connected && !own.heavy && !own.bash && own.phase > own.hitAt + .19;
+    const recoveryCounter = own?.connected && !own.heavy && !own.bash && !own.kick && own.phase > own.hitAt + .19;
     const idle = !own && fighter.readyAt <= elapsed;
     const gap = (rival.x - fighter.x) * fighter.direction;
     if ((idle || recoveryCounter) && fighter.stunnedUntil <= elapsed) {
       const bash = shouldBash(fighter, rival, gap);
       const underGuard = rival.action && !rival.action.connected
         && isGuarding(rival.action) && rival.action.phase > .17;
-      if (bash || (idle && !underGuard)) startAction(fighter, rival, bash);
+      const kick = !bash && idle && !underGuard && shouldKick(fighter, rival, gap);
+      if (bash || (idle && !underGuard)) startAction(fighter, rival, bash, kick);
     }
   }
   fighters.forEach(fighter => moveFighter(fighter, dt));
@@ -3536,9 +3591,11 @@ artButton.addEventListener('click', () => {
 showArtStyle();
 
 // ?cast=1 or ?cast=2 pins gear that has 2D art, so the proof of concept can be seen at a glance.
+// ?cast=3 is a sword against a rapier, for the Lodged Blade finisher.
 const cast = {
   1: [{ weapon: 'sword', reserve: 'staff', shield: 'round', armor: 'plate' }, { weapon: 'crossbow', reserve: 'sword', shield: 'round', armor: 'leather' }],
-  2: [{ weapon: 'staff', reserve: 'none', shield: 'round', armor: 'robes' }, { weapon: 'sword', reserve: 'crossbow', shield: 'round', armor: 'plate' }]
+  2: [{ weapon: 'staff', reserve: 'none', shield: 'round', armor: 'robes' }, { weapon: 'sword', reserve: 'crossbow', shield: 'round', armor: 'plate' }],
+  3: [{ weapon: 'sword', reserve: 'none', shield: 'none', armor: 'leather' }, { weapon: 'rapier', reserve: 'none', shield: 'none', armor: 'leather' }]
 }[new URLSearchParams(location.search).get('cast')];
 cast?.forEach((gear, index) => {
   for (const [slot, key] of Object.entries(gear)) fighters[index].loadout[slot].value = key;

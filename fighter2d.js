@@ -1236,7 +1236,7 @@ const ArenaArt2D = (() => {
     function heldWeapon() {
       const thrown = view.weapon.thrown;
       drawWeapon(view.weapon.key, thrown?.hand || j.weaponHand, thrown?.angle ?? pose.angle, 1, view.weapon.draw, view.weapon.chains);
-      if (!thrown) fist('weapon', parts.far);
+      if (!thrown || thrown.emptyHand) fist('weapon', parts.far);
     }
 
     const swing = drapeSwing(view.owner, view.forward, clamp(pose.cloth * 1.5, -.5, .35), view.clock);

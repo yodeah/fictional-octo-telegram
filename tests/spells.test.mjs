@@ -42,7 +42,7 @@ const matchups = [
   ['drain', axeman, fighter('B', { maxHP: 260 }, 'mace', 'tower', 'plate'), 'ready', 'auto'],
   ['ember', swordsman, mauler, 'ready', 'finish'],
   ['heal', axeman, mauler, 'ready', 'hurt'],
-  ['tailwind', swordsman, fighter('B', {}, 'sword', 'round', 'leather'), 'finish', 'auto']
+  ['tailwind', swordsman, fighter('B', {}, 'spear', 'round', 'leather'), 'finish', 'auto']
 ];
 for (const [spell, hero, foe, better, worse] of matchups) {
   test(spell + ': "' + better + '" wins more often than "' + worse + '"', () => {

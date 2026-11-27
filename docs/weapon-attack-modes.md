@@ -20,7 +20,7 @@ These are starting values to playtest. Energy (EP) pays for physical effort. Man
 
 **Spear finisher — Last Cast.** The current game gives a lethal spear melee hit from at least 1.8 units away a one-in-eight chance of Last Cast. The winner rocks back and throws the spear, pinning the fallen rival. Once spear modes exist, use the driving thrust as the eligible move. The throw spends no extra energy and deals no second hit.
 
-**Planned sword and rapier finisher — Lodged Blade.** A killing thrust to the torso can occasionally leave the blade stuck in the opponent. The victor lets go of the hilt as the opponent falls. A brief blood mark shows the point of contact, and the blade falls with the body and stays embedded through the victory screen. On a rapier kill, the existing run-through and kick remains another possible finish.
+**Sword and rapier finisher — Lodged Blade (shipped).** A killing thrust to the torso can occasionally leave the blade stuck in the opponent. The victor lets go of the hilt as the opponent falls. A brief blood mark shows the point of contact, and the blade falls with the body and stays embedded through the victory screen. On a rapier kill, the existing run-through and kick remains another possible finish.
 
 ## Rest of the roster
 
@@ -52,7 +52,7 @@ Work down this table one row per playable commit. Impact rates the expected chan
 | 6 | 4 | Spear probe and driving thrust reward spacing and give Last Cast a recognizable setup. | Check a blocked thrust, a close kill and a lethal long thrust. |
 | 7 | 4 | Crossbow snap and aimed shots change the value of maintaining distance. | Compare close and distant shots. Verify the repeater burst consumes its budget once. |
 | 8 | 3 | Sword and falchion cuts add variety to the starting loadout. | Watch the falchion return cut and verify its extra energy cost. |
-| 9 | 3 | Lodged Blade gives sword and rapier thrusts a rare finish. | Trigger it with each weapon. Check that the victor releases the only visible blade, it follows the falling torso, and the victor has it back on rematch. |
+| 9 | 3 | **Shipped.** Lodged Blade gives sword and rapier thrusts a rare finish. | Trigger it with each weapon. Check that the victor releases the only visible blade, it follows the falling torso, and the victor has it back on rematch. |
 | 10 | 3 | Greatsword jab and sweep give a two-handed fighter a close-range option. | Check shield stowing and compare recovery on a missed sweep. |
 | 11 | 3 | Maul shove and slam let the fighter trade damage for space. | Verify shove distance near both walls and a grounded fall on a lethal slam. |
 | 12 | 3 | Flail snap and orbit reward choosing the right distance for the chain. | Verify shield interception and two distinct contacts on the twin flail. |

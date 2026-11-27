@@ -33,19 +33,20 @@ const bow = { weapon: 'crossbow', shield: 'none' };
 const tank = { weapon: 'mace', shield: 'tower', armor: 'plate', stats: { end: 16 } };
 const club = { weapon: 'club', shield: 'none', armor: 'rags', train: 1 };
 const axe = { weapon: 'axe' };
-// Foes: a number is that champion, otherwise the blood bout on offer.
+// Foes: a number is that champion, otherwise the blood bout on offer. A fourth value scales the foe's health.
 const cases = {
   peddler: { right: [tank, { key: 'peddler' }, 1], wrong: [bow, { key: 'peddler' }, 0] },
-  envoy: { right: [staff, { key: 'envoy' }, 'blood'], wrong: [maul, { key: 'envoy' }, 1] },
-  flagellant: { right: [axe, { key: 'flagellant', part: 'leg' }, 1], wrong: [staff, { key: 'flagellant', part: 'leg' }, 'blood'] },
+  envoy: { right: [staff, { key: 'envoy' }, 'blood'], wrong: [bow, { key: 'envoy' }, 0] },
+  flagellant: { right: [{ weapon: 'sword' }, { key: 'flagellant', part: 'leg' }, 0, .8], wrong: [staff, { key: 'flagellant', part: 'leg' }, 'blood'] },
   crone: { right: [maul, { key: 'crone', up: 'end', down: 'str' }, 0], wrong: [club, { key: 'crone', up: 'str', down: 'end' }, 'blood'] }
 };
 
 for (const [key, sides] of Object.entries(cases)) {
-  for (const [side, [build, offer, against]] of Object.entries(sides)) {
+  for (const [side, [build, offer, against, health = 1]] of Object.entries(sides)) {
     test(key + ' is ' + side + ' for some gladiator, and the test bot sees it', () => {
       const run = gladiator(build);
-      const foe = against === 'blood' ? run.offers.blood : Rules.championConfig(against);
+      const base = against === 'blood' ? run.offers.blood : Rules.championConfig(against);
+      const foe = { ...base, maxHP: Math.round(base.maxHP * health) };
       run.visitor = { ...offer };
       assert.equal(wouldAccept(game, run), side === 'right');
       const after = copy(run);

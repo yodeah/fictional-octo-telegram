@@ -48,8 +48,8 @@ for (const [best, [hero, foe]] of Object.entries(matchups)) {
   test('only the ' + best + ' stance wins its matchup', () => {
     for (const tactic of Object.keys(tactics)) {
       let wins = 0;
-      for (let n = 0; n < 60; n++) wins += play(n * 131 + 7, { ...hero, tactic }, foe).won;
-      const rate = wins / 60;
+      for (let n = 0; n < 300; n++) wins += play(n * 131 + 7, { ...hero, tactic }, foe).won;
+      const rate = wins / 300;
       if (tactic === best) assert.ok(rate > .5, tactic + ' wins ' + rate.toFixed(2));
       else assert.ok(rate < .45, tactic + ' wins ' + rate.toFixed(2));
     }

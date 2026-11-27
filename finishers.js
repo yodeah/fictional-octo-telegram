@@ -3,7 +3,8 @@
 // Cosmetic finishers on the killing blow, chosen by weapon and hit zone. finishBout has already
 // decided the winner when one starts, and a finisher only moves the loser's ragdoll and changes
 // drawing, so it can never change who wins. Like effects.js, nothing here calls Math.random.
-// Testing: ?force=behead (or impale, crumple, lastCast, shatter, pin) uses that finisher on every kill.
+// Testing: ?force=behead (or impale, crumple, lastCast, shatter, pin) uses that finisher on every kill,
+// and ?force=lodged on every sword or rapier kill (sandbox.html?cast=3&force=lodged shows it).
 let finisher = null;
 
 const finisherTypes = {
@@ -12,11 +13,13 @@ const finisherTypes = {
   lastCast: { name: 'LAST CAST', verb: 'pins', color: '#f2bd91' },
   crumple: { name: 'CRUMPLED', verb: 'flattens', color: '#e0a060' },
   shatter: { name: 'SHATTERED', verb: 'shatters', color: '#cfefff' },
-  pin: { name: 'PINNED', verb: 'pins', color: '#fae3ac' }
+  pin: { name: 'PINNED', verb: 'pins', color: '#fae3ac' },
+  lodged: { name: 'LODGED BLADE', verb: 'leaves the blade in', color: '#ffd0ba' }
 };
 
 function chooseFinisher(attacker, defender, zone, action) {
-  const pick = Object.keys(finisherTypes).find(type => forced.has(type));
+  const bladed = action?.style === 'melee' && !action.bash && !action.kick && ['sword', 'rapier'].includes(action.key);
+  const pick = Object.keys(finisherTypes).find(type => forced.has(type) && (type !== 'lodged' || bladed));
   if (pick) return pick;
   if (forced.has('launch')) return 'crumple'; // Older preview links.
   if (action?.execute) return 'behead';
@@ -24,12 +27,13 @@ function chooseFinisher(attacker, defender, zone, action) {
   const iced = action?.spell?.ice || (key && specialOf(attacker, key) === specials.wintersBite)
     || (defender.frozenUntil > elapsed && defender.rootedUntil <= elapsed);
   if (iced) return 'shatter';
-  if (!action || action.bash || action.spell || !key) return null;
+  if (!action || action.bash || action.kick || action.spell || !key) return null;
   if (action.style === 'ranged') return 'pin';
   // Presentation rolls stay independent of the fight's random sequence.
   const rare = () => crypto.getRandomValues(new Uint8Array(1))[0] < 32;
   if (key === 'spear' && Math.abs(attacker.x - defender.x) >= 1.8 && rare()) return 'lastCast';
   if (zone === 'head' && meleeType(key) === 1 && rare()) return 'behead';
+  if (bladed && zone === 'body' && rare()) return 'lodged';
   if (key === 'rapier' && zone === 'body') return 'impale';
   if (weaponFamily(key) === 'maul') return 'crumple';
   return null;
@@ -76,6 +80,8 @@ function startFinisher(attacker, defender, zone, action) {
     for (const node of all) node.speed = [0, 0, 0];
   } else if (type === 'shatter') {
     for (const node of all) node.speed = [0, 0, 0];
+  } else if (type === 'lodged') {
+    lodgeBlade(action.key);
   } else if (type === 'pin') {
     // Knocked back, but only as far as stays in view, then pinned where the chest lands.
     const room = 3.5 + defender.direction * defender.x;
@@ -85,7 +91,31 @@ function startFinisher(attacker, defender, zone, action) {
   const { name, verb, color } = finisherTypes[type];
   ArenaEffects.label([defender.x, 2.9, defender.z + .3], name, color, { power: .2 });
   logEvent(attacker.name + ' ' + verb + ' ' + defender.name + '.');
-  return type === 'impale' ? 1 : .6;
+  return type === 'impale' || type === 'lodged' ? 1 : .6;
+}
+
+// The loser's torso as the victor sees it: a point on it and the way it leans.
+function torsoFrame(attacker, defender) {
+  const { hips, chest } = defender.ragdoll.nodes;
+  const [low, high] = [hips, chest].map(node => toLocal(attacker, worldPoint(defender, node.point)));
+  return { point: pointBetween(low, high, .55), lean: Math.atan2(high[1] - low[1], high[0] - low[0]) };
+}
+
+// Remembers how the blade sits in the torso at the moment of the kill, so it can follow the fall.
+function lodgeBlade(key) {
+  const { attacker, defender } = finisher;
+  const held = displayPose(attacker);
+  const hand = held.joints.weaponHand;
+  const torso = torsoFrame(attacker, defender);
+  const [dx, dy] = [torso.point[0] - hand[0], torso.point[1] - hand[1]];
+  // Keep the tip just inside the far side of the body, wherever the fighters stood.
+  const length = key === 'rapier' ? 1.37 : 1.13;
+  const angle = clamp(Math.atan2(dy, dx), -.4, .4);
+  Object.assign(finisher, { held, key, depth: clamp(Math.hypot(dx, dy), .6, length - .2), angle: angle - torso.lean });
+  // The body topples onto its back, so the hilt ends up standing out of it.
+  for (const node of Object.values(defender.ragdoll.nodes)) node.speed = [-node.point[1] * .9, 0, 0];
+  const wound = worldPoint(defender, pointBetween(defender.ragdoll.nodes.hips.point, defender.ragdoll.nodes.chest.point, .55));
+  ArenaEffects.bleed(wound, attacker.direction, .6);
 }
 
 // Runs each finished-bout step in place of the plain ragdoll step. Returns true if it stepped the ragdoll.
@@ -169,21 +199,33 @@ function finisherPose(fighter) {
     pose.angle = mix(held.angle, .18, draw) - .48 * release;
     return pose;
   }
+  if (finisher.type === 'lodged') {
+    // Let go of the hilt and draw the empty hand back.
+    applyMotion(fighter, pose, { handX: -.34, handY: -.3, leanX: -.12, hipX: -.05 }, smooth((t - .14) / .4));
+    return pose;
+  }
   const kick = smooth((t - .55) / .25) * (1 - smooth((t - 1.05) / .35));
   if (kick > 0) applyMotion(fighter, pose, { frontX: .62, frontY: .42, leanX: -.14, hipX: -.05 }, kick);
   return pose;
 }
 
-// Return the same mesh grip in fighter-local coordinates throughout the throw.
-function finishingSpear(fighter, pose) {
-  if (finisher?.type !== 'lastCast' || fighter !== finisher.attacker) return null;
+// Where the victor's weapon is when it is not in the hand: thrown (Last Cast) or left in the body
+// (Lodged Blade). Both are in the victor's local coordinates, with the same mesh grip throughout.
+function looseWeapon(fighter, pose) {
+  if (fighter !== finisher?.attacker) return null;
+  if (finisher.type === 'lodged') {
+    const torso = torsoFrame(fighter, finisher.defender);
+    const angle = torso.lean + finisher.angle;
+    return { key: finisher.key, angle, hand: weaponAxis(torso.point, angle)(-finisher.depth), emptyHand: true };
+  }
+  if (finisher.type !== 'lastCast') return null;
   const flight = clamp((finisher.clock - .42) / .28, 0, 1);
   const target = toLocal(fighter, worldPoint(finisher.defender, finisher.defender.ragdoll.nodes.chest.point));
   const angle = mix(pose.angle, -.56, flight);
   const endGrip = weaponAxis(target, angle)(-1.68);
   const hand = pointBetween(pose.joints.weaponHand, endGrip, flight);
   hand[1] += .12 * Math.sin(Math.PI * flight);
-  return { hand, angle };
+  return { key: 'spear', hand, angle };
 }
 
 // How far to tint the loser toward ice while they freeze, 0 to 1.
