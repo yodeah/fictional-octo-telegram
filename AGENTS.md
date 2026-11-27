@@ -17,7 +17,7 @@ Every commit that changes the game must be a meaningful improvement in a working
 
 ## Deploy
 
-After each commit, push it with `git push origin HEAD`. A push to this branch publishes the game to https://yodeah.github.io/fictional-octo-telegram/arena-2d/ through `.github/workflows/pages.yml`, beside Salt & Sand from the `swords-and-sandals` branch at the site's root. Check that the **Deploy games to Pages** run for your commit succeeded (`gh run list --workflow pages.yml`) before reporting, and give the user that address.
+After each commit, push it with `git push origin HEAD`. A push to this branch publishes the game to https://yodeah.github.io/fictional-octo-telegram/arena-2d/ through `.github/workflows/pages.yml`, beside Salt & Sand from the `swords-and-sandals` branch at the site's root. Check that the **Deploy games to Pages** run for your commit succeeded (`gh run list --branch claude/detailed-2d-assets-poc-63e424`) before reporting, and give the user that address.
 
 ## Ideas backlog
 
