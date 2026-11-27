@@ -107,17 +107,86 @@
       blob(g, Math.cos(a) * (rx - .06), Math.sin(a) * (ry - .04), .13, ink);
       blob(g, Math.cos(a) * (rx - .06), Math.sin(a) * (ry - .04) - .02, .08, '#e9c36c');
     }
-    // Broken columns, urns and undergrowth around the platform.
-    for (let i = 0; i < 26; i++) {
-      const a = i / 26 * Math.PI * 2 + .12;
-      const x = Math.cos(a) * (rx + 1.15), y = Math.sin(a) * (ry + 1.0);
-      if (i % 3 === 0 && Math.sin(a) < .3) column(g, x, y, 1.5 + r() * 1.6);
-      else if (i % 3 === 1) urn(g, x, y + .1, .5 + r() * .25);
-      else for (let k = 0; k < 16; k++) {
-        blob(g, x + r() * 1.6 - .8, y + r() * .6 - .3, .16 + r() * .24,
-          `hsl(${160 + r() * 50}, 45%, ${14 + r() * 18}%)`);
-      }
+    surroundings(g, r, rx, ry);
+  }
+
+  // Islands of rock in the dark water, then the colonnade and guardians along the far side.
+  function surroundings(g, r, rx, ry) {
+    for (let i = 0; i < 46; i++) {
+      const a = r() * Math.PI * 2, far = 1.12 + r() * .5;
+      const x = Math.cos(a) * rx * far, y = Math.sin(a) * ry * far;
+      rock(g, x, y, .25 + r() * .6, r);
     }
+    const around = (a, out = 1.05) => [Math.cos(a) * (rx + out), Math.sin(a) * (ry + out * .9)];
+    for (let i = 0; i < 30; i++) {
+      const a = i / 30 * Math.PI * 2 + .1;
+      const [x, y] = around(a);
+      if (Math.sin(a) < -.35) continue;
+      if (i % 2) urn(g, x, y + .1, .5 + r() * .25);
+      for (let k = 0; k < 3; k++) tuft(g, x + (r() - .5) * 1.7, y + (r() - .5) * .8, .35 + r() * .35, r);
+    }
+    // Far side, drawn from the corners inward so nearer pieces overlap farther ones.
+    for (const [a, kind, tall] of [[-1.571, 'statue'], [-2.0, 'column', 2.6], [-1.14, 'column', 2.6], [-2.36, 'statue'], [-.78, 'statue'],
+      [-2.68, 'column', 1.7], [-.46, 'column', 2.1], [-2.94, 'column', 2.3], [-.2, 'column', 1.4]]) {
+      const [x, y] = around(a, .35);
+      for (let k = 0; k < 2; k++) tuft(g, x + (k ? .8 : -.8), y + .1, .55, r);
+      // Kept low enough that heads and fire bowls stay inside the camera's view.
+      g.save();
+      g.translate(x, y);
+      g.scale(.66, .66);
+      if (kind === 'column') column(g, 0, 0, tall * .8, r);
+      else statue(g, 0, 0, x > .1 ? -1 : 1);
+      g.restore();
+    }
+  }
+
+  function shapeAt(g, points, color, line = .07) {
+    g.beginPath();
+    points.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](x, y));
+    g.closePath();
+    g.fillStyle = color;
+    g.fill();
+    if (!line) return;
+    g.strokeStyle = ink;
+    g.lineWidth = line;
+    g.lineJoin = 'round';
+    g.stroke();
+  }
+
+  function rock(g, x, y, s, r) {
+    const top = Array.from({ length: 7 }, (_, i) => {
+      const a = i / 7 * Math.PI * 2, reach = s * (.7 + r() * .55);
+      return [x + Math.cos(a) * reach, y + Math.sin(a) * reach * .5];
+    });
+    g.strokeStyle = 'rgba(110,235,215,.2)';
+    g.lineWidth = .06;
+    ellipsePath(g, x, y + s * .42, s * 1.35, s * .55);
+    g.stroke();
+    shapeAt(g, [top[0], [x + s * .6, y + s * .55], [x, y + s * .8], [x - s * .65, y + s * .5], top[3], top[2], top[1]], '#0c2432');
+    shapeAt(g, top, `hsl(${178 + r() * 40}, 32%, ${18 + r() * 9}%)`, .05);
+    shapeAt(g, [top[4], top[5], top[6], [x, y - s * .05]], 'rgba(150,235,215,.16)', 0);
+  }
+
+  // A hooded guardian leaning on a greatsword, facing into the arena.
+  function statue(g, x, y, turn) {
+    const at = list => list.map(([dx, dy]) => [x + dx * turn, y - dy]);
+    shapeAt(g, at([[-.95, 0], [-.8, .5], [.8, .5], [.95, 0]]), '#1b414a');
+    shapeAt(g, at([[-.95, .5], [-.95, .66], [.95, .66], [.95, .5]]), '#8d7440');
+    shapeAt(g, at([[-.75, .66], [-.58, 1.9], [-.3, 2.35], [.3, 2.35], [.58, 1.9], [.75, .66]]), '#3f7478');
+    shapeAt(g, at([[.05, .68], [.12, 2.3], [.3, 2.35], [.58, 1.9], [.75, .66]]), '#24505a', 0);
+    for (const fold of [-.46, -.2, .3, .54]) shapeAt(g, at([[fold, .68], [fold * .55, 1.7], [fold + .07, .68]]), '#1d444e', 0);
+    shapeAt(g, at([[-.36, 2.2], [-.42, 2.75], [0, 3.15], [.42, 2.75], [.36, 2.2], [0, 2.05]]), '#4b8586');
+    shapeAt(g, at([[-.22, 2.35], [-.24, 2.7], [0, 2.86], [.24, 2.7], [.22, 2.35], [0, 2.22]]), '#07151d', .04);
+    for (const dx of [-.09, .09]) {
+      blob(g, x + dx, y - 2.55, .09, 'rgba(120,255,220,.22)');
+      blob(g, x + dx, y - 2.55, .035, '#c8fff0');
+    }
+    shapeAt(g, at([[-.09, 1.7], [-.14, .78], [0, .62], [.14, .78], [.09, 1.7]]), '#a9c9c9');
+    shapeAt(g, at([[0, 1.7], [.09, 1.7], [.14, .78], [0, .62]]), '#5e868e', 0);
+    shapeAt(g, at([[-.4, 1.68], [-.4, 1.86], [.4, 1.86], [.4, 1.68]]), '#c39b4c');
+    shapeAt(g, at([[-.34, 1.86], [-.2, 2.12], [.2, 2.12], [.34, 1.86]]), '#4b8586');
+    shapeAt(g, at([[-.62, 1.85], [-.9, 2.2], [-.42, 2.28], [-.3, 2.05]]), '#8d7440');
+    shapeAt(g, at([[.62, 1.85], [.9, 2.2], [.42, 2.28], [.3, 2.05]]), '#6d5830');
   }
 
   function tuft(g, x, y, size, r) {
@@ -288,25 +357,30 @@
     g.restore();
   }
 
-  function column(g, x, y, tall) {
-    g.lineWidth = .08;
-    g.strokeStyle = ink;
-    g.fillStyle = '#2b5a60';
-    g.beginPath();
-    g.rect(x - .42, y - tall, .84, tall);
-    g.fill();
-    g.stroke();
-    g.fillStyle = 'rgba(160,245,225,.18)';
-    g.fillRect(x - .34, y - tall, .16, tall);
-    g.fillStyle = 'rgba(0,10,20,.35)';
-    g.fillRect(x + .12, y - tall, .28, tall);
-    for (const [dy, w] of [[-tall - .18, 1.15], [-.2, 1.1]]) {
-      g.fillStyle = '#917a47';
-      g.beginPath();
-      g.rect(x - w / 2, y + dy, w, .24);
-      g.fill();
-      g.stroke();
+  // A fluted column; the taller ones carry a fire bowl, the rest are snapped off.
+  function column(g, x, y, tall, r) {
+    const box = (x0, y0, w, h, color, line) => shapeAt(g, [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]], color, line);
+    box(x - .62, y - .22, 1.24, .24, '#8d7440');
+    box(x - .5, y - .38, 1, .17, '#1f4a52');
+    const broken = tall < 1.75;
+    const crown = broken ? [[x - .4, y - tall], [x - .14, y - tall + .22], [x + .04, y - tall - .14], [x + .2, y - tall + .16], [x + .4, y - tall + .02]]
+      : [[x - .38, y - tall], [x + .38, y - tall]];
+    shapeAt(g, [[x - .43, y - .36], ...crown, [x + .43, y - .36]], '#2f626a');
+    for (const [dx, w, color] of [[-.33, .13, 'rgba(170,250,230,.28)'], [-.1, .09, 'rgba(170,250,230,.12)'], [.1, .12, 'rgba(2,14,26,.3)'], [.28, .13, 'rgba(2,14,26,.5)']]) {
+      box(x + dx, y - tall + .26, w, tall - .62, color, 0);
     }
+    box(x - .46, y - .62, .92, .13, '#b28d47', .05);
+    if (broken) {
+      for (let k = 0; k < 3; k++) rock(g, x + (r() - .5) * 1.8, y + .15, .14 + r() * .16, r);
+      return;
+    }
+    box(x - .55, y - tall - .2, 1.1, .22, '#b28d47');
+    shapeAt(g, [[x - .62, y - tall - .55], [x + .62, y - tall - .55], [x + .34, y - tall - .2], [x - .34, y - tall - .2]], '#6d5830');
+    box(x - .68, y - tall - .66, 1.36, .13, '#d4ad5c', .05);
+    for (const [dx, dy, rad, color] of [[0, 1.25, 1.3, 'rgba(80,255,210,.08)'], [0, .95, .7, 'rgba(100,255,220,.16)']]) blob(g, x, y - tall - dy, rad, color);
+    shapeAt(g, [[x - .4, y - tall - .66], [x - .18, y - tall - 1.2], [x - .08, y - tall - .95], [x + .06, y - tall - 1.55],
+      [x + .2, y - tall - 1.02], [x + .34, y - tall - 1.18], [x + .42, y - tall - .66]], '#4fe8c4', .04);
+    shapeAt(g, [[x - .2, y - tall - .66], [x - .04, y - tall - 1.06], [x + .08, y - tall - .86], [x + .22, y - tall - .66]], '#e4fff6', 0);
   }
 
   function urn(g, x, y, s) {
