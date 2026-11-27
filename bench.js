@@ -2,29 +2,21 @@
 
 // Frame pacing and the on-screen benchmark overlay. Nothing here reads or writes fight state:
 // the arena asks gate() whether to render on each animation frame, reports each drawn frame to
-// record(), and reads the renderer and polygon multiplier that the overlay toggles.
+// record(), and reads the test toggles that the overlay sets.
 const ArenaBench = (() => {
   const CAP_FPS = 120;
   const CAP_INTERVAL = 1000 / CAP_FPS;
-  const WARMUP = 1000; // ms ignored after load, Reset, or a renderer change
+  const WARMUP = 1000; // ms ignored after load, Reset, or a toggle
   const WINDOW = 500; // ms per FPS sample for current and minimum FPS
   const UI_EVERY = 250; // ms between text updates
-  const saved = (() => {
-    try { return JSON.parse(localStorage.getItem('arena-bench') || '{}'); } catch { return {}; }
-  })();
   const query = new URLSearchParams(location.search);
   const settings = {
-    renderer: query.get('renderer') || saved.renderer || 'canvas',
-    polygons: Number(query.get('polygons') || saved.polygons || 1),
     // Hidden on every load so the fight is unobstructed; ?bench opens it straight away.
     open: query.has('bench')
   };
   // Diagnostic toggles are deliberately not saved: a fighter-less arena must not survive a reload.
   const probe = { lowRes: query.get('res') === '1', fighters: true, scene: true, effects: true };
   let onResolution = () => {};
-  const store = () => {
-    try { localStorage.setItem('arena-bench', JSON.stringify({ renderer: settings.renderer, polygons: settings.polygons })); } catch { /* private mode */ }
-  };
 
   // Refresh-rate estimate from every animation frame callback, rendered or skipped.
   const rafIntervals = [];
@@ -74,11 +66,8 @@ const ArenaBench = (() => {
 
   // Main-thread ms for [backdrop and scenery, fighters, effects] in the frame being drawn.
   let pendingParts = null;
-  let animatedFacets = 0;
-  let backdrop = { facets: 0, rebuildMs: 0 };
-  function parts(scene, fighters, effects, facets) {
+  function parts(scene, fighters, effects) {
     pendingParts = [scene, fighters, effects];
-    animatedFacets = facets;
   }
 
   // `now` is the animation frame timestamp; drawMs is how long draw() took on the main thread.
@@ -168,26 +157,12 @@ const ArenaBench = (() => {
     return element;
   };
   const resolutionButton = probeButton('lowRes', 'Draw the arena at full sharpness (up to 2 pixels per CSS pixel) or at 1, to test fill rate');
-  const fighterButton = probeButton('fighters', 'Skip building, sorting and painting the fighters, to test their cost');
+  const fighterButton = probeButton('fighters', 'Skip drawing the fighters, to test their cost');
   const sceneButton = probeButton('scene', 'Skip the animated crowd and wildlife, to test their cost');
   const effectsButton = probeButton('effects', 'Skip dust, trails, blood, sparks, magic, bolts and damage numbers, to test their cost');
   const reset = () => { resetStats(); render(performance.now()); };
   const resetButton = button('Reset', reset);
-  const rendererButton = button('', () => {
-    settings.renderer = settings.renderer === 'webgl' ? 'canvas' : 'webgl';
-    store();
-    labels();
-    resetStats();
-  });
-  const polygonButton = button('', () => {
-    settings.polygons = settings.polygons === 3 ? 1 : 3;
-    store();
-    labels();
-    resetStats();
-  });
   button('Close', () => toggle(false));
-  rendererButton.title = 'Switch between the Canvas 2D and WebGL fighter painters';
-  polygonButton.title = 'Draw each fighter once or three times over (same picture, 3× the polygons)';
   panel.append(text, row, probes);
   const opener = document.createElement('button');
   opener.type = 'button';
@@ -198,11 +173,8 @@ const ArenaBench = (() => {
   opener.addEventListener('click', () => toggle(panel.hidden));
   resetButton.title = 'Clear the statistics. The first second after a reset is ignored.';
 
-  let active = 'canvas';
-  let info = { polygons: 0, complex: 0, pixels: '', geometry: null };
+  let pixels = '';
   function labels() {
-    rendererButton.textContent = settings.renderer === 'webgl' ? 'WebGL' : 'Canvas';
-    polygonButton.textContent = 'Polys ' + settings.polygons + '×';
     resolutionButton.textContent = probe.lowRes ? 'Res 1×' : 'Res full';
     fighterButton.textContent = probe.fighters ? 'Fighters' : 'No fighters';
     sceneButton.textContent = probe.scene ? 'Scenery' : 'No scenery';
@@ -217,7 +189,6 @@ const ArenaBench = (() => {
     panel.hidden = !open;
     settings.open = open;
     opener.setAttribute('aria-expanded', String(open));
-    store();
     if (open) resetStats();
   }
 
@@ -242,20 +213,9 @@ const ArenaBench = (() => {
       'Scene ' + part(0) + ' · Fighters ' + part(1) + ' · FX ' + part(2) + ' ms',
       'Drops ' + stats.drops + ' (>' + f(expected() * 1.5, 1) + ' ms)'
         + (stats.recent.length ? ': ' + stats.recent.map(drop => f(drop.at, 1) + 's ' + f(drop.fps) + 'fps').join(', ') : ''),
-      (active === 'webgl' ? 'WebGL' : 'Canvas 2D') + (settings.renderer !== active ? ' (WebGL unavailable)' : '')
-        + ' · ' + info.polygons + ' polys · ' + info.pixels + ' · ' + f(hz) + ' Hz' + (forcedHz ? '' : ' est.')
-        + ' · cap ' + CAP_FPS + status
+      pixels + ' · ' + f(hz) + ' Hz' + (forcedHz ? '' : ' est.') + ' · cap ' + CAP_FPS + status
         + (probe.lowRes || !probe.fighters || !probe.scene || !probe.effects ? ' · TEST TOGGLE ON' : '')
     ];
-    if (info.geometry) {
-      lines.push('Scenery ' + backdrop.facets + ' cached / ' + animatedFacets + ' animated facets · '
-        + f(backdrop.rebuildMs, 1) + ' ms cache rebuild');
-      lines.push('Geometry (faces / triangles)');
-      for (const { name, parts } of info.geometry) {
-        lines.push(name + ' · ' + Object.entries(parts).map(([part, count]) =>
-          part + ' ' + count.faces + '/' + count.triangles).join(' · '));
-      }
-    }
     text.textContent = lines.join('\n');
   }
 
@@ -269,28 +229,19 @@ const ArenaBench = (() => {
     gate,
     record,
     reset,
-    get renderer() { return settings.renderer; },
-    get polygons() { return settings.polygons; },
     get lowResolution() { return probe.lowRes; },
     get drawFighters() { return probe.fighters; },
     get drawScenery() { return probe.scene; },
     get drawEffects() { return probe.effects; },
-    get measureGeometry() { return query.has('bench') && !panel.hidden; },
     parts,
-    reportBackdrop(facets, rebuildMs) {
-      backdrop = { facets, rebuildMs };
-    },
     onResolutionChange(callback) { onResolution = callback; },
     // Read-only copy of the statistics for scripted comparisons.
     snapshot() {
-      return { ...stats, recent: stats.recent.slice(), geometry: structuredClone(info.geometry),
-        backdrop: { ...backdrop }, animatedFacets,
-        avg: stats.frames ? stats.frames * 1000 / stats.time : null,
-        drawAvg: stats.frames ? stats.drawSum / stats.frames : null, hz: 1000 / refresh, expected: expected(), renderer: active, polys: info.polygons };
+      return { ...stats, recent: stats.recent.slice(), avg: stats.frames ? stats.frames * 1000 / stats.time : null,
+        drawAvg: stats.frames ? stats.drawSum / stats.frames : null, hz: 1000 / refresh, expected: expected() };
     },
-    report(renderer, polygons, complex, pixels, geometry) {
-      active = renderer;
-      info = { polygons, complex, pixels, geometry };
+    report(description) {
+      pixels = description;
     }
   };
 })();

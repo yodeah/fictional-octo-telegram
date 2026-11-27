@@ -2,13 +2,6 @@
 
 const canvas = document.querySelector('#arena');
 const ctx = canvas.getContext('2d');
-const qualitySelect = document.getElementById('quality');
-const qualityLevels = ['low', 'medium', 'high'];
-const savedQuality = (() => {
-  try { return localStorage.getItem('arena-quality'); } catch { return null; }
-})();
-let modelDetail = Math.max(0, qualityLevels.indexOf(savedQuality));
-qualitySelect.value = qualityLevels[modelDetail];
 const elements = Object.fromEntries(
   ['bout', 'status', 'cast', 'hitboxes', 'result', 'winner', 'play', 'reset', 'generate', 'speed', 'repeat', 'log', 'record']
     .map(id => [id, document.getElementById(id)])
@@ -299,11 +292,6 @@ function applySpellbook(fighter) {
   }));
 }
 const particles = [];
-const faces = [];
-const armor = [135, 125, 108];
-const metal = [192, 194, 182];
-const leather = [89, 54, 37];
-const skin = [183, 118, 77];
 const speeds = [1, 2, 4];
 let speedIndex = 0;
 let state = 'ready';
@@ -428,148 +416,6 @@ function polygon(points, color) {
   ctx.fill();
 }
 
-// Every fighter, armor and weapon part ends up here. A face costs build, sort and paint time
-// whether or not it ends up visible, so skip faces that can never be seen (as prism() does for
-// back-facing sides). Measured costs per face are in docs/rendering-performance.md.
-function surface(points, color, light, transform) {
-  projectedSurface(points.map(point => project(transform(point))), color, light);
-}
-
-function projectedSurface(projected, color, light) {
-  let depth = 0;
-  for (const point of projected) depth += point[2];
-  const rgb = color.map(channel => clamp(Math.round(channel * light), 0, 255));
-  faces.push({ projected, depth: depth / projected.length, rgb });
-}
-
-const ringAngles = new Map();
-function circleProfile(sides, roll = 0) {
-  const key = sides + ':' + roll;
-  if (!ringAngles.has(key)) {
-    ringAngles.set(key, Array.from({ length: sides }, (_, index) => {
-      const angle = index * 2 * Math.PI / sides + roll;
-      return { cosine: Math.cos(angle), sine: Math.sin(angle), angle };
-    }));
-  }
-  return ringAngles.get(key);
-}
-
-const prismProfiles = new Map();
-function prismProfile(sides, detail) {
-  const key = sides * qualityLevels.length + detail;
-  if (prismProfiles.has(key)) return prismProfiles.get(key);
-  const roll = Math.PI / 4;
-  const original = circleProfile(sides, roll);
-  const count = sides === 4 ? sides : sides + detail * 2;
-  const refined = count === sides ? original : circleProfile(count);
-  let angles = original;
-  if (count !== sides) {
-    const max = (ring, axis) => Math.max(...ring.map(vertex => Math.abs(vertex[axis])));
-    // Retain the original cross-section's maximum width and depth.
-    const width = max(original, 'cosine') / max(refined, 'cosine');
-    const depth = max(original, 'sine') / max(refined, 'sine');
-    angles = refined.map(({ cosine, sine }) => ({ cosine: cosine * width, sine: sine * depth }));
-  }
-  const visible = [];
-  for (let index = 0; index < count; index++) {
-    const next = (index + 1) % count;
-    if (refined[index].sine + refined[next].sine < -.01) continue;
-    const angle = refined[index].angle + Math.PI / count;
-    const light = .84 + .26 * Math.cos(angle - .26) + .15 * Math.sin(angle);
-    visible.push({ index, next, light });
-  }
-  const profile = { angles, visible };
-  prismProfiles.set(key, profile);
-  return profile;
-}
-
-function prism(from, to, base, tip, color, transform, sides = 4, detail = 0) {
-  const dx = to[0] - from[0];
-  const dy = to[1] - from[1];
-  const length = Math.hypot(dx, dy) || 1;
-  const { angles, visible } = prismProfile(sides, detail);
-  const bevel = Math.min(.23, Math.max(...base, ...tip) * .65 / length);
-  const squareBevels = detail === 2 && sides === 4;
-  const sections = [
-    [0, .74],
-    ...(squareBevels ? [[bevel * .45, .91, .85]] : []),
-    [bevel, 1.04, squareBevels ? .94 : .85],
-    ...(detail ? [[.46, detail === 2 ? 1.013 : 1.016, 1.025]] : []),
-    [1 - bevel, 1, detail ? .965 : 1],
-    ...(squareBevels ? [[1 - bevel * .42, .93, 1.08]] : []),
-    [1, .76, 1.18]
-  ];
-  const profiles = sections.map(([t, bevelScale]) => {
-    const [x, y, z] = pointBetween(from, to, t);
-    const radialWidth = mix(base[0], tip[0], t) * bevelScale;
-    const radialDepth = mix(base[1], tip[1], t) * bevelScale;
-    return angles.map(({ cosine, sine }) => project(transform([
-      x + dy / length * cosine * radialWidth,
-      y - dx / length * cosine * radialWidth,
-      z + sine * radialDepth
-    ])));
-  });
-  const last = profiles.length - 1;
-  const pointed = tip[0] === 0 && tip[1] === 0;
-  for (const { index: i, next: j, light } of visible) {
-    for (let row = 1; row < profiles.length; row++) {
-      const a = profiles[row - 1];
-      const b = profiles[row];
-      const face = row === last && pointed ? [a[i], a[j], b[i]] : [a[i], a[j], b[j], b[i]];
-      projectedSurface(face, color, light * sections[row][2]);
-    }
-  }
-  if (tip[0] > 0 || tip[1] > 0) projectedSurface(profiles[last], color, 1.16);
-}
-
-function shield(cx, cy, z, fighter, transform) {
-  const gear = shields[fighter.gear.shield];
-  const detail = modelDetail;
-  const contour = value => Math.sign(value) * Math.pow(Math.abs(value), gear.shape);
-  const sides = gear.shape < .9 ? 16 : 20;
-  const ring = (radius, depth) => circleProfile(sides, Math.PI / sides).map(({ cosine, sine }) =>
-    [cx + contour(cosine) * radius * gear.width, cy + contour(sine) * radius * gear.height, depth]);
-  const rim = ring(1, z);
-  const bead = ring(.91, z + .047);
-  const panel = ring(.80, z + .034);
-  const boss = ring(.29, z + .10);
-  const crown = ring(.22, z + .158);
-  const bands = [
-    [rim],
-    ...(detail ? [[ring(.966, z + .025), darkSteel, .83]] : []),
-    [bead, darkSteel, .97],
-    ...(detail === 2 ? [[ring(.85, z + .044), bronze, 1.37]] : []),
-    [panel, bronze, 1.21],
-    ...(detail ? [[ring(.752, z + .028), fighter.trim, .85]] : []),
-    ...(detail === 2 ? [[ring(.355, z + .061), fighter.color, .86]] : []),
-    [boss, fighter.color, 1],
-    ...(detail ? [[ring(.252, z + .139), armor, .82]] : []),
-    [crown, armor, 1]
-  ];
-  const projected = bands.map(([points]) => points.map(point => project(transform(point))));
-  for (let i = 0; i < sides; i++) {
-    const j = (i + 1) % sides;
-    const light = 1 + Math.cos((i + .5) * Math.PI * 2 / sides - .60) * .26;
-    for (let row = 1; row < bands.length; row++) {
-      const outer = projected[row - 1];
-      const inner = projected[row];
-      const [, color, shade] = bands[row];
-      projectedSurface([outer[i], outer[j], inner[j], inner[i]], color, light * shade);
-    }
-    if (i % 2 === 0) {
-      const [rx, ry] = bead[i];
-      surface([[rx, ry + .017, z + .07], [rx + .014, ry, z + .07], [rx, ry - .018, z + .07], [rx - .014, ry, z + .07]], metal, 1.11, transform);
-    }
-  }
-  projectedSurface(projected.at(-1), metal, 1.09);
-  surface(ring(.131, z + .168), bronze, 1.23, transform);
-  for (const side of [-1, 1]) {
-    const y = cy + gear.height * side * .47;
-    surface([[cx - gear.width * .36, y, z + .093], [cx, y + side * .034, z + .097],
-      [cx + gear.width * .36, y, z + .093], [cx, y - side * .033, z + .104]], fighter.trim, 1.06, transform);
-  }
-}
-
 function weaponAxis(hand, angle) {
   const [x, y, z] = hand;
   return (distance, offset = 0) => [
@@ -588,263 +434,6 @@ function flailChain(anchor, windup, strike, clock, fraction, length = .48, offse
 function flailTrails(key, anchor, windup, strike, clock) {
   if (key === 'twinFlail') return [-.23, .23].map(offset => fraction => flailChain(anchor, windup, strike, clock, fraction, .46, offset));
   return [fraction => flailChain(anchor, windup, strike, clock, fraction, weapons[key].chain)];
-}
-
-function forgedBlade(along, sections, render, tint = metal) {
-  const profile = modelDetail === 2
-    ? [[-1, 0], [-.75, .42, 1.30], [-.14, .90, .94], [0, .79, .72], [.14, .90, .84],
-      [.75, .42, 1.13], [1, 0, 1.35]]
-    : [[-1, 0], [-.76, .43, 1.26], [0, 1, .88], [.76, .43, 1.13], [1, 0, 1.30]];
-  for (let index = 1; index < sections.length; index++) {
-    const [s0, bend0, half0, bevel0] = sections[index - 1];
-    const [s1, bend1, half1, bevel1] = sections[index];
-    const point = (s, bend, shift, depth) => shifted(along(s, bend + shift), 0, 0, depth);
-    if (modelDetail) {
-      const section = (s, bend, half, bevel) => profile.map(([across, height]) =>
-        point(s, bend, across * half, mix(.015, bevel, height)));
-      const start = section(s0, bend0, half0, bevel0);
-      const end = section(s1, bend1, half1, bevel1);
-      for (let facet = 1; facet < profile.length; facet++) {
-        render([start[facet - 1], start[facet], end[facet], end[facet - 1]], tint, profile[facet][2]);
-      }
-      continue;
-    }
-    const leftA = point(s0, bend0, -half0, .015);
-    const spineA = point(s0, bend0, 0, bevel0);
-    const rightA = point(s0, bend0, half0, .015);
-    const leftB = point(s1, bend1, -half1, .015);
-    const spineB = point(s1, bend1, 0, bevel1);
-    const rightB = point(s1, bend1, half1, .015);
-    render([leftA, spineA, spineB, leftB], tint, .86);
-    render([spineA, rightA, rightB, spineB], tint, 1.2);
-    if (half0 > .045) {
-      render([leftA, point(s0, bend0, -half0 * .78, .026), point(s1, bend1, -half1 * .78, .026), leftB], tint, 1.32);
-    }
-  }
-}
-
-function variantWeapon(key, along, limb, paint) {
-  const family = weaponFamily(key);
-  const band = (distance, width, height, color = bronze) =>
-    limb(along(distance - width / 2), along(distance + width / 2), [height, height], [height, height], color, 8);
-  if (family === 'sword' || family === 'greatsword') {
-    const heavy = family === 'greatsword';
-    const handle = heavy ? -.54 : -.29;
-    limb(along(handle), along(.21), [.073, .067], [.056, .057], leather, 8);
-    for (let wrap = handle + .075; wrap < .02; wrap += .088) band(wrap, .020, .075, darkSteel);
-    band(handle, .082, .085);
-    const guard = key === 'rapier' ? .17 : heavy ? .31 : .24;
-    for (const direction of [-1, 1]) {
-      limb(along(.17), along(heavy ? .33 : .05, direction * guard), [.064, .068], [.036, .056], bronze, 8);
-    }
-    if (key === 'rapier') {
-      limb(along(.07, -.13), along(.17, .15), [.116, .070], [.090, .055], bronze, 10);
-      forgedBlade(along, [[.19, 0, .053, .064], [.75, 0, .046, .05], [1.19, 0, .030, .037], [1.37, 0, 0, .016]], paint);
-    } else if (key === 'falchion') {
-      forgedBlade(along, [[.18, 0, .086, .062], [.46, .04, .119, .075], [.88, .10, .145, .067], [1.17, .15, .086, .045], [1.28, .22, 0, .017]], paint);
-    } else if (key === 'claymore') {
-      forgedBlade(along, [[.25, 0, .152, .085], [.42, 0, .164, .093], [1.21, 0, .13, .060], [1.51, 0, .095, .04], [1.74, 0, 0, .017]], paint);
-      paint([shifted(along(.35), 0, 0, .102), shifted(along(.56, -.037), 0, 0, .093),
-        shifted(along(1.48), 0, 0, .06), shifted(along(.56, .037), 0, 0, .093)], darkSteel, .95);
-    } else {
-      forgedBlade(along, [[.19, 0, .125, .083], [.44, 0, .222, .085], [1.17, 0, .226, .074], [1.46, 0, .199, .049], [1.55, .054, 0, .018]], paint, [153, 151, 139]);
-      paint([shifted(along(1.19, -.055), 0, 0, .084), shifted(along(1.27), 0, 0, .083),
-        shifted(along(1.19, .055), 0, 0, .084), shifted(along(1.11), 0, 0, .088)], bronze, 1.25);
-    }
-    return true;
-  }
-  if (family === 'spear') {
-    limb(along(-1.15), along(1.48), [.066, .061], [.052, .050], leather, 8);
-    for (const distance of [-1.12, -.19, .17, 1.36]) band(distance, .068, .070);
-    if (key === 'trident') {
-      for (const offset of [-.19, 0, .19]) {
-        limb(along(1.40), along(1.52, offset), [.065, .057], [.040, .048], bronze, 8);
-        limb(along(1.49, offset), along(1.87 - Math.abs(offset) * .32, offset), [.052, .036], [0, 0], metal, 8);
-      }
-    } else {
-      limb(along(1.44), along(1.88), [.091, .056], [0, 0], metal, 8);
-      paint([along(1.22, -.06), along(1.29, -.32), along(1.58, -.28), along(1.76, -.10),
-        along(1.56, .018), along(1.20, .056)], metal, 1.10);
-      paint([shifted(along(1.29, -.32), 0, 0, .027), shifted(along(1.57, -.27), 0, 0, .025),
-        shifted(along(1.73, -.10), 0, 0, .026), shifted(along(1.46, -.14), 0, 0, .049)], bronze, .94);
-    }
-    return true;
-  }
-  if (family === 'axe') {
-    const large = key === 'crescentAxe';
-    limb(along(large ? -.72 : -.30), along(1.07), [.080, .075], [.058, .062], leather, 8);
-    for (const t of [0, .16, .65, 1.02]) band(t, .060, .081);
-    const outline = large ? [[.72, -.086], [1.05, .12], [1.28, .37], [1.06, .49], [.78, .52], [.54, .44], [.80, .23]]
-      : [[.57, -.077], [.89, -.08], [1.07, .20], [.95, .37], [.66, .49], [.38, .41], [.60, .27]];
-    paint(outline.map(([a, b]) => shifted(along(a, b), 0, 0, .073)), metal, 1.09);
-    paint(outline.slice(2, 6).map(([a, b]) => shifted(along(a, b), 0, 0, .081))
-      .concat([shifted(along(.80, .30), 0, 0, .087)]), armor, .84);
-    paint([shifted(along(.76,.108),0,0,.086),shifted(along(.82,.18),0,0,.085),
-      shifted(along(.77,.24),0,0,.087),shifted(along(.70,.174),0,0,.09)], bronze, 1.25);
-    return true;
-  }
-  if (family === 'mace' || family === 'maul') {
-    const heavy = family === 'maul';
-    limb(along(heavy ? -.61 : -.30), along(.94), [.077, .077], [.068, .069], leather, 8);
-    for (const t of [-.22, -.07, .18, .63]) band(t, .056, .08, key === 'club' ? bronze : darkSteel);
-    if (key === 'club') {
-      limb(along(.47), along(1.08), [.12, .102], [.167, .131], [152, 105, 59], 10);
-      for (const t of [.62, .77, .93]) band(t, .032, .13);
-    } else if (key === 'morningstar') {
-      limb(along(.72), along(.91), [.094, .085], [.198, .159], armor, 10);
-      limb(along(.91), along(1.09), [.198, .159], [.065, .057], metal, 10);
-      for (const offset of [-1, 1]) {
-        for (const t of [.77, .91, 1.03]) limb(along(t), along(t + .02, offset * .25), [.063, .064], [0, 0], metal, 6);
-      }
-    } else if (key === 'pickhammer') {
-      limb(along(.86, -.13), along(.92, .16), [.13, .16], [.17, .16], armor, 10);
-      limb(along(.89, .10), along(.94, .48), [.14, .10], [0, 0], metal, 8);
-      limb(along(.86, -.05), along(.81, -.30), [.14, .16], [.132, .14], bronze, 8);
-    } else {
-      limb(along(.88, -.31), along(.88, .33), [.28, .265], [.28, .27], [130, 115, 100], 6);
-      for (const offset of [-.22, .22]) limb(along(.61, offset), along(1.13, offset), [.044, .155], [.041, .15], darkSteel, 6);
-    }
-    return true;
-  }
-  if (family === 'crossbow') {
-    const heavy = key === 'arbalest';
-    const arm = heavy ? .46 : .29;
-    limb(along(heavy ? -.58 : -.40), along(.81), [.132, .13], [.082, .068], leather, 10);
-    limb(along(-.14, .04), along(.84, .035), [.047, .087], [.034, .058], metal, 8);
-    if (!heavy) limb(along(.17, -.16), along(.55, -.17), [.088, .094], [.067, .076], bronze, 8);
-    for (const side of [-1, 1]) {
-      limb(along(.64), along(.62, side * arm * .67), [.072, .06], [.057, .052], armor, 8);
-      limb(along(.62, side * arm * .67), along(.50, side * arm), [.052, .05], [.031, .034], bronze, 8);
-      limb(along(.50, side * arm), along(heavy ? -.02 : .18), [.016, .016], [.017, .015], [215, 190, 162], 4);
-    }
-    band(.74, .048, .086);
-    return true;
-  }
-  if (family === 'staff') {
-    const sun = key === 'sunStaff';
-    limb(along(sun ? -.94 : -.66), along(1.15), [.072, .067], [.059, .054], sun ? leather : [103, 115, 117], 8);
-    for (const d of [-.39, -.16, .12, .85, 1.06]) band(d, .040, .073, sun ? bronze : armor);
-    if (sun) {
-      for (let spoke = 0; spoke < 8; spoke++) {
-        const theta = spoke * Math.PI / 4;
-        limb(along(1.29 + Math.cos(theta) * .08, Math.sin(theta) * .08),
-          along(1.29 + Math.cos(theta) * .235, Math.sin(theta) * .235), [.044, .044], [0, 0], bronze, 8);
-      }
-      limb(along(1.16), along(1.29), [.086, .075], [.117, .105], [245, 179, 72], 10);
-      limb(along(1.29), along(1.47), [.117, .105], [0, 0], [255, 210, 100], 10);
-    } else {
-      limb(along(1.06), along(1.27, -.11), [.081, .098], [.052, .052], darkSteel, 8);
-      limb(along(1.06), along(1.27, .11), [.081, .098], [.052, .052], darkSteel, 8);
-      limb(along(1.13), along(1.30), [.087, .081], [.13, .119], [89, 190, 183], 8);
-      limb(along(1.30), along(1.48), [.13, .119], [.027, .032], [169, 231, 221], 8);
-    }
-    return true;
-  }
-  return false;
-}
-
-function specialTint(fighter, special) {
-  const names = { metal, leather, armor, bronze, darkSteel, trim: fighter.trim };
-  const swaps = new Map(Object.entries(special.palette).map(([name, color]) => [names[name], color]));
-  return color => swaps.get(color) || color;
-}
-
-function weaponModel(fighter, hand, angle, windup, strike, clock, limb, transform, key = fighter.weapon) {
-  const along = weaponAxis(hand, angle);
-  // A special reuses its base weapon's model with its own colors and a few extra parts.
-  const special = specialOf(fighter, key);
-  const tint = special ? specialTint(fighter, special) : color => color;
-  if (special) {
-    const plain = limb;
-    limb = (from, to, start, end, color, sides) => plain(from, to, start, end, tint(color), sides);
-  }
-  const paint = (points, color, light) => surface(points, tint(color), light, transform);
-  special?.details?.({ along, limb, paint, fighter, state: fighter.special });
-  if (variants[key] && variantWeapon(key, along, limb, paint)) return;
-  if (key === 'greatsword') {
-    limb(along(-.53), along(.23), [.073, .077], [.066, .065], leather, 8);
-    limb(along(-.62), along(-.49), [.086, .079], [.107, .092], bronze, 8);
-    limb(along(.205, -.32), along(.205, .32), [.057, .079], [.057, .079], darkSteel, 8);
-    limb(along(.21), along(1.29), [.185, .065], [.143, .052], metal, 6);
-    limb(along(1.29), along(1.63), [.143, .052], [0, 0], metal, 6);
-    const ridge = (distance, offset, depth) => shifted(along(distance, offset), 0, 0, depth);
-    paint([ridge(.30, -.026, .058), ridge(.30, .026, .058), ridge(1.42, 0, .047)], darkSteel, 1.05);
-    return;
-  }
-  if (key === 'maul') {
-    limb(along(-.59), along(1.02), [.086, .092], [.076, .085], leather, 8);
-    limb(along(-.58), along(-.45), [.117, .10], [.095, .10], armor, 8);
-    for (const grip of [-.34, -.15, .08]) limb(along(grip - .021), along(grip + .021), [.094, .10], [.090, .098], bronze, 8);
-    limb(along(.86, -.28), along(.87, .28), [.25, .20], [.25, .20], darkSteel, 8);
-    for (const side of [-1, 1]) {
-      limb(along(.86, side * .21), along(.87, side * .34), [.257, .218], [.21, .173], metal, 8);
-      limb(along(.87, side * .32), along(.87, side * .379), [.185, .155], [.162, .147], bronze, 6);
-    }
-    return;
-  }
-  if (key === 'staff') {
-    limb(along(-.90), along(1.11), [.066, .065], [.055, .052], leather, 6);
-    limb(along(.94), along(1.12), [.083, .078], [.11, .10], metal, 6);
-    limb(along(1.10), along(1.27), [.065, .065], [.155, .12], [106, 102, 188], 6);
-    limb(along(1.27), along(1.47), [.155, .12], [0, 0], [174, 158, 251], 6);
-    return;
-  }
-  if (key === 'crossbow') {
-    limb(along(-.40), along(.77), [.12, .105], [.09, .07], leather);
-    limb(along(-.21, .04), along(.78, .04), [.055, .09], [.04, .055], armor);
-    for (const direction of [-1, 1]) {
-      const bowTip = along(.48, direction * .35);
-      limb(along(.63), along(.60, direction * .22), [.057, .06], [.048, .05], metal);
-      limb(along(.60, direction * .22), bowTip, [.048, .05], [.032, .03], metal);
-      limb(bowTip, along(.09 + strike * .27), [.018, .014], [.018, .014], [218, 193, 148]);
-    }
-    return;
-  }
-  if (key === 'spear') {
-    limb(along(-1.18), along(1.32), [.063, .061], [.055, .05], leather, 6);
-    limb(along(1.25), along(1.49), [.088, .07], [.13, .066], metal);
-    limb(along(1.49), along(1.79), [.13, .066], [0, 0], metal);
-    return;
-  }
-  if (key === 'sword') {
-    limb(along(-.23), along(.17), [.07, .065], [.07, .065], leather);
-    limb(along(.14, -.20), along(.14, .20), [.06, .07], [.06, .07], fighter.trim);
-    limb(along(.16), along(.91), [.13, .05], [.10, .043], metal);
-    limb(along(.91), along(1.13), [.10, .043], [0, 0], metal);
-    return;
-  }
-  const flail = weaponFamily(key) === 'flail';
-  const tip = flail ? .61 : .77;
-  limb(along(-.23), along(tip), [.082, .077], [.065, .062], leather, 6);
-  if (key === 'axe') {
-    limb(along(.66, -.10), along(.66, .22), [.115, .095], [.190, .07], armor);
-    limb(along(.66, .22), along(.66, .40), [.190, .07], [.23, .029], metal);
-    return;
-  }
-  if (!flail) {
-    limb(along(.61), along(.79), [.12, .11], [.21, .17], metal, 6);
-    limb(along(.79), along(.98), [.21, .17], [.12, .11], armor, 6);
-    return;
-  }
-  const chains = flailTrails(key, along(tip), windup, strike, clock);
-  const radius = key === 'scourge' ? .10 : key === 'twinFlail' ? .125 : .17;
-  for (const chainPoint of chains) {
-    const ball = chainPoint(1);
-    for (let i = 0; i < 5; i++) {
-      const link = chainPoint(i / 5);
-      limb(link, chainPoint((i + 1) / 5), [.043, .04], [.043, .04], i % 2 ? armor : metal, 6);
-    }
-    const [bx, by, bz] = ball;
-    limb([bx, by - radius * .88, bz], ball, [.075, .075], [radius, radius], armor, 6);
-    limb(ball, [bx, by + radius * .88, bz], [radius, radius], [.075, .075], metal, 6);
-    for (let i = 0; i < 5; i++) {
-      const theta = (i + .5) * Math.PI * 2 / 5;
-      const dx = Math.cos(theta), dy = Math.sin(theta);
-      paint([[bx + dx * radius * .76 - dy * .05, by + dy * radius * .76 + dx * .05, bz + .10],
-        [bx + dx * radius * 1.42, by + dy * radius * 1.42, bz + .10],
-        [bx + dx * radius * .76 + dy * .05, by + dy * radius * .76 - dx * .05, bz + .10]], metal, .98);
-    }
-  }
 }
 
 const pointBetween = (from, to, amount) => from.map((value, index) => mix(value, to[index], amount));
@@ -1155,293 +744,6 @@ function displayPose(fighter) {
   return pose;
 }
 
-const bronze = [172, 128, 76];
-const darkSteel = [72, 72, 65];
-const clothLining = [64, 48, 75];
-const soleColor = [49, 36, 29];
-
-const loftProfiles = new Map();
-function loft(rings, color, transform) {
-  const sides = 24 + modelDetail * 12;
-  if (!loftProfiles.has(sides)) {
-    const angles = circleProfile(sides).slice(0, sides / 2 + 1);
-    const light = angles.slice(1).map((_, i) => {
-      const angle = (i + .5) * Math.PI * 2 / sides;
-      return .64 + Math.sin(angle) * .32 + Math.cos(angle - .42) * .22
-        + Math.max(0, Math.cos(angle - 1.11)) ** 13 * .08;
-    });
-    loftProfiles.set(sides, { angles, light });
-  }
-  const { angles, light } = loftProfiles.get(sides);
-  const vertices = rings.map(([y, width, depth]) =>
-    angles.map(({ cosine, sine }) => project(transform([cosine * width, y, sine * depth]))));
-  for (let row = 1; row < vertices.length; row++) {
-    for (let i = 0; i < sides / 2; i++) {
-      const a = vertices[row - 1];
-      const b = vertices[row];
-      projectedSurface([a[i], a[i + 1], b[i + 1], b[i]], color, light[i]);
-    }
-  }
-}
-
-function armorTorso(fighter, pose, transform) {
-  const kit = armors[fighter.gear.armor];
-  const shell = kit.shell || metal;
-  const edging = kit.edging || bronze;
-  const piece = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, transform, sides, modelDetail);
-  const panel = (points, color, light = 1) => surface(points, color, light, transform);
-  const stud = (x, y, z, color = bronze) =>
-    panel([[x - .020, y, z], [x, y + .025, z], [x + .022, y, z], [x, y - .024, z]], color, 1.14);
-  const skirt = pose.cloth;
-  const beltColor = kit.style === 'magic' ? fighter.color : leather;
-
-  loft([[-.12, .262, .257], [-.055, .287, .305], [.13, .32, .34], [.32, .375, .379],
-    [.43, .411, .385], [.55, .395, .359], [.60, .33, .323], [.645, .224, .253]], kit.color, transform);
-
-  if (kit.style === 'melee') {
-    loft([[.14, .327, .35], [.23, .348, .37], [.44, .40, .386], [.57, .38, .35]], shell, transform);
-    panel([[-.35, .55, .232], [-.24, .59, .32], [0, .38, .404], [.25, .58, .32],
-      [.35, .52, .23], [0, .29, .413]], darkSteel, 1.02);
-    panel([[-.30, .54, .282], [0, .34, .420], [.30, .54, .282], [.29, .49, .30],
-      [0, .28, .425], [-.28, .49, .305]], edging, 1.16);
-    panel([[0, .50, .406], [.087, .422, .418], [0, .34, .423], [-.087, .422, .418]], fighter.trim, 1);
-    for (const side of [-1, 1]) {
-      const x = side * .20;
-      panel([[x - .035, .51, .361], [x + .018, .554, .345], [x + .048, .521, .357],
-        [x + .031, .483, .373], [x - .019, .456, .385]], shell, 1.20);
-      for (const y of [.435, .528, .589]) stud(side * (.285 - (y - .45) * .28), y, .319, bronze);
-      piece([side * .175, .019, .31], [side * .235 + skirt * .5, -.207, .33], [.108, .075], [.091, .052], darkSteel, 8);
-      piece([side * .203 + skirt * .5, -.105, .38], [side * .232 + skirt * .5, -.244, .356],
-        [.090, .036], [.072, .028], kit.shell || armor, 8);
-      stud(side * .228 + skirt * .5, -.15, .409, bronze);
-    }
-    for (const y of [.03, .115, .20]) {
-      loft([[y - .07, .33, .34], [y, .355, .368], [y + .035, .31, .339]], kit.shell || armor, transform);
-      stud(-.20, y, .325);
-      stud(.20, y, .325);
-    }
-    for (let strip = -1; strip <= 1; strip++) {
-      const x = strip * .17;
-      piece([x, .04, .28], [x + strip * .043 + skirt, -.31, .285], [.116, .06], [.075, .055], leather);
-      piece([x + strip * .036 + skirt, -.25, .329], [x + strip * .045 + skirt, -.35, .322],
-        [.074, .03], [.049, .024], bronze);
-    }
-  } else if (kit.style === 'ranged') {
-    panel([[-.32, .50, .27], [-.15, .62, .35], [.04, .37, .415], [.22, .55, .34],
-      [.31, .45, .28], [.14, .16, .38], [-.15, .12, .38]], kit.shell || [132, 88, 56], 1.03);
-    for (const x of [-.19, .17]) {
-      piece([x, .18, .351], [x * 1.10, .51, .349], [.027, .022], [.031, .020], leather, 6);
-      for (const y of [.20, .29, .38, .47]) stud(x + .045, y, .37, [200, 156, 98]);
-    }
-    for (let row = 0; row < 4; row++) {
-      for (let column = -1; column <= 1; column++) {
-        const x = column * .11 + (row % 2) * .025;
-        const y = .18 + row * .082;
-        const z = .402 + row * .005;
-        panel([[x - .066, y + .028, z], [x + .05, y + .028, z], [x + .056, y - .024, z + .002],
-          [x + .011, y - .053, z + .008], [x - .047, y - .028, z + .004]], kit.shell || [130, 82, 52], .88 + (column + 1) * .10);
-        panel([[x - .057, y + .025, z + .006], [x + .042, y + .025, z + .006],
-          [x + .042, y + .011, z + .007], [x - .05, y + .011, z + .007]], kit.edging || [201, 149, 88], .94);
-        stud(x - .027, y + .008, z + .012, darkSteel);
-      }
-    }
-    piece([-.24, .15, .334], [.22, .57, .365], [.063, .043], [.073, .044], darkSteel, 6);
-    piece([.19, -.11, .287], [.25, .09, .330], [.11, .09], [.12, .093], [102, 68, 42], 8);
-    panel([[.16, .04, .426], [.25, .09, .407], [.31, .04, .414], [.24, -.015, .44]], bronze);
-    loft([[-.26, .35, .31], [-.11, .29, .31], [.035, .31, .33]], fighter.color, transform);
-  } else {
-    const hem = y => [skirt + y, -.59, .304];
-    panel([[-.30, .12, .29], [-.34 + skirt, -.49, .25], hem(-.17), [-.03, .08, .407]], kit.color, .82);
-    panel([[-.03, .08, .408], hem(-.17), hem(.10), [.25 + skirt, -.49, .30], [.27, .10, .32]], kit.color, 1.12);
-    panel([[-.09, .09, .412], hem(-.045), hem(.10), [.25, .10, .329]], clothLining, 1);
-    for (const [x, z] of [[-.22, .332], [-.12, .385], [.17, .372]]) {
-      panel([[x, .06, z + .023], [x - .043 + skirt, -.52, z], [x + .028 + skirt, -.54, z],
-        [x + .028, .06, z + .025]], kit.color, x < -.15 ? .82 : 1.21);
-    }
-    const cape = [[-.30, .58, -.13], [-.36, .27, -.14], [-.38 + skirt * .52, -.07, -.13],
-      [-.44 + skirt, -.34, -.14], [-.40 + skirt, -.63, -.10]];
-    for (let index = 1; index < cape.length; index++) {
-      const start = cape[index - 1];
-      const end = cape[index];
-      const innerStart = shifted(start, .19, .005, .078);
-      const innerEnd = shifted(end, .19, .007, .078);
-      const seamStart = shifted(start, .073, 0, .045);
-      const seamEnd = shifted(end, .075, 0, .042);
-      panel([start, seamStart, seamEnd, end], kit.color, .74);
-      panel([seamStart, innerStart, innerEnd, seamEnd], kit.color, .94);
-      panel([start, shifted(start, .025, 0, .012), shifted(end, .026, 0, .012), end], bronze, .92);
-    }
-    panel([[-.20 + skirt, -.505, .315], hem(-.17), hem(.10), [.24 + skirt, -.49, .31],
-      [.21 + skirt, -.444, .316], [.08 + skirt, -.53, .316], [-.16 + skirt, -.54, .316]], edging, 1.1);
-    panel([[-.30, .54, .30], [-.12, .63, .35], [.03, .40, .43], [.21, .61, .36],
-      [.31, .51, .30], [.03, .27, .432]], fighter.color, 1.13);
-    panel([[-.24, .55, .326], [.03, .335, .442], [.25, .54, .334], [.235, .49, .348],
-      [.03, .30, .445], [-.21, .51, .36]], edging, 1.11);
-    stud(.03, .29, .454, fighter.trim);
-    stud(.03, .22, .444, fighter.trim);
-    for (const y of [-.16, -.29, -.42]) {
-      const x = .075 + skirt * (.13 - y);
-      stud(x, y, .420, fighter.trim);
-      panel([[x - .053, y + .009, .418], [x, y + .055, .421], [x + .048, y + .011, .42],
-        [x, y + .039, .424]], bronze, 1.09);
-    }
-  }
-
-  loft([[.023, .32, .36], [.093, .333, .372]], beltColor, transform);
-  piece([-.062, .056, .393], [.074, .061, .403], [.054, .028], [.054, .028], bronze, 6);
-  panel([[-.029, .035, .433], [.043, .035, .433], [.043, .078, .433], [-.029, .078, .433]], darkSteel, .95);
-  for (const x of [-.255, -.169, .159, .244]) stud(x, .058, .365 - Math.abs(x) * .12, bronze);
-  armorSignature(kit, pose, panel, piece);
-}
-
-function armorSignature(kit, pose, panel, piece) {
-  const { cut, edging } = kit;
-  if (!cut) return;
-  const shell = kit.shell || kit.color;
-  if (cut === 'lamellar' || cut === 'fortress') {
-    const breadth = cut === 'fortress' ? .19 : .14;
-    for (let row = 0; row < 3; row++) {
-      const y = .24 + row * .113;
-      for (const side of [-1, 1]) {
-        const x = side * (.15 + row * .037);
-        const z = .442 - row * .023;
-        panel([[x - breadth * .61, y + .054, z], [x + breadth * .61, y + .054, z],
-          [x + breadth * .51, y - .018, z + .01], [x, y - .045, z + .022],
-          [x - breadth * .57, y - .018, z + .01]], shell, 1.12 + row * .035);
-        piece([x - .056, y + .043, z + .012], [x + .057, y + .046, z + .012], [.013, .014], [.012, .012], edging, 6);
-      }
-    }
-    return;
-  }
-  if (cut === 'mantle' || cut === 'night') {
-    panel([[-.31, .62, .296], [-.54, .52, .284], [-.50 + pose.cloth * .4, .25, .321],
-      [-.31, .18, .335], [-.18, .49, .406], [-.04, .64, .352]], shell, cut === 'night' ? .78 : 1.09);
-    piece([-.50, .49, .308], [-.39, .23, .341], [.022, .027], [.017, .02], edging, 8);
-    if (cut === 'night') {
-      for (const x of [-.29, -.17, -.05, .07]) {
-        piece([x - .034, .47, .432], [x, .39, .444], [.014, .013], [.014, .012], edging, 4);
-      }
-    }
-    return;
-  }
-  const large = cut === 'astral' ? .115 : .102;
-  const knot = [.055, .423, .455];
-  for (const [i, { cosine, sine }] of circleProfile(8).entries()) {
-    const a = shifted(knot, cosine * large, sine * large, .01);
-    const b = shifted(knot, cosine * large * .43 - sine * .022, sine * large * .43 + cosine * .022, .018);
-    const c = shifted(knot, cosine * large * .43 + sine * .022, sine * large * .43 - cosine * .022, .018);
-    panel([a, b, c], edging, 1.14 - i * .026);
-  }
-  piece([.034, .40, .467], [.078, .44, .468], [.040, .025], [.039, .024], edging, 10);
-  if (cut === 'astral') {
-    panel([[-.27, -.02, .28], [-.36 + pose.cloth * .45, -.35, .29], [-.34 + pose.cloth, -.72, .30],
-      [-.12 + pose.cloth, -.60, .344], [-.117, -.04, .37]], kit.color, 1.13);
-  }
-}
-
-function armorHelmet(fighter, kit, transform) {
-  const piece = (a, b, r1, r2, color, sides = 8) => prism(a, b, r1, r2, color, transform, sides, modelDetail);
-  const panel = (points, color, light = 1) => surface(points, color, light, transform);
-  const face = fighter.direction > 0 ? [190, 128, 88] : [155, 106, 81];
-  const shadow = [45, 33, 28];
-  const trim = kit.edging || bronze;
-  const steel = kit.shell || [151, 160, 154];
-
-  function faceProfile() {
-    loft([[-.19, .115, .116], [-.134, .183, .176], [-.07, .213, .215], [.011, .235, .234],
-      [.102, .224, .23], [.185, .206, .204], [.238, .165, .169]], face, transform);
-    panel([[.055, .09, .250], [.177, .083, .239], [.174, .047, .251], [.059, .055, .263]], shadow, .86);
-    panel([[.112, .051, .267], [.167, .05, .257], [.157, .031, .26], [.119, .032, .273]], [207, 190, 155], .92);
-    panel([[.136, .052, .277], [.152, .051, .276], [.149, .028, .276], [.137, .027, .278]], shadow);
-    panel([[.159, .066, .254], [.224, .018, .263], [.268, -.033, .202], [.216, -.046, .254],
-      [.161, -.017, .272]], face, 1.15);
-    panel([[.216, -.046, .254], [.267, -.033, .202], [.21, -.065, .223], [.161, -.052, .257]], face, .73);
-    panel([[.049, -.004, .253], [.15, -.028, .273], [.198, -.061, .246], [.126, -.117, .222],
-      [.023, -.092, .224]], face, 1.11);
-    panel([[.103, -.082, .260], [.207, -.071, .226], [.203, -.088, .226],
-      [.149, -.094, .250], [.105, -.095, .256]], shadow, .92);
-    panel([[.112, -.121, .226], [.190, -.103, .220], [.162, -.145, .193], [.084, -.151, .197]], face, 1.10);
-  }
-
-  if (kit.style === 'magic') {
-    const tall = kit.cut === 'astral';
-    loft([[-.195, .211, .209], [-.10, .240, .265], [.02, .280, .282], [.15, .280, .265],
-      [.22, .260, .238], [.33, .177, .180], [.38, .075, .085], [tall ? .44 : .395, .015, .027]], kit.color, transform);
-    panel([[-.10, -.185, .265], [.123, -.165, .260], [.263, -.06, .226], [.255, .105, .226],
-      [.171, .208, .220], [0, .24, .279], [-.124, .12, .295]], [47, 38, 59], .8);
-    faceProfile();
-    panel([[-.248, .047, .185], [-.190, .172, .226], [-.066, .259, .272], [.088, .249, .268],
-      [.195, .188, .230], [.255, .10, .243], [.134, .159, .275], [-.015, .158, .297],
-      [-.071, .068, .302], [-.118, -.155, .272], [-.195, -.089, .249]], kit.color, 1.13);
-    piece([-.068, .18, .296], [.202, .14, .272], [.018, .026], [.014, .024], trim);
-    piece([-.082, .115, .285], [-.123, -.159, .286], [.023, .024], [.017, .022], trim);
-    if (tall) {
-      piece([-.22, .185, .13], [-.33, .444, .15], [.095, .086], [.017, .035], kit.color);
-      panel([[.047,.207,.310],[.088,.274,.292],[.132,.225,.286],[.108,.164,.299]], trim, 1.32);
-    }
-    return;
-  }
-
-  if (kit.style === 'ranged' || kit.cut === 'lamellar') {
-    const helmet = kit.style === 'melee' ? steel : kit.shell || leather;
-    faceProfile();
-    loft([[.075, .247, .243], [.113, .259, .268], [.162, .257, .263], [.228, .235, .228],
-      [.279, .179, .186], [.310, .096, .104], [.315, .042, .05]], helmet, transform);
-    piece([-.234,.120,.206], [.257,.123,.204], [.026,.053], [.019,.046], kit.style === 'melee' ? trim : fighter.trim);
-    panel([[-.226,.122,.213],[-.107,.105,.277],[-.071,-.093,.260],[-.106,-.160,.226],[-.224,-.118,.189]],
-      helmet, 1.14);
-    piece([.196,.119,.233], [.227,-.019,.226], [.022,.031], [.022,.026], trim);
-    if (kit.cut === 'night') {
-      panel([[-.182,-.037,.276],[-.106,.006,.286],[.13,-.014,.289],[.238,-.033,.258],
-        [.155,-.155,.233], [-.09,-.157,.240]], kit.color, .79);
-    } else if (kit.style === 'melee') {
-      panel([[-.193,.105,.257],[-.087,.08,.303],[-.073,-.086,.285],[-.126,-.163,.245],[-.177,-.124,.250]], steel, 1.18);
-    }
-    for (const x of [-.165, -.112, -.054, .007]) {
-      panel([[x-.012,.121,.291],[x+.005,.141,.295],[x+.020,.12,.295],[x+.005,.099,.294]], trim, 1.17);
-    }
-    return;
-  }
-
-  const fortress = kit.cut === 'fortress';
-  loft([[-.184, .158, .168], [-.153, .216, .222], [-.06, .245, .25], [.07, .269, .27],
-    [.153, .271, .264], [.231, .246, .234], [.29, .174, .188], [.323, .086, .098]], steel, transform);
-  const visor = fortress
-    ? [[-.192,.105,.251],[.115,.123,.306],[.27,.076,.229],[.264,-.136,.211],[.09,-.178,.294],[-.158,-.134,.259]]
-    : [[-.171,.111,.243],[.097,.117,.293],[.273,.038,.222],[.214,-.110,.247],[.09,-.172,.28],[-.139,-.127,.261]];
-  panel(visor, steel, .84);
-  panel([[-.139,.095,.282],[.088,.116,.323],[.257,.064,.258],[.224,.023,.274],[.079,.056,.326],
-    [-.131,.050,.284]], shadow);
-  panel([[-.161,.112,.273],[.095,.135,.324],[.274,.077,.238],[.246,.063,.261],
-    [.089,.109,.333],[-.150,.09,.290]], trim, 1.20);
-  panel([[-.129,.03,.291],[.076,.040,.328],[.222,.004,.276],[.180,-.076,.285],[.057,-.11,.321],
-    [-.131,-.055,.293]], steel, 1.19);
-  panel([[.012,.143,.287],[.120,.152,.303],[.220,.097,.269],[.106,.123,.316]], steel, 1.31);
-  for (const x of [.061,.112,.163]) {
-    const z = .327 - (x - .061) * .31;
-    panel([[x-.012,-.034,z],[x+.005,-.037,z],[x+.012,-.086,z-.012],[x-.004,-.084,z-.011]], shadow, .88);
-  }
-  piece([-.202,.019,.253], [-.161,-.123,.248], [.050,.038], [.037,.039], trim);
-  if (fortress) {
-    piece([-.231,.141,.131], [-.281,.322,.138], [.088,.083], [.015,.044], steel);
-    piece([-.144,-.097,.254], [-.092,-.211,.226], [.092,.058], [.036,.046], steel);
-  } else {
-    piece([-.093,.258,.060], [-.115,.319,.061], [.197,.118], [.170,.099], trim);
-    piece([-.114,.311,.060], [-.186,.432,.055], [.178,.107], [.057,.069], fighter.color, 10);
-    piece([-.174,.398,.061], [-.286,.386,.049], [.101,.081], [.038,.054], fighter.trim, 8);
-  }
-}
-
-function recordGeometry(parts, name, start) {
-  const end = faces.length;
-  if (parts) {
-    const part = parts[name] ??= { faces: 0, triangles: 0 };
-    part.faces += end - start;
-    for (let index = start; index < end; index++) part.triangles += faces[index].projected.length - 2;
-  }
-  return end;
-}
-
 const torsoLean = ({ joints: j }) => Math.atan2(j.chest[1] - j.hips[1], j.chest[0] - j.hips[0]) - Math.PI / 2;
 
 // Maps a point on the torso (up from the hips) onto the posed spine.
@@ -1470,13 +772,6 @@ function stowedMount(pose, spare) {
   };
 }
 
-function stowedWeapon(fighter, pose, spare, limb, world) {
-  const { mount, angle, scale: size } = stowedMount(pose, spare);
-  const stow = point => pointBetween(mount, point, size);
-  const holder = (a, b, r1, r2, color, sides) => limb(stow(a), stow(b), r1.map(r => r * size), r2.map(r => r * size), color, sides);
-  weaponModel(fighter, mount, angle, 0, 0, 0, holder, point => world(stow(point)), spare);
-}
-
 // A worn shield sits on the hand; a stowed one hangs on the back, a little smaller.
 function shieldPlacement(fighter, pose) {
   const worn = shieldReady(fighter);
@@ -1488,52 +783,15 @@ function shieldPlacement(fighter, pose) {
   };
 }
 
-function drawShieldModel(fighter, pose, world) {
-  const { at: [sx, sy, sz], tilt, size } = shieldPlacement(fighter, pose);
-  const transform = ([x, y, z]) => world([
-    sx + (x * Math.cos(tilt) - y * Math.sin(tilt)) * size,
-    sy + (x * Math.sin(tilt) + y * Math.cos(tilt)) * size,
-    sz + z
-  ]);
-  shield(0, 0, .11, fighter, transform);
-  return transform;
-}
-
-// Which art is on: the 2D cut-out art (fighter2d.js), the default, or the older 3D meshes.
-const artStyle = (() => {
-  const query = new URLSearchParams(location.search).get('style');
-  if (query === '2d' || query === '3d') return { flat: query === '2d' };
-  try { return { flat: localStorage.getItem('arena-art') !== '3d' }; } catch { return { flat: true }; }
-})();
-
-// Gear without 2D art yet keeps its 3D mesh, painted in place between the sprites.
-function flushFaces(frost) {
-  faces.sort((a, b) => a.depth - b.depth);
-  for (const face of faces) polygon(face.projected, 'rgb(' + (frost ? iced(face.rgb, frost) : face.rgb).join(',') + ')');
-  const count = faces.length;
-  faces.length = 0;
-  return count;
-}
-
-const iced = (rgb, frost) => rgb.map((channel, axis) => Math.round(mix(channel, [196, 232, 250][axis] * (.55 + channel / 560), frost)));
-
-// Hands the posed skeleton to the sprite painter. Returns how many 3D faces the fallback gear used.
-function drawGladiator2D(fighter, pose) {
-  // A kit without its own 2D set uses its class's.
+// Hands the posed skeleton to the 2D painter in fighter2d.js.
+function drawGladiator(fighter, pose) {
+  // Anything without art of its own borrows: a kit its class's set, a weapon its family's shape.
   const own = fighter.gear.armor;
   const set = ArenaArt2D.hasArmor(own) ? own : { melee: 'plate', ranged: 'leather', magic: 'robes' }[armors[own].style];
   const world = point => worldPoint(fighter, point);
-  const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides, modelDetail);
-  const frost = finisherFrost(fighter);
-  let fallbackFaces = 0;
-  const mesh = build => () => {
-    build();
-    fallbackFaces += flushFaces(frost);
-  };
-  // A special has art of its own, under its own key.
   const art = key => {
     const wanted = specialOf(fighter, key) ? fighter.gear.special : key;
-    return ArenaArt2D.has(wanted) ? wanted : null;
+    return [wanted, key, weaponFamily(key)].find(ArenaArt2D.has);
   };
   // The curves a flail's chains hang on, scaled toward the mount when it is stowed.
   const chains = (key, hand, angle, windup, strike, mount, size = 1) => weaponFamily(key) !== 'flail' ? null
@@ -1556,7 +814,7 @@ function drawGladiator2D(fighter, pose) {
     base: armors[set].color,
     pose,
     torsoPoint: torsoTransform(pose),
-    frost,
+    frost: finisherFrost(fighter),
     clock: weaponClock(),
     owner: fighter,
     forward: fighter.x * fighter.direction + pose.joints.chest[0],
@@ -1564,161 +822,17 @@ function drawGladiator2D(fighter, pose) {
       key: art(thrown ? 'spear' : fighter.weapon),
       chains: chains(fighter.weapon, pose.joints.weaponHand, pose.angle, pose.windup, pose.strike),
       twoHanded: weapons[fighter.weapon].twoHanded,
-      thrown,
-      draw: mesh(() => weaponModel(fighter, thrown?.hand || pose.joints.weaponHand, thrown?.angle ?? pose.angle,
-        pose.windup, pose.strike, weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon))
+      thrown
     },
     spare: stowed ? {
-      key: art(spare), ...stowed, draw: mesh(() => stowedWeapon(fighter, pose, spare, limb, world)),
-      chains: chains(spare, stowed.mount, stowed.angle, 0, 0, stowed.mount, stowed.scale)
+      key: art(spare), ...stowed, chains: chains(spare, stowed.mount, stowed.angle, 0, 0, stowed.mount, stowed.scale)
     } : null,
     shield: fighter.shieldHitsLeft === 0 ? null : {
-      key: ArenaArt2D.hasShield(fighter.gear.shield) ? fighter.gear.shield : null,
+      key: ArenaArt2D.hasShield(fighter.gear.shield) ? fighter.gear.shield : 'round',
       ...shieldPlacement(fighter, pose),
-      bolts: ArenaEffects.stuckBolts(fighter.name),
-      draw: mesh(() => stuckBolts(fighter, drawShieldModel(fighter, pose, world)))
+      bolts: ArenaEffects.stuckBolts(fighter.name)
     }
   });
-  return fallbackFaces;
-}
-
-function drawGladiator(fighter, pose, parts) {
-  const { joints: j } = pose;
-  const kit = armors[fighter.gear.armor];
-  const plated = kit.style === 'melee';
-  const robed = kit.style === 'magic';
-  const world = point => worldPoint(fighter, point);
-  const limb = (a, b, r1, r2, color, sides) => prism(a, b, r1, r2, color, world, sides, modelDetail);
-  let partStart = faces.length;
-
-  for (const side of ['rear', 'front']) {
-    const hip = j[side + 'Hip'];
-    const knee = j[side + 'Knee'];
-    const ankle = j[side + 'Ankle'];
-    const toe = j[side + 'Toe'];
-    limb(hip, knee, [.19, .17], [.13, .136], robed ? clothLining : leather, 8);
-    limb(knee, ankle, [.139, .14], [.103, .106], robed ? clothLining : skin, 8);
-    if (plated) {
-      limb(shifted(pointBetween(hip, knee, .17), 0, 0, .086), shifted(pointBetween(hip, knee, .70), 0, 0, .092),
-        [.136, .099], [.118, .08], kit.shell || armor, 8);
-      limb(shifted(knee, -.066, .076, .087), shifted(knee, .028, -.083, .085), [.129, .095], [.085, .085], kit.shell || metal, 8);
-    }
-    limb(shifted(pointBetween(knee, ankle, .13), 0, 0, .062), shifted(pointBetween(ankle, knee, .08), 0, 0, .064),
-      [.109, .102], [.090, .080], plated ? kit.shell || metal : robed ? leather : kit.color, 8);
-    for (const t of (plated ? [.24, .73] : [.32, .53, .73])) {
-      const strap = pointBetween(knee, ankle, t);
-      limb(shifted(strap, -.10, -.022, .084), shifted(strap, .10, .022, .084), [.028, .03], [.028, .03], plated ? bronze : leather, 6);
-    }
-    const heel = shifted(pointBetween(toe, ankle, 1.67), 0, -.09);
-    limb(heel, toe, [.10, .136], [.067, .118], leather, 8);
-    limb(shifted(heel, -.008, -.045, .019), shifted(toe, .012, -.044, .019), [.035, .145], [.031, .124], soleColor, 8);
-    if (plated) {
-      limb(shifted(ankle, .024, -.020, .072), shifted(toe, .008, .036, .044), [.067, .10], [.048, .105], armor, 8);
-    }
-    for (const t of [.42, .62, .80]) {
-      const instep = pointBetween(heel, toe, t);
-      limb(shifted(instep, -.011, .044, .083), shifted(instep, .012, .052, .106),
-        [.015, .018], [.014, .018], plated ? bronze : fighter.trim, 6);
-    }
-  }
-
-  const torsoAngle = torsoLean(pose);
-  const torso = torsoTransform(pose);
-  partStart = recordGeometry(parts, 'body', partStart);
-  armorTorso(fighter, pose, point => world(torso(point)));
-  partStart = recordGeometry(parts, 'armor', partStart);
-
-  const spare = fighter.weapon === fighter.gear.weapon ? fighter.gear.reserve : fighter.gear.weapon;
-  if (weapons[spare]) stowedWeapon(fighter, pose, spare, limb, world);
-  partStart = recordGeometry(parts, 'stowed', partStart);
-
-  if (pose.severed) {
-    // Beheaded: a short stump stays on the body and the head tumbles on its own.
-    const stumpTop = shifted(j.chest, 0, .2);
-    limb(j.chest, stumpTop, [.12, .15], [.11, .13], robed ? clothLining : leather, 8);
-    limb(stumpTop, shifted(stumpTop, 0, .015), [.11, .13], [.09, .11], [120, 22, 20], 8);
-  } else {
-    const neck = pointBetween(j.chest, j.head, .48);
-    limb(j.chest, neck, [.12, .15], [.12, .15], robed ? clothLining : leather, 8);
-  }
-  const headTurn = pose.severed ? pose.headSpin : Math.atan2(j.head[1] - j.chest[1], j.head[0] - j.chest[0]) - Math.PI / 2;
-  const headPoint = ([x, y, z]) => world([
-    j.head[0] + x * Math.cos(headTurn) - y * Math.sin(headTurn),
-    j.head[1] + x * Math.sin(headTurn) + y * Math.cos(headTurn), j.head[2] + z
-  ]);
-  partStart = recordGeometry(parts, 'body', partStart);
-  armorHelmet(fighter, kit, headPoint);
-  partStart = recordGeometry(parts, 'helmet', partStart);
-
-  for (const side of ['weapon', 'shield']) {
-    const shoulder = j[side + 'Shoulder'];
-    const elbow = j[side + 'Elbow'];
-    const hand = j[side + 'Hand'];
-    limb(shoulder, elbow, [.16, .15], [.109, .11], robed ? kit.color : skin, 8);
-    limb(elbow, hand, [.115, .118], [.08, .083], robed ? clothLining : skin, 8);
-    const shoulderShell = plated ? kit.shell || metal : robed ? fighter.color : kit.color;
-    limb(shifted(shoulder, 0, 0, .046), shifted(pointBetween(shoulder, elbow, .42), 0, 0, .062),
-      [kit.cut === 'fortress' ? .24 : .18, .144], [plated ? .177 : .122, .11], shoulderShell, 8);
-    if (plated) {
-      limb(shifted(pointBetween(shoulder, elbow, .25), 0, 0, .078), shifted(pointBetween(shoulder, elbow, .58), 0, 0, .071),
-        [.163, .12], [.132, .097], kit.shell || armor, 8);
-      limb(shifted(elbow, 0, .059, .051), shifted(elbow, 0, -.046, .062), [.102, .078], [.07, .065], metal, 8);
-    }
-    limb(shifted(pointBetween(elbow, hand, .38), 0, 0, .04), shifted(pointBetween(elbow, hand, .85), 0, 0, .039),
-      [.105, .105], [.086, .086], plated ? armor : robed ? fighter.color : leather, 8);
-    limb(pointBetween(elbow, hand, .83), pointBetween(elbow, hand, .91), [.092, .097], [.092, .097], bronze, 8);
-    limb(pointBetween(elbow, hand, .90), pointBetween(elbow, hand, 1.14), [.082, .091], [.067, .075], robed ? skin : leather, 8);
-    const knuckles = pointBetween(elbow, hand, 1.05);
-    for (let index = -1; index <= 1; index++) {
-      const finger = shifted(knuckles, index * .035, -.012, .072);
-      limb(shifted(finger, -.008, -.036), shifted(finger, .009, .023), [.014, .012], [.017, .014],
-        plated ? armor : robed ? skin : leather, 6);
-    }
-    if (modelDetail) {
-      const thumb = shifted(pointBetween(elbow, hand, .98), 0, 0, .077);
-      const a = shifted(thumb, -.032, .026);
-      const b = shifted(thumb, .030, .018, .014);
-      const c = shifted(thumb, .038, -.011);
-      const d = shifted(thumb, -.022, -.019, -.008);
-      const color = plated ? armor : robed ? skin : leather;
-      surface([a, b, d], color, 1.20, world);
-      surface([b, c, d], color, .94, world);
-    }
-  }
-
-  partStart = recordGeometry(parts, 'body', partStart);
-  const thrown = finishingSpear(fighter, pose);
-  weaponModel(fighter, thrown?.hand || j.weaponHand, thrown?.angle ?? pose.angle, pose.windup, pose.strike,
-    weaponClock(), limb, world, thrown ? 'spear' : fighter.weapon);
-  partStart = recordGeometry(parts, 'held', partStart);
-  if (fighter.shieldHitsLeft === 0) return;
-  const shieldTransform = drawShieldModel(fighter, pose, world);
-  partStart = recordGeometry(parts, 'shield', partStart);
-  stuckBolts(fighter, shieldTransform);
-  recordGeometry(parts, 'bolts', partStart);
-}
-
-function stuckBolts(fighter, transform) {
-  const { width: halfWidth, height: halfHeight } = shields[fighter.gear.shield];
-  const piece = (a, b, radius, tip, color) => prism(a, b, [radius, radius], [tip, tip], color, transform, 6, modelDetail);
-  for (const bolt of ArenaEffects.stuckBolts(fighter.name)) {
-    // The shaft leans out of the shield face toward the shooter and the viewer.
-    const head = [bolt.x * halfWidth, bolt.y * halfHeight, .25];
-    const tail = shifted(head, .36, bolt.tilt * .36, .22);
-    piece(head, tail, .019, .019, [226, 196, 142]);
-    for (const side of [-1, 1]) {
-      const vane = pointBetween(head, tail, .72);
-      const front = shifted(tail, -.02, side * .065);
-      const back = shifted(tail, .035, side * .06);
-      const color = [222, 214, 190];
-      if (modelDetail) {
-        const crease = shifted(pointBetween(front, back, .55), 0, 0, .014);
-        surface([vane, front, crease, tail], color, 1.07, transform);
-        surface([crease, back, tail], color, .79, transform);
-      } else surface([vane, front, back, tail], color, 1, transform);
-    }
-    piece(shifted(head, -.012, 0, -.01), pointBetween(head, tail, .1), .036, .024, darkSteel);
-  }
 }
 
 function worldPoint(fighter, [x, y, z]) {
@@ -1970,146 +1084,6 @@ function drawHitboxes(fighter, pose) {
   ctx.lineCap = 'butt';
 }
 
-function randomSource(seed) {
-  return () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-}
-
-function drawBackdrop() {
-  const rand = randomSource(351);
-  let facets = 0;
-  const face = (points, color) => {
-    polygon(points, color);
-    facets++;
-  };
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, '#8a563b');
-  gradient.addColorStop(.48, '#ad7651');
-  gradient.addColorStop(.49, '#c69660');
-  gradient.addColorStop(1, '#935c38');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, width, height);
-
-  const stone = Math.max(24, width / 20);
-  for (let row = 0; row < 7; row++) {
-    for (let column = -1; column < width / stone; column++) {
-      const x = (column + (row % 2) * .5) * stone;
-      const y = row * height * .069;
-      ctx.fillStyle = rand() > .52 ? '#ffd29b16' : '#5227121c';
-      ctx.fillRect(x + 1, y, stone - 2, height * .069 - 2);
-      facets++;
-      const pattern = row + column + 1;
-      if ((modelDetail === 2 && pattern % 4 !== 0) || (modelDetail === 1 && pattern % 3 === 0)) {
-        const lip = Math.min(5, height * .018);
-        face([[x + 1, y], [x + stone - 1, y], [x + stone - lip, y + lip], [x + 2, y + lip]], '#f1bc7950');
-      }
-    }
-  }
-  const bay = clamp(width / 8, 90, 145);
-  for (let i = -1; i < Math.ceil(width / bay); i++) {
-    const x = i * bay + bay * .11;
-    const y = height * .09;
-    const w = bay * .78;
-    const h = height * .33;
-    ctx.fillStyle = '#b1835d';
-    ctx.fillRect(x - 4, y + w * .4, w + 8, h - w * .4);
-    const recess = ctx.createLinearGradient(0, y, 0, y + h);
-    recess.addColorStop(0, '#482a22');
-    recess.addColorStop(1, '#8c5c40');
-    ctx.fillStyle = recess;
-    ctx.beginPath();
-    ctx.moveTo(x + w * .12, y + h);
-    ctx.lineTo(x + w * .12, y + w * .45);
-    ctx.ellipse(x + w * .50, y + w * .45, w * .38, w * .35, 0, Math.PI, 2 * Math.PI);
-    ctx.lineTo(x + w * .88, y + h);
-    ctx.fill();
-    ctx.strokeStyle = '#c79970';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    if (modelDetail) {
-      const facetsPerArch = modelDetail === 2 ? 11 : 7;
-      const rim = Math.min(7, w * .074);
-      const arch = (segment, outset = 0) => {
-        const angle = Math.PI * (1 + segment / facetsPerArch);
-        return [x + w * .5 + Math.cos(angle) * (w * .38 + outset),
-          y + w * .45 + Math.sin(angle) * (w * .35 + outset)];
-      };
-      for (let segment = 0; segment < facetsPerArch; segment++) {
-        face([arch(segment), arch(segment + 1), arch(segment + 1, rim), arch(segment, rim)],
-          ['#c3996b', '#ae835a', '#cfa778'][segment % 3]);
-      }
-      face([[x - 4, y + w * .54], [x + 1, y + w * .60], [x + 1, y + h], [x - 4, y + h]], '#c69a70');
-      if (modelDetail === 2) {
-        face([[x + w + 4, y + w * .54], [x + w - 3, y + w * .60], [x + w - 3, y + h],
-          [x + w + 4, y + h]], '#91613f');
-      }
-    }
-    ctx.fillStyle = '#d8ae7f';
-    ctx.fillRect(x + w * .45, y + w * .08, w * .10, 5);
-    ctx.fillStyle = '#bf976f';
-    ctx.fillRect(x - 3, y + w * .54, 8, h - w * .54);
-    ctx.fillStyle = '#513322';
-    ctx.fillRect(x + w * .24, y + h - 7, w * .52, 7);
-    facets += 5;
-  }
-
-  ctx.fillStyle = '#815134';
-  ctx.fillRect(0, height * .411, width, height * .078);
-  ctx.fillStyle = '#ce9d6d';
-  ctx.fillRect(0, height * .418, width, 4);
-  ctx.fillStyle = '#9d6847';
-  ctx.fillRect(0, height * .449, width, height * .037);
-  ctx.fillStyle = '#75482d';
-  for (let x = 0; x < width; x += 43) ctx.fillRect(x, height * .45, 1.5, height * .036);
-
-  for (const [side, cloth, fold] of [[-1, '#853f34', '#a85542'], [1, '#37585b', '#47767a']]) {
-    const x = width * (.5 + side * .34);
-    const y = height * .105;
-    const w = clamp(width * .058, 27, 58);
-    const h = height * .26;
-    ctx.fillStyle = '#d9ad75';
-    ctx.fillRect(x - w * .61, y - 3, w * 1.22, 4);
-    face([[x - w / 2, y], [x + w / 2, y], [x + w / 2, y + h * .86], [x, y + h], [x - w / 2, y + h * .86]], cloth);
-    face([[x - w / 2, y], [x - w * .13, y], [x - w * .10, y + h * .96], [x - w / 2, y + h * .86]], fold);
-    if (modelDetail) {
-      face([[x + w * .32, y], [x + w * .50, y], [x + w * .50, y + h * .86],
-        [x + w * .28, y + h * .92]], '#30252c42');
-      if (modelDetail === 2) {
-        face([[x - w * .50, y + h * .80], [x, y + h * .94], [x + w * .50, y + h * .80],
-          [x + w * .50, y + h * .86], [x, y + h], [x - w * .50, y + h * .86]], '#d6a676bd');
-      }
-    }
-    face([[x, y + h * .28], [x + w * .22, y + h * .48], [x, y + h * .66], [x - w * .22, y + h * .48]], '#d7a46b');
-    face([[x, y + h * .37], [x + w * .12, y + h * .48], [x, y + h * .57], [x - w * .12, y + h * .48]], cloth);
-  }
-
-  for (let i = 0; i < 380; i++) {
-    const x = rand() * width;
-    const y = mix(height * .49, height, rand());
-    ctx.fillStyle = i % 2 ? '#f5c58736' : '#57351923';
-    ctx.fillRect(x, y, rand() * 5 + 1, rand() * 1.5 + .4);
-  }
-  ctx.beginPath();
-  for (let i = 0; i <= 72; i++) {
-    const angle = i / 72 * 2 * Math.PI;
-    const [x, y] = project([Math.cos(angle) * 3.75, 0, Math.sin(angle) * 2.6]);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.strokeStyle = '#f5d09b53';
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
-  const glow = ctx.createRadialGradient(width * .50, height * .70, 0, width * .50, height * .70, width * .56);
-  glow.addColorStop(0, '#ffdc8b35');
-  glow.addColorStop(1, '#1e0e0963');
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, width, height);
-  return facets;
-}
-
 function ellipse(x, y, rx, ry, color) {
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -2248,10 +1222,8 @@ function drawFacetedBolt([x, y], [tailX, tailY], shaft, head) {
   polygon([point(0, -.35), top, bottom, point(0, .35)], shaft);
   polygon([point(.74), point(0, -1.08), point(.17), point(0, 1.08)], '#b7a486');
   polygon([point(1), point(.74, -.86), point(.82), point(.74, .86)], head);
-  if (modelDetail === 2) {
-    polygon([point(.84), bottom, point(0, .35), point(0)], '#684e34');
-    polygon([point(1), point(.82), point(.74, .86)], '#b1a18c');
-  }
+  polygon([point(.84), bottom, point(0, .35), point(0)], '#684e34');
+  polygon([point(1), point(.82), point(.74, .86)], '#b1a18c');
 }
 
 function drawBolt(action) {
@@ -2266,29 +1238,12 @@ function drawBolt(action) {
   const [x, y] = project(point);
   const tail = project(shifted(point, -attacker.direction * .33, -.015));
   const shaft = action.snare ? specials.snarecaster.color : action.doubleShot || action.echo ? fireColors[0] : travel > 0 ? '#fae3ac' : '#cdb592';
-  if (modelDetail) drawFacetedBolt([x, y], tail, shaft, '#ebe3c7');
-  else {
-    ctx.strokeStyle = shaft;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(...tail.slice(0, 2));
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ellipse(x, y, 2.6, 1.5, '#ebe3c7');
-  }
+  drawFacetedBolt([x, y], tail, shaft, '#ebe3c7');
   if (action.doubleShot && travel > .12) {
     // The second, burning bolt trails the first.
     const echo = project(shifted(pointBetween(from, target, travel - .12), 0, .09));
     const echoTail = project(shifted(pointBetween(from, target, travel - .12), -attacker.direction * .33, .075));
-    if (modelDetail) drawFacetedBolt(echo, echoTail, fireColors[0], fireColors[1]);
-    else {
-      ctx.strokeStyle = fireColors[0];
-      ctx.beginPath();
-      ctx.moveTo(echoTail[0], echoTail[1]);
-      ctx.lineTo(echo[0], echo[1]);
-      ctx.stroke();
-      ellipse(echo[0], echo[1], 3, 1.8, fireColors[1]);
-    }
+    drawFacetedBolt(echo, echoTail, fireColors[0], fireColors[1]);
   }
 }
 
@@ -2301,33 +1256,16 @@ function resize() {
   canvas.width = Math.round(width * density);
   canvas.height = Math.round(height * density);
   ctx.setTransform(density, 0, 0, density, 0, 0);
-  const started = performance.now();
-  const backdropFacets = scenery.backdrop(width, height, drawBackdrop, modelDetail);
+  scenery.backdrop(width, height);
   backdrop = document.createElement('canvas');
   backdrop.width = canvas.width;
   backdrop.height = canvas.height;
   backdrop.getContext('2d').drawImage(canvas, 0, 0);
-  ArenaBench.reportBackdrop(backdropFacets, performance.now() - started);
   draw();
 }
 
-// Paints the depth-sorted faces. Canvas 2D fills one path per face; WebGL (gl-renderer.js)
-// batches them and is about 4× cheaper on the main thread at phone size (1.8 ms vs 0.4 ms
-// for 2,347 faces). Build and sort cost the same for both. See docs/rendering-performance.md.
-let glRenderer;
-function paintFaces(geometry) {
-  if (ArenaBench.renderer === 'webgl' && glRenderer === undefined) glRenderer = ArenaGL.create();
-  const useGL = ArenaBench.renderer === 'webgl' && glRenderer && !glRenderer.lost
-    && glRenderer.paint(faces, width, height, canvas.width, canvas.height);
-  if (useGL) ctx.drawImage(glRenderer.canvas, 0, 0, width, height);
-  else for (const face of faces) polygon(face.projected, 'rgb(' + face.rgb.join(',') + ')');
-  ArenaBench.report(useGL ? 'webgl' : 'canvas', faces.length, useGL ? glRenderer.paint.complex : 0,
-    canvas.width + '×' + canvas.height + ' px', geometry);
-}
-
-// Frame order: cached still backdrop, animated scenery, stains and shadows, fighter faces
-// (build → sort → paintFaces), then effects and labels on top. Keep fighter faces in one
-// contiguous paintFaces() call so either renderer can paint them without breaking layering.
+// Frame order: cached still backdrop, animated scenery, stains and shadows, fighters, then effects
+// and labels on top.
 function draw() {
   // The benchmark times three sections and can skip each one; skipping only changes the picture.
   const startedAt = performance.now();
@@ -2339,22 +1277,18 @@ function draw() {
     ctx.translate(shakeX * scale, shakeY * scale);
     ctx.drawImage(backdrop, 0, 0, width, height);
   }
-  const animatedFacets = ArenaBench.drawScenery ? scenery.draw(width, height, sceneryClock, modelDetail) : 0;
+  if (ArenaBench.drawScenery) scenery.draw(width, height, sceneryClock);
   const sceneDone = performance.now();
   if (ArenaBench.drawEffects) ArenaEffects.drawStains(ctx, project, scale);
   const stainsDone = performance.now();
   const poses = fighters.map(fighter => fighter.ragdoll?.pose || finisherPose(fighter) || displayPose(fighter));
-  const geometry = ArenaBench.measureGeometry ? [] : null;
-  let meshFaces = 0;
   // Sprites paint immediately, so the attacker and then the victor's finisher go last to stay on top.
-  const order = [0, 1];
-  if (artStyle.flat) {
-    const rank = fighter => (fighter.ragdoll ? 0 : fighter.action?.style === 'melee' ? 2 : 1);
-    order.sort((a, b) => rank(fighters[a]) - rank(fighters[b]));
-  }
-  if (ArenaBench.drawFighters) order.forEach(index => {
+  const rank = fighter => (fighter.ragdoll ? 0 : fighter.action?.style === 'melee' ? 2 : 1);
+  const order = [0, 1].sort((a, b) => rank(fighters[a]) - rank(fighters[b]))
+    .filter(index => ArenaBench.drawFighters && !fighters[index].shattered);
+  // Every shadow goes down first, so none lands on top of the other fighter.
+  for (const index of order) {
     const fighter = fighters[index];
-    if (fighter.shattered) return;
     const pose = poses[index];
     const hips = pose.joints.hips;
     const down = fighter.ragdoll ? clamp(1 - hips[1] / 1.1, 0, 1) : 0;
@@ -2368,30 +1302,9 @@ function draw() {
         ctx.globalAlpha = 1;
       }
     }
-    if (artStyle.flat) return;
-    // The benchmark's polygon multiplier rebuilds each fighter in place: same picture, more polygons.
-    const firstFace = faces.length;
-    const parts = geometry ? {} : null;
-    if (geometry) geometry.push({ name: fighter.name, parts });
-    for (let copy = 0; copy < ArenaBench.polygons; copy++) drawGladiator(fighter, pose, parts);
-    // A frost-shatter finisher turns the body to ice before it breaks.
-    const frost = finisherFrost(fighter);
-    if (frost) for (let i = firstFace; i < faces.length; i++) {
-      faces[i].rgb = iced(faces[i].rgb, frost);
-    }
-  });
-  if (artStyle.flat) {
-    // Shadows were all laid down above, so no shadow lands on top of the other fighter.
-    if (ArenaBench.drawFighters) for (const index of order) {
-      if (!fighters[index].shattered) meshFaces += drawGladiator2D(fighters[index], poses[index]);
-    }
-    ArenaBench.report('canvas', meshFaces, 0, canvas.width + '×' + canvas.height + ' px · 2D art, '
-      + ArenaArt2D.stats.sprites + ' sprites', null);
-  } else {
-    faces.sort((a, b) => a.depth - b.depth);
-    paintFaces(geometry);
   }
-  faces.length = 0;
+  for (const index of order) drawGladiator(fighters[index], poses[index]);
+  ArenaBench.report(canvas.width + '×' + canvas.height + ' px · ' + ArenaArt2D.stats.sprites + ' sprites');
   const fightersDone = performance.now();
   const effects = ArenaBench.drawEffects;
   if (effects) {
@@ -2403,8 +1316,7 @@ function draw() {
   if (effects) drawEffects();
   ctx.restore();
   if (effects) ArenaEffects.drawLabels(ctx, project, width, height);
-  ArenaBench.parts(sceneDone - startedAt, fightersDone - stainsDone, stainsDone - sceneDone + performance.now() - fightersDone,
-    animatedFacets);
+  ArenaBench.parts(sceneDone - startedAt, fightersDone - stainsDone, stainsDone - sceneDone + performance.now() - fightersDone);
 }
 
 // Magic, bolts, particles, blood and sparks, drawn over the fighters and hitboxes.
@@ -3400,38 +2312,6 @@ elements.speed.addEventListener('click', () => {
   elements.speed.setAttribute('aria-label', 'Simulation speed, ' + speeds[speedIndex] + ' times');
 });
 
-qualitySelect.addEventListener('change', () => {
-  modelDetail = qualityLevels.indexOf(qualitySelect.value);
-  try { localStorage.setItem('arena-quality', qualitySelect.value); } catch { /* private mode */ }
-  resize();
-  ArenaBench.reset();
-});
-
-const artButton = document.getElementById('art');
-function showArtStyle() {
-  artButton.textContent = artStyle.flat ? 'Art 2D' : 'Art 3D';
-  artButton.setAttribute('aria-pressed', String(artStyle.flat));
-  // Quality only refines the 3D meshes and venues.
-  qualitySelect.closest('label').hidden = artStyle.flat;
-}
-artButton.addEventListener('click', () => {
-  artStyle.flat = !artStyle.flat;
-  try { localStorage.setItem('arena-art', artStyle.flat ? '2d' : '3d'); } catch { /* private mode */ }
-  showArtStyle();
-  resize();
-  ArenaBench.reset();
-});
-showArtStyle();
-
-// ?cast=1 or ?cast=2 pins gear that has 2D art, so the proof of concept can be seen at a glance.
-const cast = {
-  1: [{ weapon: 'sword', reserve: 'staff', shield: 'round', armor: 'plate' }, { weapon: 'crossbow', reserve: 'sword', shield: 'round', armor: 'leather' }],
-  2: [{ weapon: 'staff', reserve: 'none', shield: 'round', armor: 'robes' }, { weapon: 'sword', reserve: 'crossbow', shield: 'round', armor: 'plate' }]
-}[new URLSearchParams(location.search).get('cast')];
-cast?.forEach((gear, index) => {
-  for (const [slot, key] of Object.entries(gear)) fighters[index].loadout[slot].value = key;
-});
-
 // Showing gear and stats only changes the page layout, so it stays available during a fight.
 const detailsToggle = document.getElementById('details');
 detailsToggle.addEventListener('click', () => {
@@ -3448,7 +2328,7 @@ elements.hitboxes.addEventListener('click', () => {
 
 scenery = ArenaVenues.create(ctx, document.getElementById('venue'),
   ['scenery-primary', 'scenery-secondary'].map(id => document.getElementById(id)),
-  document.getElementById('arena-title'), resize, () => artStyle.flat);
+  document.getElementById('arena-title'), resize);
 startBout();
 resize();
 new ResizeObserver(resize).observe(canvas);

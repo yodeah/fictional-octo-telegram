@@ -1,29 +1,20 @@
-# Detailed 2D art: investigation, proof of concept and plan
+# 2D art: how it works, and why it replaced the 3D renderer
 
-Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Measured 2026-11-26. Every weapon, shield, armor kit and venue now has 2D art.
+Measured 2026-11-26 on branch `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. The 3D renderer, its WebGL painter and the Quality setting were removed on 2026-11-27, after the 2D art was checked on a phone; they remain in git history up to that removal. The 3D numbers below are the last measured before it.
 
 ## Answer
 
-Detailed 2D fighters look far better than the current meshes and draw faster, as long as each part is painted once into a sprite and only moved afterwards. The 2D art is now the default, after it was checked on a phone on 2026-11-27; **Art 2D / Art 3D** still switches.
+Detailed 2D fighters look far better than the low-poly meshes did and draw faster, as long as each part is painted once into a sprite and only moved afterwards.
 
-**3D (today)**
+**Before: 3D**
 
 ![3D fighters](art2d/plate-vs-leather-3d.jpg)
 
-**2D proof of concept, same frame**
+**After: 2D, same frame**
 
 ![2D fighters](art2d/plate-vs-leather-2d.jpg)
 
 ![2D robes and plate](art2d/robes-vs-plate-2d.jpg)
-
-## Try it
-
-`open index.html`. The **Art** button switches painters at any time, also mid-bout, and remembers the choice. Pick any gear under **Show gear, stats & spells**.
-
-To start from a set matchup, run `python3 -m http.server 8000` in the project folder and open one of these (`open` cannot pass address options to a local file):
-
-- <http://localhost:8000/?style=2d&cast=1>: plate with sword and staff against leather with crossbow and sword.
-- <http://localhost:8000/?style=2d&cast=2>: robes with staff against plate with sword and crossbow.
 
 ## What has 2D art
 
@@ -41,11 +32,11 @@ Everything a fighter can carry or wear:
 
 ![All armor kits](art2d/armor.jpg)
 
-Each blade and head covers the stretch that `weaponSegments()` hit-tests, and flail chains hang on the same curves as the hit test. Nothing in the simulation changed, so timing, hit detection and **Hitboxes** are unaffected. A sweep of 66 bouts (every finisher and 60 random matchups) drew no 3D mesh in 2D mode.
+Each blade and head covers the stretch that `weaponSegments()` hit-tests, and flail chains hang on the same curves as the hit test. Nothing in the simulation changed, so timing, hit detection and **Hitboxes** are unaffected. A sweep of 66 bouts (every finisher and 60 random matchups) found no item without art.
 
 ### Venues
 
-`venues2d.js` redraws the Sand Pit, Fernwood Clearing and Moonlit Ruins. The still art is painted into the cached backdrop, so it adds nothing per frame, and the crowd and wildlife are sprites on the same paths as before, so their click targets still work. **Art 3D** keeps the original venues unchanged.
+`venues2d.js` redraws the Sand Pit, Fernwood Clearing and Moonlit Ruins. The still art is painted into the cached backdrop, so it adds nothing per frame, and the crowd and wildlife are sprites on the same paths as before, so their click targets still work.
 
 ![Fernwood Clearing](art2d/venue-fernwood.jpg)
 
@@ -55,7 +46,7 @@ With 20 full redraws per frame on the desktop size, 2D held about 17 ms in all t
 
 ### Adding an item
 
-Add an entry to `ArenaArt2D.weapons`, `.shields` or `.armors` under the item's key. Until it exists, the item keeps its 3D mesh, or an armor kit borrows its class's set.
+Add an entry to `ArenaArt2D.weapons`, `.shields` or `.armors` under the item's key. Until it exists, a weapon borrows its family's shape, a shield the round shield and an armor kit its class's set.
 
 ## How it works
 
@@ -87,7 +78,7 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 - Sprite memory for the first matchup: about 2.8 MB on desktop and 0.5 MB at phone size. Baking took 7–60 ms, once, and repeats after a resize or a new look.
 - Looks pile up over many matchups, so sprites are released between bouts once they pass 12 MB. Peak in the 66-bout sweep was about 15 MB on desktop.
 - A forced-readback timing in the app's hidden browser pane showed 2D as slower. Neither real frame measurement above reproduced that, so it is not counted.
-- **Phone:** reported to work fine on 2026-11-27, without frame-rate numbers. To get them, add `?style=2d&cast=1&bench` to the served address and compare with `?style=3d&cast=1&bench`. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
+- **Phone:** reported to work fine on 2026-11-27, without frame-rate numbers. Open the game with `?bench` to get them. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
 
 ## Options considered
 
@@ -105,18 +96,7 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 - One side-on drawing per part, so there is no true twist or turn of the torso or shield.
 - Specials do not change their art with their state (Last Oath's blade does not brighten when sworn; the aura still shows it).
 - Sprites do not interleave by depth between the two fighters. The attacker is drawn on top.
-- The Quality setting only affects 3D, so it is hidden in 2D mode.
-- The Polys and WebGL benchmark toggles do nothing to the sprites.
 
-## Plan to finish
+## State
 
-| # | Step | Est. tokens | State |
-| --- | --- | ---: | --- |
-| 1 | Look at the 2D art, test on the phone, and decide | — | Done: 2D is the default |
-| 2 | Joint polish and cloth swing | 40k | Done |
-| 3 | All weapons, shields, specials and armor kits, with a first polish pass | 370k | Done |
-| 4 | Matching backdrop and crowd art for the three venues | 80k | Done |
-| 5 | Make 2D the default | 10k | Done |
-| 6 | Remove the 3D painter, WebGL path and Quality setting, update docs | 40k | **Open** |
-
-Stop adding 3D mesh detail, because step 6 deletes it. A new weapon or armor kit now needs 2D art too.
+Joint polish, every weapon, shield, special, armor kit and venue, the switch to 2D as the default and the removal of the 3D renderer are done. A seeded run of 60 fights gave identical results before and after the removal.

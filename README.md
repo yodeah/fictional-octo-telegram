@@ -1,13 +1,13 @@
 # Arena Ledger
 
-A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters, gear and venues are hand-drawn 2D art on a Canvas 2D skeleton with a perspective camera; the earlier low-poly 3D look is still available.
+A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters, gear and venues are hand-drawn 2D art, posed on a skeleton with a perspective camera and drawn on Canvas 2D.
 
 ## Design decision: fights are fully idle
 
 **Decided 2026-11-26.** Once a fight starts, the player cannot interact with it. All choices happen between fights, and the fighters decide everything until one falls.
 
 - **Locked during a fight, including while paused:** gear and spellbook pickers, Reset, Generate matchup, the venue selector and the scene markers.
-- **Still available, because they only change how you watch:** Pause/Resume, playback speed, Quality, Hitboxes and Auto-rematch.
+- **Still available, because they only change how you watch:** Pause/Resume, playback speed, Hitboxes and Auto-rematch.
 - **For future features:** do not add in-fight commands, abilities, cheers or other inputs. Put player choices in preparation and progression between fights.
 
 This replaces the earlier idea of a "corner coach" with timed calls.
@@ -45,8 +45,6 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
-With **Art 3D**, the **Quality** menu appears and saves your choice for the next visit. Low is the default. Medium and High refine the fighters, equipment, bolts, finisher props and the three venues. High draws about twice as much geometry as Low in the reference bout.
-
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
 
 The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and lists improvement ideas. Its numbers are written by hand, so update it when combat values change.
@@ -63,25 +61,19 @@ Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake 
 
 Fighters coil before they swing and carry the weapon through after it lands, then settle back to guard. Heavy two-handed weapons coil deepest, spears draw back for a thrust, crossbows steady the aim and kick on release, and staves gather power before pushing a spell out. Blows knock the defender back by more for heavier hits and a larger share of health lost, and big hits force a stumble step. Head hits snap the head back, body blows double the fighter over, arm hits fling the arm, and leg hits buckle the knee. A blocked weapon rebounds off the shield while the defender braces, and a miss overreaches. This motion is drawing only: `fighterPose` stays the combat pose that hit detection, guarding and movement use, and `displayPose` adds the animation on top for rendering. While a blow can still connect, both fighters are drawn exactly in their combat pose, so **Hitboxes** match what you see when it matters.
 
-## Renderers and benchmark
+## Art
+
+Every fighter part and item is vector art written in code, painted once into a sprite and then only moved, so detail costs bake time and not frame time. `fighter2d.js` holds the painter and each class's first armor set and weapon, `weapons2d.js` the other weapons, specials and shields, `armor2d.js` the other armor kits, and `venues2d.js` the three venues. A new weapon, shield, armor kit or venue needs art there. How it works, the measurements and the earlier 3D renderer are in [docs/2d-art.md](docs/2d-art.md).
+
+## Benchmark
 
 The benchmark overlay is hidden by default so it never covers the fight. Select **FPS** next to the speed control to show or hide it, or open `index.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
 
-The overlay toggles the fighter painter between **Canvas** (the default) and **WebGL**, and **Polys 1×/3×** builds each fighter three times over to test three times as many polygons with the same picture. The choices are saved in the browser; `?renderer=webgl` and `?polygons=3` set them from the address bar.
+The second row of buttons finds what limits the frame rate on a device. **Res full / Res 1×** draws the arena at up to 2 pixels per CSS pixel or at 1 (`?res=1`), which tests fill rate. **Fighters**, **Scenery** and **Effects** each skip drawing that part. These toggles change only the picture, are never saved, and add **TEST TOGGLE ON** to the overlay while active. Rendering is capped at 120 FPS; skipped frames leave the simulation clock alone.
 
-Opening with `?bench` adds face and triangle-equivalent counts by fighter part, plus cached and animated scenery counts and the most recent backdrop rebuild time. The same breakdown is available from `ArenaBench.snapshot()` while that overlay is open. Use **Polys 1×** to compare Quality levels.
+## Phone
 
-The second row of buttons finds what limits the frame rate on a device. **Res full / Res 1×** draws the arena at up to 2 pixels per CSS pixel or at 1 (`?res=1`), which tests fill rate. **Fighters**, **Scenery** and **Effects** each skip drawing that part: the fighters' polygons and shadows, the animated crowd and wildlife, or dust, trails, blood, sparks, magic, bolts and damage numbers. These toggles change only the picture, are never saved, and add **TEST TOGGLE ON** to the overlay while active. The **Scene · Fighters · FX** line shows the main-thread milliseconds each part took per frame. Only the depth-sorted fighter polygons move to WebGL (`gl-renderer.js`). They are painted in sorted order into an offscreen WebGL canvas that is drawn into the arena canvas where Canvas 2D would have filled them, so backdrops, shadows and effects keep their layering. Concave and self-crossing polygons use a stencil pass with the same nonzero fill rule as Canvas 2D. Rendering is capped at 120 FPS; skipped frames leave the simulation clock alone, so the next frame advances by the full elapsed time.
-
-Measured at phone size on a Mac (60 Hz), both renderers held 60 FPS with no drops at 1× and 3×. WebGL cut main-thread draw time from 3.2 to 2.3 ms at 1× and from 9.2 to 5.0 ms at 3×, and painting alone from 1.8 to 0.4 ms. The first test on a phone reported about 24 FPS on Canvas and 22 FPS on WebGL. The follow-up phone profiling steps and full measurements are in [docs/rendering-performance.md](docs/rendering-performance.md). The plan for doubling geometric detail with a Quality setting is in [docs/detail-rework-plan.md](docs/detail-rework-plan.md).
-
-## 2D art
-
-**Art 2D / Art 3D** switches between the detailed 2D cut-out art (`fighter2d.js`, the default) and the older 3D meshes. `?style=2d` or `?style=3d` sets it from the address bar, and `?cast=1` or `?cast=2` starts from a set matchup. Every weapon, special, shield, armor kit and venue has 2D art (`weapons2d.js`, `armor2d.js`, `venues2d.js`); a new item needs it too, or it keeps its 3D mesh there. It changes only the picture. Findings, measurements and the plan are in [docs/2d-art-poc.md](docs/2d-art-poc.md).
-
-## Armor geometry
-
-The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents on Low and 1,980 on High. Leather goes from 853 to 1,569 and robes go from 695 to 1,281. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
+On a phone held sideways, the page headings are hidden and the scoreboard, arena and controls share one screen. The combat log is below it.
 
 ## Development plan
 

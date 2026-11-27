@@ -1,8 +1,8 @@
 'use strict';
 
-// 2D venues to match the 2D fighters. The still art is painted into the cached backdrop, so its
+// The venues' art. The still art is painted into the cached backdrop, so its
 // detail costs nothing per frame; the crowd and wildlife are sprites baked once and then moved.
-// venues.js uses a scene from here when the 2D art is on, and falls back to its own otherwise.
+// venues.js picks the venue and places its click targets.
 const ArenaVenues2D = (() => {
   const { tone, gradient, shape, stroke, disc, clipped, seeded } = ArenaArt2D.tools;
   // Softer than the fighters' outline, so scenery stays behind them.
@@ -637,7 +637,6 @@ const ArenaVenues2D = (() => {
   };
 
   return {
-    has: index => Boolean(scenes[index]),
     backdrop: (ctx, index, width, height) => scenes[index].backdrop(ctx, width, height),
     draw: (ctx, index, width, height, clock, active) => scenes[index].draw(ctx, width, height, clock, active)
   };

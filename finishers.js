@@ -205,11 +205,9 @@ function drawFinisher() {
       const foot = [x + h * .05, y];
       polygon([left, tip, right, base], '#c9ecf8d0');
       polygon([tip, right, foot], '#eef8fcd0');
-      if (modelDetail) {
-        const ridge = [x - h * .12, y - h * .44];
-        polygon([tip, ridge, left], '#9dc4dfd0');
-        if (modelDetail === 2) polygon([ridge, right, base, foot], '#b5dcefd0');
-      }
+      const ridge = [x - h * .12, y - h * .44];
+      polygon([tip, ridge, left], '#9dc4dfd0');
+      polygon([ridge, right, base, foot], '#b5dcefd0');
     }
     return;
   }
@@ -220,21 +218,5 @@ function drawFinisher() {
   const toward = Math.sign(attacker.x - defender.x) || 1;
   const [x0, y0] = project(shifted(from, -toward * .1, -.12));
   const [x1, y1] = project(shifted(from, toward * .42, .58));
-  if (modelDetail) {
-    drawFacetedBolt([x1, y1], [x0, y0], '#6b4a2c', '#e8dcc0');
-    return;
-  }
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#6b4a2c';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
-  ctx.fillStyle = '#e8dcc0';
-  ctx.beginPath();
-  ctx.arc(x1, y1, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  drawFacetedBolt([x1, y1], [x0, y0], '#6b4a2c', '#e8dcc0');
 }

@@ -1,6 +1,6 @@
 'use strict';
 
-// Proof of concept: detailed 2D cut-out fighters (docs/2d-art-poc.md). Every body part and item is
+// The fighters, as detailed 2D cut-outs (docs/2d-art.md). Every body part and item is
 // painted once as vector art into its own offscreen sprite, and each frame only moves those sprites
 // along the existing skeleton. Detail therefore costs bake time, not frame time. Drawing only:
 // nothing here reads or writes fight state.
@@ -1031,8 +1031,8 @@ const ArenaArt2D = (() => {
   // view: { ctx, toScreen(localPoint) -> [x, y, pixelsPerMetre], direction (1 or -1), pixelsPerMetre,
   //   color, trim, style, base, pose, torsoPoint, frost, clock,
   //   owner (the fighter, to remember its cloth) and forward (its chest position along the way it faces),
-  //   weapon: { key (null = use draw), draw() }, spare: { key, draw, mount, angle, scale } | null,
-  //   shield: { sprite (false = use draw), draw, at, tilt, size, stowed, bolts, width, height } | null }
+  //   weapon: { key, chains, twoHanded, thrown }, spare: { key, chains, mount, angle, scale } | null,
+  //   shield: { key, at, tilt, size, stowed, bolts } | null }
   function drawFighter(view) {
     const { ctx: g, toScreen, direction: dir, pose, frost } = view;
     const j = pose.joints;
@@ -1146,11 +1146,7 @@ const ArenaArt2D = (() => {
       g.stroke();
     }
 
-    function drawWeapon(key, hand, angle, size, fallback, chains, dim = false) {
-      if (!key) {
-        fallback();
-        return;
-      }
+    function drawWeapon(key, hand, angle, size, chains, dim = false) {
       const art = weaponArt[key];
       item(hand, angle, size, () => {
         stamp(g, weaponSprite(key, view.color, view.trim, 'draw', dim), frost);
@@ -1170,10 +1166,6 @@ const ArenaArt2D = (() => {
 
     function drawShield() {
       const shield = view.shield;
-      if (!shield.key) {
-        shield.draw();
-        return;
-      }
       const sprite = shieldSprite(shield.key, view.color, view.trim, shield.stowed);
       const [halfWidth, halfHeight] = shieldArt[shield.key].half;
       place(shield.at, () => {
@@ -1236,7 +1228,7 @@ const ArenaArt2D = (() => {
     }
     function heldWeapon() {
       const thrown = view.weapon.thrown;
-      drawWeapon(view.weapon.key, thrown?.hand || j.weaponHand, thrown?.angle ?? pose.angle, 1, view.weapon.draw, view.weapon.chains);
+      drawWeapon(view.weapon.key, thrown?.hand || j.weaponHand, thrown?.angle ?? pose.angle, 1, view.weapon.chains);
       if (!thrown) fist('weapon', parts.far);
     }
 
@@ -1244,7 +1236,7 @@ const ArenaArt2D = (() => {
 
     // Back to front. Stowed gear and the cloak sit behind everything.
     if (view.shield?.stowed) drawShield();
-    if (view.spare) drawWeapon(view.spare.key, view.spare.mount, view.spare.angle, view.spare.scale, view.spare.draw, view.spare.chains, true);
+    if (view.spare) drawWeapon(view.spare.key, view.spare.mount, view.spare.angle, view.spare.scale, view.spare.chains, true);
     // Upright, the cape hangs half way between the spine and the ground. As the body goes over it
     // turns with the spine and stops swinging, so it lies along a fallen fighter, not through the floor.
     const fallen = clamp((Math.abs(torsoTurn) - .5) / .7, 0, 1);

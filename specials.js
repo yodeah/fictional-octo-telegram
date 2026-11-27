@@ -1,7 +1,7 @@
 'use strict';
 
-// Rare weapon specials. Each one reuses an existing weapon model (`weapon`) with new colors and a
-// few added details, and changes the fight through optional hooks that arena.js calls:
+// Rare weapon specials. Each one reuses an existing weapon (`weapon`), has its own art under its key in
+// weapons2d.js, and changes the fight through optional hooks that arena.js calls:
 //   modifyAction(fighter, action, state)    when an attack with this weapon starts
 //   onLanded(fighter, target, action, damage, state)  after an attack with this weapon lands (not blocked or missed)
 //   onMissed / onBlocked(fighter, target, action, state)  after an attack with this weapon misses or is blocked
@@ -12,7 +12,6 @@
 //   noGuard(fighter, state)                 true stops the fighter from blocking
 //   lockWeapon(fighter, state)              a weapon key the fighter must use
 //   status(fighter, state)                  short text for the scoreboard
-//   details({ along, limb, paint, fighter, state })  extra model parts on top of the base weapon
 //   aura(fighter, state)                    a color to glow around the fighter, or nothing
 //   draw(fighter, state)                    extra canvas drawing over the fighters
 //   banner(fighter, state)                  action-banner text while something is happening, or nothing
@@ -25,7 +24,6 @@ const specials = {
   stormbrand: {
     name: 'Stormbrand', weapon: 'sword', icon: 'ϟ', color: '#9fd8ff', trail: '#cdeaff',
     effect: 'After 3 landed hits, lightning strikes the target once: 14 + Magic ÷ 12 magic damage and drains 20 energy',
-    palette: { metal: [170, 198, 228], leather: [38, 50, 86], trim: [228, 200, 96] },
     onLanded(fighter, target, action, damage, state) {
       state.hits = (state.hits || 0) + 1;
       if (state.hits < 3 || state.spent) return;
@@ -44,7 +42,6 @@ const specials = {
   snarecaster: {
     name: 'Snarecaster', weapon: 'crossbow', icon: '⌇', color: '#9be08a', trail: '#c8f0b4',
     effect: 'Its first bolt to land also roots the target in place for 3 seconds (once per bout)',
-    palette: { metal: [118, 150, 104], leather: [58, 70, 38], armor: [92, 104, 64] },
     modifyAction(fighter, action, state) {
       if (!state.spent) action.snare = true;
     },
@@ -59,18 +56,12 @@ const specials = {
       burst(target, { y: .25, colors: [this.color, '#5f8a45'], count: 22, gravity: 3 });
       logEvent(fighter.name + '’s Snarecaster bolt roots ' + target.name + ' in place.');
     },
-    details({ along, limb }) {
-      // Weighted snare cords coiled around the stock, with a weight at each bow tip.
-      for (const at of [.05, .14, .23]) limb(along(at - .02), along(at + .02), [.128, .112], [.128, .112], [146, 196, 112], 8);
-      for (const side of [-1, 1]) limb(along(.47, side * .37), along(.45, side * .40), [.05, .05], [.05, .05], [60, 64, 52], 6);
-    },
     status: (fighter, state) => state.spent ? 'spent' : 'snare ready'
   },
 
   lastOath: {
     name: 'Last Oath', weapon: 'greatsword', icon: '✠', color: '#ff6a5a', trail: '#ff9d8a',
     effect: 'Below 10% health, the oath takes hold for the rest of the bout: +60% damage and 40% lifesteal, but no blocking',
-    palette: { metal: [152, 142, 150], leather: [112, 24, 30], bronze: [226, 210, 180], darkSteel: [92, 22, 28] },
     onUpdate(fighter, state) {
       const threshold = forced.has('oath') ? 1 : .10;
       if (state.sworn || fighter.hp <= 0 || fighter.hp >= fighter.maxHP * threshold) return;
@@ -98,11 +89,6 @@ const specials = {
       logEvent(fighter.name + ' drinks ' + healing + ' health through the Last Oath.');
       updateHealth();
     },
-    details({ along, limb, state }) {
-      // A crimson fuller down the blade that burns brighter once the oath is sworn.
-      const glow = state.sworn ? [255, 92, 70] : [150, 34, 40];
-      limb(shifted(along(.32), 0, 0, .05), shifted(along(1.32), 0, 0, .045), [.035, .02], [.022, .016], glow, 6);
-    },
     aura: (fighter, state) => state.sworn ? '#ff5a4a' : null,
     status: (fighter, state) => state.sworn ? 'SWORN' : 'below 10% HP'
   },
@@ -110,7 +96,6 @@ const specials = {
   dawnMender: {
     name: 'Dawn Mender', weapon: 'mace', icon: '☀', color: '#ffe28a', trail: '#fff1c0',
     effect: 'Once below 35% health, channels for 1.5 seconds to heal 30% of maximum health; any damage interrupts it and wastes the heal',
-    palette: { metal: [238, 214, 150], armor: [250, 240, 212], leather: [124, 88, 52] },
     onUpdate(fighter, state) {
       if (state.channel && elapsed >= state.channel) {
         state.channel = fighter.channelUntil = 0;
@@ -139,10 +124,6 @@ const specials = {
       floatLabel(fighter, 'INTERRUPTED', '#ffb28a', { tag: 'DAWN MENDER' });
       logEvent(fighter.name + '’s healing is interrupted.');
     },
-    details({ along, limb }) {
-      // A pale sun crystal crowning the head.
-      limb(along(.97), along(1.13), [.07, .07], [0, 0], [255, 250, 222], 6);
-    },
     banner: (fighter, state) => state.channel ? 'Dawn Mender · healing' : null,
     aura: (fighter, state) => state.channel ? '#ffe28a' : null,
     status: (fighter, state) => state.channel ? 'healing…' : state.spent ? (state.healed ? 'healed' : 'interrupted') : 'below 35% HP'
@@ -151,7 +132,6 @@ const specials = {
   dragonBow: {
     name: 'Dragon Bow', weapon: 'crossbow', icon: '♨', color: '#ff8a3d', trail: '#ffc08a',
     effect: 'Its first shot fires two burning bolts; each that lands sets the target burning for 3 seconds (2 damage every half second)',
-    palette: { metal: [198, 76, 42], armor: [74, 30, 24], leather: [54, 32, 26] },
     modifyAction(fighter, action, state) {
       if (state.spent) return;
       state.spent = true;
@@ -170,17 +150,12 @@ const specials = {
     onLanded(fighter, target, action) {
       if ((action.doubleShot || action.echo) && target.hp > 0) ignite(target, fighter, 3);
     },
-    details({ along, limb }) {
-      // Horned tips on the bow arms.
-      for (const side of [-1, 1]) limb(along(.48, side * .35), along(.58, side * .45), [.045, .045], [0, 0], [240, 204, 128], 5);
-    },
     status: (fighter, state) => state.spent ? 'spent' : 'double shot ready'
   },
 
   wintersBite: {
     name: 'Winter’s Bite', weapon: 'axe', icon: '❄', color: '#bfe8ff', trail: '#e2f5ff',
     effect: 'Every third landed hit freezes the target for 1.2 seconds: no movement and no new attacks',
-    palette: { metal: [202, 234, 250], armor: [122, 152, 178], leather: [200, 210, 222] },
     onLanded(fighter, target, action, damage, state) {
       state.hits = (state.hits || 0) + 1;
       if (state.hits % 3 || target.hp <= 0) return;
@@ -192,17 +167,12 @@ const specials = {
       burst(target, { colors: [this.color, '#ffffff'], count: 24, gravity: 2 });
       logEvent(fighter.name + '’s Winter’s Bite freezes ' + target.name + '.');
     },
-    details({ along, limb }) {
-      // An icicle hanging from the blade.
-      limb(along(.62, .26), along(.48, .30), [.05, .04], [0, 0], [222, 246, 255], 5);
-    },
     status: (fighter, state) => ((state.hits || 0) % 3) + '/3 to freeze'
   },
 
   leechFang: {
     name: 'Leech Fang', weapon: 'rapier', icon: '⚕', color: '#e0566a', trail: '#f08a98',
     effect: 'Heals 30% of the damage it deals, but each miss costs its wielder 3 HP (never below 1)',
-    palette: { metal: [124, 32, 46], bronze: [224, 214, 192], leather: [42, 18, 22], darkSteel: [82, 22, 32] },
     onLanded(fighter, target, action, damage) {
       const healing = Math.min(Math.round(damage * .3), fighter.maxHP - fighter.hp);
       if (healing <= 0) return;
@@ -218,17 +188,12 @@ const specials = {
       logEvent(fighter.name + '’s Leech Fang drinks ' + loss + ' of their own health.');
       updateHealth();
     },
-    details({ along, limb }) {
-      // A curved fang beside the guard.
-      limb(along(.17, .10), along(.04, .17), [.045, .03], [0, 0], [236, 226, 204], 5);
-    },
     status: () => 'heals on hit · bleeds on miss'
   },
 
   earthshaker: {
     name: 'Earthshaker', weapon: 'maul', icon: '⛰', color: '#e0a060', trail: '#f0c290',
     effect: 'Once per bout, a slam that breaks the target’s stance whether it hits or is blocked',
-    palette: { metal: [132, 114, 94], darkSteel: [82, 68, 56], bronze: [200, 122, 62], armor: [98, 86, 72] },
     modifyAction(fighter, action, state) {
       if (state.spent || elapsed < 2) return;
       action.slam = true;
@@ -249,17 +214,12 @@ const specials = {
     onBlocked(fighter, target, action, state) {
       if (action.slam) this.slam(fighter, target, state);
     },
-    details({ along, limb }) {
-      // A glowing rune on the head.
-      limb(shifted(along(.86, -.06), 0, 0, .14), shifted(along(.86, .06), 0, 0, .14), [.035, .035], [.035, .035], [255, 152, 62], 6);
-    },
     status: (fighter, state) => state.spent ? 'spent' : 'slam ready'
   },
 
   jailersChain: {
     name: 'Jailer’s Chain', weapon: 'flail', icon: '⛓', color: '#c9ccd6', trail: '#e2e4ea',
     effect: 'Once per bout, when the target keeps more than 3.1 units away, the chain pulls them into reach and cancels their attack',
-    palette: { metal: [98, 100, 110], armor: [130, 86, 60], leather: [46, 42, 42] },
     onUpdate(fighter, state) {
       const rival = otherFighter(fighter);
       if (state.spent || specialOf(fighter) !== this || fighter.action || fighter.stunnedUntil > elapsed
@@ -291,17 +251,12 @@ const specials = {
       ctx.stroke();
       ctx.restore();
     },
-    details({ along, limb }) {
-      // A shackle on the haft.
-      limb(along(-.20), along(-.13), [.115, .115], [.115, .115], [142, 146, 152], 8);
-    },
     status: (fighter, state) => state.spent ? 'spent' : 'pull ready'
   },
 
   phoenixSpear: {
     name: 'Phoenix Spear', weapon: 'spear', icon: '♆', color: '#ffa040', trail: '#ffd08a',
     effect: 'Once per bout, survives a killing blow at 1 HP and bursts into flame, setting the attacker burning for 4 seconds',
-    palette: { metal: [242, 172, 72], leather: [152, 42, 30] },
     onLethal(fighter, attacker, state) {
       if (state.spent) return false;
       state.spent = true;
@@ -313,10 +268,6 @@ const specials = {
       if (attacker && attacker !== fighter) ignite(attacker, fighter, 4);
       return true;
     },
-    details({ along, limb }) {
-      // Two flame feathers below the head.
-      for (const side of [-1, 1]) limb(along(1.20, side * .04), along(1.02, side * .18), [.05, .02], [0, 0], [255, 112, 44], 5);
-    },
     aura: (fighter, state) => state.blazeUntil > elapsed ? '#ff9a3a' : null,
     status: (fighter, state) => state.spent ? 'reborn' : 'rebirth ready'
   },
@@ -324,7 +275,6 @@ const specials = {
   tidecaller: {
     name: 'Tidecaller', weapon: 'trident', icon: '≈', color: '#6fd3e8', trail: '#b8ecf6',
     effect: 'Every third landed hit crashes a wave into the target: pushed back 2.2 units (a wall slam if they reach the edge) and attacks slowed for 2 seconds',
-    palette: { metal: [104, 198, 214], bronze: [226, 214, 182], leather: [32, 74, 92] },
     onLanded(fighter, target, action, damage, state) {
       state.hits = (state.hits || 0) + 1;
       if (state.hits % 3 || target.hp <= 0) return;
@@ -336,17 +286,12 @@ const specials = {
       floatLabel(target, 'TIDAL WAVE', this.color, { tag: 'PUSHED · SLOWED 2S' });
       logEvent(fighter.name + '’s Tidecaller crashes a wave into ' + target.name + '.');
     },
-    details({ along, limb }) {
-      // A spiral shell lashed below the prongs.
-      limb(along(1.30, .07), along(1.20, .13), [.07, .06], [.02, .02], [246, 224, 206], 6);
-    },
     status: (fighter, state) => ((state.hits || 0) % 3) + '/3 to wave'
   },
 
   gamblersClub: {
     name: 'Gambler’s Club', weapon: 'club', icon: '⚄', color: '#f2d36b', trail: '#f8e6a8',
     effect: 'Each swing rolls a die: a 6 triples the damage, a 1 deals half and fumbles away 12 energy',
-    palette: { bronze: [214, 46, 52], leather: [40, 70, 48], darkSteel: [236, 230, 214] },
     modifyAction(fighter, action, state) {
       action.die = 1 + Math.floor(Math.random() * 6);
       if (action.die === 6) action.damage *= 3;
@@ -374,17 +319,12 @@ const specials = {
     onMissed(fighter, target, action) {
       if (action.die === 1) this.roll(fighter, action);
     },
-    details({ along, limb }) {
-      // A pair of dice pips studded into the head.
-      for (const t of [.78, .92]) limb(shifted(along(t, .08), 0, 0, .09), shifted(along(t, .08), 0, 0, .12), [.03, .03], [.03, .03], [250, 246, 236], 6);
-    },
     status: (fighter, state) => state.last ? 'last roll ' + state.last : 'roll the die'
   },
 
   briarBlade: {
     name: 'Briar Blade', weapon: 'falchion', icon: '❦', color: '#8fcf6a', trail: '#c4eaa8',
     effect: 'Thorns: whoever lands a weapon or bolt on its wielder takes 30% of that damage back (at least 1)',
-    palette: { metal: [118, 148, 96], bronze: [96, 62, 40], leather: [52, 78, 40], darkSteel: [60, 92, 44] },
     onHurt(fighter, damage, state, source, kind) {
       if (!source || source === fighter || (kind !== 'melee' && kind !== 'ranged')) return;
       // Applied a moment later, after the blow that caused it has finished resolving.
@@ -396,17 +336,12 @@ const specials = {
         logEvent(source.name + ' is cut by the Briar Blade’s thorns for ' + dealt + '.');
       });
     },
-    details({ along, limb }) {
-      // Thorns along the back of the blade.
-      for (const t of [.45, .70, .95]) limb(along(t, -.06), along(t + .05, -.15), [.03, .03], [0, 0], [176, 214, 140], 5);
-    },
     status: (fighter, state) => (state.returned || 0) + ' returned'
   },
 
   pendulum: {
     name: 'Pendulum', weapon: 'twinFlail', icon: '∞', color: '#c79cff', trail: '#e2ccff',
     effect: 'Momentum: each landed hit in a row makes its swings 12% faster, up to +48%; a miss or block resets it',
-    palette: { metal: [176, 150, 222], armor: [92, 70, 132], leather: [48, 36, 66] },
     modifyAction(fighter, action, state) {
       action.tempo *= 1 + .12 * (state.stacks || 0);
     },
@@ -431,7 +366,6 @@ const specials = {
   headsmansVerdict: {
     name: 'Headsman’s Verdict', weapon: 'executioner', icon: '⚖', color: '#d9d2c0', trail: '#f0ead8',
     effect: 'Once per bout, when the target is below 25% health, the next swing is an unblockable execution that kills if it lands, with a beheading',
-    palette: { metal: [200, 196, 188], leather: [24, 22, 26], bronze: [70, 64, 60], darkSteel: [36, 34, 38] },
     modifyAction(fighter, action, state) {
       const target = action.defender;
       if (state.spent || target.hp >= target.maxHP * (forced.has('verdict') ? 1 : .25)) return;
@@ -450,11 +384,6 @@ const specials = {
     },
     onMissed(fighter, target, action) {
       if (action.execute) floatLabel(target, 'SPARED', '#d8cbb8', { tag: 'THE VERDICT MISSED' });
-    },
-    details({ along, limb }) {
-      // A hole near the tip and a black tassel on the pommel.
-      limb(shifted(along(1.20, .03), 0, 0, .05), shifted(along(1.20, .03), 0, 0, .07), [.04, .04], [.04, .04], [20, 18, 20], 8);
-      limb(along(-.62), along(-.80, .04), [.03, .03], [.06, .05], [40, 30, 34], 6);
     },
     status: (fighter, state) => state.spent ? 'spent' : 'target below 25% HP'
   }
