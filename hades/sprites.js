@@ -288,10 +288,12 @@
     g.stroke();
   }
 
-  function taperPath(a, b, wa, wb) {
+  // fresh = false adds the shape to the current path, for building a clip from several shapes.
+  function taperPath(a, b, wa, wb, fresh = true) {
     const ax = px(a), ay = py(a), bx = px(b), by = py(b);
     const angle = Math.atan2(by - ay, bx - ax);
-    g.beginPath();
+    if (fresh) g.beginPath();
+    else g.moveTo(ax + Math.cos(angle + Math.PI / 2) * wa * res / 2, ay + Math.sin(angle + Math.PI / 2) * wa * res / 2);
     g.arc(ax, ay, wa * res / 2, angle + Math.PI / 2, angle - Math.PI / 2);
     g.arc(bx, by, wb * res / 2, angle - Math.PI / 2, angle + Math.PI / 2);
     g.closePath();
@@ -1487,7 +1489,7 @@
       const spine = (forward, right, up) => P(lean * (.3 + .46 * clamp01((up - hipZ) / (chestZ - hipZ))) + forward, right, up);
       // Built from masses like a figure drawing: pelvis, a narrow waist, a broad ribcage flaring
       // into the lats, a shoulder girdle reaching out to the deltoids, trapezius and a thick neck.
-      fused([
+      const torso = [
         [spine(0, -.1, hipZ + .03), spine(0, .1, hipZ + .03), .3, .3, varro ? c.skin : c.leatherDeep],
         [spine(0, -.07, hipZ + .16), spine(0, .07, hipZ + .16), .32, .32, body],
         [spine(.01, 0, hipZ + .14), spine(.02, 0, chestZ - .14), .34, .46, body],
@@ -1499,14 +1501,28 @@
         // Depth front to back, so the side view has a chest and a seat, not a pole.
         [spine(-.07, 0, chestZ - .08), spine(.07, 0, chestZ - .05), .34, .36, body],
         [spine(-.07, 0, hipZ + .06), spine(.02, 0, hipZ + .08), .26, .24, varro ? c.skin : c.leatherDeep]
-      ]);
+      ];
+      fused(torso);
+      // Surface details sit a little proud of the masses; clipped to them, the ones near the edge
+      // of a turned torso stop spilling over the arm behind it.
+      const clipToTorso = () => {
+        g.save();
+        g.beginPath();
+        for (const [a, b, wa, wb] of torso) taperPath(a, b, wa, wb, false);
+        g.clip();
+      };
       if (varro && front) {
+        clipToTorso();
         // Bare chest: pectorals, a six-pack, obliques, collarbones and an old scar.
         for (const s of [-1, 1]) {
-          poly([on(s * .03, chestZ + .12), on(s * .24, chestZ + .13), on(s * .25, chestZ - .02), on(s * .04, chestZ - .06)], c.glint, false);
-          fine([on(s * .26, chestZ - .01), on(s * .14, chestZ - .09), on(s * .02, chestZ - .06)], c.shade, .03);
-          fine([on(s * .05, chestZ + .17), on(s * .24, chestZ + .19)], c.shade, .016);
-          fine([on(s * .22, chestZ - .1), on(s * .19, hipZ + .26), on(s * .13, hipZ + .16)], c.shade, .02);
+          // The outer muscles of a side turned away from the camera crowd into the edge of the
+          // torso and smear over the shoulder behind it, so only the turned-toward side gets them.
+          if (.6 * Math.sin(facing) + .8 * s * Math.cos(facing) > .15) {
+            poly([on(s * .03, chestZ + .12), on(s * .24, chestZ + .13), on(s * .25, chestZ - .02), on(s * .04, chestZ - .06)], c.glint, false);
+            fine([on(s * .26, chestZ - .01), on(s * .14, chestZ - .09), on(s * .02, chestZ - .06)], c.shade, .03);
+            fine([on(s * .05, chestZ + .17), on(s * .24, chestZ + .19)], c.shade, .016);
+            fine([on(s * .22, chestZ - .1), on(s * .19, hipZ + .26), on(s * .13, hipZ + .16)], c.shade, .02);
+          }
           for (let row = 0; row < 3; row++) {
             const z = chestZ - .15 - row * .085;
             fine([on(s * .025, z), on(s * .1, z - .012)], c.shade, .016);
@@ -1516,12 +1532,14 @@
         fine([on(0, chestZ + .02), on(0, hipZ + .2)], c.shade, .018);
         disc(on(0, hipZ + .2), .014, c.deep, false);
         fine([on(-.2, chestZ + .08), on(-.05, chestZ - .02), on(.08, chestZ - .14)], c.scar, .014);
+        g.restore();
       } else if (varro) {
         // Spine and shoulder blades.
         fine([P(lean * .76 - .25, 0, chestZ + .12), P(lean * .45 - .22, 0, hipZ + .18)], c.shade, .022);
         for (const s of [-1, 1]) fine([P(lean * .7 - .2, s * .06, chestZ + .06), P(lean * .7 - .22, s * .2, chestZ - .02), P(lean * .6 - .2, s * .16, chestZ - .16)], c.shade, .018);
       } else if (front) {
         // Lorica squamata: rows of overlapping bronze-edged scales, then the quiver baldric.
+        clipToTorso();
         for (let row = 0; row < 5; row++) {
           const z = chestZ + .12 - row * .085;
           for (let col = -3; col <= 3; col++) {
@@ -1532,6 +1550,7 @@
             fine([on(right - .024, z - .014), on(right, z - .02), on(right + .024, z - .014)], 'rgba(255,255,255,.6)', .009);
           }
         }
+        g.restore();
         fine([on(-.26, chestZ - .3), on(0, chestZ - .33), on(.26, chestZ - .3)], c.bronze, .03);
         inked([on(.27, chestZ + .17), on(0, chestZ - .06), on(-.2, hipZ + .16)], .06, c.leatherDeep);
         disc(on(.02, chestZ - .07), .04, c.bronze, .01);
