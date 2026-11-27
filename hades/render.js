@@ -19,7 +19,7 @@
   let shake = 0, clock = 0;
   const fallen = new Map();
   const shown = [];
-  let vignette, foreground;
+  let vignette, foreground, fallArt, mistArt;
   const bursts = new Map();
   let impacts = [];
 
@@ -690,6 +690,78 @@
     }
   }
 
+  // Falling water and mist are painted once and slid past each frame.
+  function paintWeather() {
+    fallArt = makeCanvas(96, 256);
+    let g = fallArt.getContext('2d');
+    const r = noise(41);
+    for (let i = 0; i < 90; i++) {
+      const x = 6 + r() * 84, y = r() * 256, long = 30 + r() * 100, wide = 1 + r() * 4;
+      for (const shift of [0, -256]) {
+        const streak = g.createLinearGradient(0, y + shift, 0, y + shift + long);
+        streak.addColorStop(0, 'rgba(120,255,225,0)');
+        streak.addColorStop(.7, `rgba(${150 + r() * 100},255,235,${.35 + r() * .5})`);
+        streak.addColorStop(1, 'rgba(120,255,225,0)');
+        g.fillStyle = streak;
+        g.fillRect(x, y + shift, wide, long);
+      }
+    }
+    mistArt = makeCanvas(512, 96);
+    g = mistArt.getContext('2d');
+    for (let i = 0; i < 70; i++) {
+      // Puffs stop short of the ends: neighboring strips overlap there without a visible join.
+      const x = 48 + r() * 416, y = 48 + (r() - .5) * 34, rad = 16 + r() * 28;
+      const puff = g.createRadialGradient(x, y, 0, x, y, rad);
+      puff.addColorStop(0, 'rgba(150,235,225,.2)');
+      puff.addColorStop(1, 'rgba(150,235,225,0)');
+      g.fillStyle = puff;
+      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+  }
+
+  function drawFalls() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [x, top, bottom, wide] of [[-6.3, -7.7, -5.45, .8], [-2.5, -7.1, -5.35, .55], [2.5, -7.1, -5.35, .55], [6.3, -7.7, -5.45, .8]]) {
+      const left = sx(x - wide / 2), width = wide * unit, from = top * unit, height = (bottom - top) * unit;
+      ctx.save();
+      ctx.beginPath();
+      // The sheet widens as it drops.
+      ctx.moveTo(left + width * .22, from);
+      ctx.lineTo(left + width * .78, from);
+      ctx.lineTo(left + width, from + height);
+      ctx.lineTo(left, from + height);
+      ctx.closePath();
+      ctx.clip();
+      ctx.fillStyle = 'rgba(45,190,175,.2)';
+      ctx.fillRect(left, from, width, height);
+      for (const [speed, alpha] of [[1.5, .55], [.9, .3]]) {
+        const slide = (clock * speed + x) % 1 * height;
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(fallArt, left, from + slide - height, width, height);
+        ctx.drawImage(fallArt, left, from + slide, width, height);
+      }
+      ctx.restore();
+      const pulse = Math.sin(clock * 5 + x) * .08;
+      glow(sx(x), bottom * unit, unit * wide * (1.15 + pulse), '110,255,220', .42);
+      glow(sx(x), top * unit, unit * wide * .7, '110,255,220', .22);
+      for (let i = 0; i < 5; i++) {
+        const t = (clock * .9 + i / 5 + x) % 1;
+        glow(sx(x + (i - 2) * wide * .22), (bottom - Math.sin(t * Math.PI) * .45) * unit, unit * .09, '200,255,240', 1 - t);
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawMist(y, speed, alpha, tall) {
+    const step = 10, wide = 14 * unit, slide = ((clock * speed) % step + step) % step * unit;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alpha;
+    for (let x = -30 * unit + slide; x < 15 * unit; x += step * unit) ctx.drawImage(mistArt, x, (y - tall / 2) * unit, wide, tall * unit);
+    ctx.restore();
+  }
+
   function resize() {
     dpr = Math.min(root.devicePixelRatio || 1, 2);
     width = canvas.clientWidth;
@@ -721,6 +793,7 @@
     paintPillar(g, arena.pillars[0].r);
     Sprites.setResolution(unit * dpr * 1.25);
     paintFrame();
+    paintWeather();
   }
 
   // ---- Projection and primitives ----
@@ -1294,6 +1367,9 @@
     ctx.scale(1, K);
     glow(0, 0, unit * 3.3, '70,255,200', .11 + Math.sin(clock * 1.7) * .045);
     ctx.restore();
+    drawFalls();
+    drawMist(-5.5, .35, .55, 1.7);
+    drawMist(-6.6, -.2, .3, 2.2);
     duel.fighters.forEach(telegraph);
     duel.fighters.forEach(footing);
 
@@ -1328,6 +1404,7 @@
     for (const p of duel.projectiles) items.push({ y: p.y, draw: () => drawProjectile(p, duel) });
     items.sort((a, b) => a.y - b.y).forEach(item => item.draw());
 
+    drawMist(6.1, .5, .35, 1.9);
     drawTrails();
     ctx.save();
     for (const p of particles) {
