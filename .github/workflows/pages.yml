@@ -1,0 +1,46 @@
+# GitHub Pages is one site, so a push to either game's branch publishes both together:
+#   /           swords-and-sandals                    (Salt & Sand)
+#   /arena-2d/  claude/detailed-2d-assets-poc-63e424  (Arena Ledger, 2D art)
+# Keep this file identical on both branches.
+name: Deploy games to Pages
+
+on:
+  push:
+    branches: [swords-and-sandals, claude/detailed-2d-assets-poc-63e424]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: swords-and-sandals
+          path: salt-and-sand
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/detailed-2d-assets-poc-63e424
+          path: arena-2d
+      - name: Assemble the site
+        run: |
+          mkdir site
+          rsync -a --exclude .git --exclude .github salt-and-sand/ site/
+          rsync -a --exclude .git --exclude .github arena-2d/ site/arena-2d/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

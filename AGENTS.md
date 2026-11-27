@@ -8,7 +8,7 @@ After each coherent change passes verification, create a Git commit for it.
 
 ## Deploy
 
-After each commit, push it with `git push origin HEAD:swords-and-sandals`. That rebuilds the GitHub Pages site (https://yodeah.github.io/fictional-octo-telegram/). Check that the build finished for your commit before reporting.
+After each commit, push it with `git push origin HEAD:swords-and-sandals`. That runs `.github/workflows/pages.yml`, which publishes the GitHub Pages site (https://yodeah.github.io/fictional-octo-telegram/). The site also holds the other game under `/arena-2d/`, so keep that file identical on both branches. Check that the **Deploy games to Pages** run for your commit succeeded (`gh run list --workflow pages.yml`) before reporting.
 
 ## Playable build
 
