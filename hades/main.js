@@ -197,12 +197,28 @@
   newMatchup();
   setup(params.has('seed') ? Number(params.get('seed')) : undefined);
 
+  // ?fps shows frame rate, draw time and the sprite cache.
+  let counted = 0, spent = 0, since = performance.now();
+  function report(now, ms) {
+    counted++;
+    spent += ms;
+    if (now - since < 500) return;
+    const { cached, baked, averageMs } = window.HadesSprites.stats();
+    $('fps').hidden = false;
+    $('fps').textContent = `${Math.round(1000 * counted / (now - since))} fps · draw ${(spent / counted).toFixed(2)} ms · `
+      + `sprites ${cached} cached, ${baked} baked at ${averageMs.toFixed(1)} ms`;
+    counted = spent = 0;
+    since = now;
+  }
+
   let last = performance.now();
   function frame(now) {
     const real = Math.min(.05, (now - last) / 1000);
     last = now;
     const dt = advance(real);
+    const before = performance.now();
     Render.draw(duel, dt, { debug: params.has('debug') });
+    if (params.has('fps')) report(now, performance.now() - before);
     updateHud();
     requestAnimationFrame(frame);
   }
@@ -212,6 +228,12 @@
   window.hadesTest = {
     get duel() { return duel; },
     get state() { return state; },
+    // Plays real time forward through the page clock and picture (hidden tabs throttle animation frames).
+    play(seconds) {
+      for (let t = 0; t < seconds; t += step) Render.draw(duel, advance(step), {});
+      updateHud();
+      return { state, bout, time: duel.time };
+    },
     run(seconds = 200) {
       if (state === 'ready') begin();
       for (let t = 0; t < seconds && state === 'running'; t += step) {

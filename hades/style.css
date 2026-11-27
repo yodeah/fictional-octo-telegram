@@ -33,6 +33,8 @@ canvas { display: block; width: 100%; height: 100%; }
 .right .pips { justify-content: flex-end; }
 .pips i { width: 16px; height: 6px; transform: skewX(-24deg); background: #1d3b3c; border: 1px solid #000; }
 .pips i.ready { background: #d9fff1; box-shadow: 0 0 6px #8fffd8; }
+.fps { position: absolute; left: 10px; bottom: 6px; margin: 0; font-size: 11px; color: #cfeee4; background: #000a; padding: 4px 8px; }
+.fps[hidden] { display: none; }
 .banner, .result { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none;
   font-family: "Copperplate", "Cinzel", Georgia, serif; text-shadow: 0 2px 0 #000, 0 0 18px #000; white-space: nowrap; }
 .banner { bottom: 12%; font-size: clamp(14px, 2.4vw, 28px); letter-spacing: .12em; color: #ffe6ae; animation: banner 2.4s forwards; }
