@@ -174,22 +174,25 @@
     j.elbowR = add(lerp(j.shoulderR, j.handR, .5), vector(-.14, .2, -.1));
     let drawHint = null;
     if (fine && spec.weapon === 'recurve' && !['dead', 'stun', 'dash', 'hurt'].includes(anim)) {
-      // An archer's stance: shoulders turned side-on, the bow arm pushed out at the target and the
-      // string hand drawn back toward the cheek as the shot charges.
-      const running = anim === 'run';
-      const twist = running ? .55 : .95, sideways = Math.sin(twist) * .34, across = Math.cos(twist) * .34;
+      // At rest the archer holds the bow low in front, arrow nocked and string hand on it. A shot
+      // raises the bow to the target in the first part of the windup, turns the shoulders side-on
+      // and draws the string back to the cheek; after the release the bow settles low again.
+      const running = anim === 'run', shooting = shape === 'bolt';
+      const raise = !shooting ? 0 : anim === 'windup' ? ease(Math.min(1, t / .45)) : anim === 'active' ? 1 : 1 - ease(t);
+      const twist = running ? .55 : mix(.7, .95, raise), sideways = Math.sin(twist) * .34, across = Math.cos(twist) * .34;
       const shoulderZ = chestZ + .1;
       j.shoulderL = P(shift + lean * .76 + sideways, -across, shoulderZ);
       j.shoulderR = P(shift + lean * .76 - sideways, across, shoulderZ);
-      // On the run the bow is carried low and forward, ready to come up.
-      const pitch = running ? -.62 + p.swing * .05 : p.pitch * .3;
+      const low = running ? -.75 + p.swing * .05 : -.62 + p.breath * .03;
+      const pitch = mix(low, p.pitch * .3, raise);
       j.aim = vector(Math.cos(pitch), 0, Math.sin(pitch));
       j.side = vector(0, 1, 0);
-      const draw = .12 + p.charge * .42;
-      j.handL = add(j.shoulderL, add(j.aim.map(v => v * .62), [0, 0, -.06]));
+      const draw = mix(.2, .3 + Math.max(0, p.charge) * .28, raise);
+      p.draw = draw;
+      j.handL = add(j.shoulderL, j.aim.map(v => v * mix(.5, .62, raise)));
       j.handR = add(j.handL, j.aim.map(v => -v * draw));
-      j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(0, -.1, -.08));
-      drawHint = add(lerp(j.shoulderR, j.handR, .5), vector(-.25, .3, .06));
+      j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(-.05, -.14, -.06));
+      drawHint = add(lerp(j.shoulderR, j.handR, .5), raise > .3 ? vector(-.25, .3, .06) : vector(-.05, .25, -.12));
     }
     if (fine && spec.weapon === 'pilum' && ['idle', 'run', 'windup', 'active', 'recover'].includes(anim)) {
       // An overhand javelin throw. Carried level at the shoulder, cocked high behind the head with
@@ -766,36 +769,77 @@
       fine([al(-.08), al(.04)], look.light, .02);
     },
     recurve(al, aim, side, look, charge) {
-      // A horn-and-sinew composite bow: dark sinew backs, pale horn bellies, bone ears that kick
-      // forward, a bronze-capped leather grip. The limbs flex back as the string is drawn; the hand
-      // holding this weapon is on the string, the grip is ahead of it by the draw.
+      // A horn-and-sinew composite recurve. Each limb is one tapered curve: it sweeps back toward
+      // the archer, then the stiff bone ear kicks forward. Dark sinew on the back, pale horn on the
+      // belly, a leather grip with bronze caps. The string hand is at the nock (this weapon's hand),
+      // the grip is the draw length ahead of it; drawing bends the limbs further back.
+      const state = typeof charge === 'object' ? charge : { draw: .3 + Math.max(0, charge) * .28, charge };
+      const loosed = state.charge < 0;
+      const pull = Math.max(0, state.charge);
+      const draw = state.draw, flex = pull * .09;
       const up = upOf(aim, side);
-      const loosed = charge < 0;
-      charge = Math.max(0, charge);
-      const draw = .12 + charge * .42, flex = charge * .1;
       const grip = al(draw);
       const at = (forward, high) => grip.map((v, i) => v + aim[i] * forward + up[i] * high);
-      const nock = al(0);
-      for (const s of [1, -1]) {
-        const limb = [at(0, s * .1), at(-.07 - flex * .4, s * .32), at(-.08 - flex, s * .56), at(-.02 - flex, s * .74), at(.1 - flex * .5, s * .84)];
-        inked(limb, .07, '#3a2016');
-        fine(limb.map(v => add(v, aim.map(x => x * .02))), '#d9b98a', .03);
-        fine(limb.slice(0, 4), '#7a3f22', .01);
-        taper(limb[3], at(.17 - flex * .4, s * .87), .05, .03, '#efe4cc');
-        disc(limb[3], .032, '#cf963c', .01);
+      // Centre line of one limb at s (0 grip, 1 tip), in bow units.
+      const curveAt = (s, sign) => {
+        const bow = s < .78 ? -(.13 + flex) * Math.sin(Math.PI * s / .78) * (1 - s * .35) : 0;
+        const ear = s > .7 ? (.15 - flex * .6) * ((s - .7) / .3) ** 1.6 : 0;
+        return at(bow + ear, sign * (.08 + s * .78));
+      };
+      const N = 14;
+      for (const sign of [1, -1]) {
+        const centre = Array.from({ length: N + 1 }, (_, i) => curveAt(i / N, sign));
+        const screen = centre.map(v => [px(v), py(v)]);
+        const width = i => (.075 - .045 * (i / N)) * res / 2;
+        const edges = (scale, shift) => {
+          const left = [], right = [];
+          screen.forEach(([x, y], i) => {
+            const [ax, ay] = screen[Math.max(0, i - 1)], [bx, by] = screen[Math.min(N, i + 1)];
+            const l = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / l, ny = (bx - ax) / l;
+            const w = width(i) * scale, o = width(i) * shift;
+            left.push([x + nx * (w + o), y + ny * (w + o)]);
+            right.push([x - nx * (w - o), y - ny * (w - o)]);
+          });
+          return [...left, ...right.reverse()];
+        };
+        const fill = (points, color, line) => {
+          g.beginPath();
+          points.forEach((point, i) => g[i ? 'lineTo' : 'moveTo'](...point));
+          g.closePath();
+          if (line) { g.strokeStyle = ink; g.lineWidth = res * line; g.lineJoin = 'round'; g.stroke(); }
+          g.fillStyle = color;
+          g.fill();
+        };
+        fill(edges(1, 0), '#3b2117', .03);
+        // The horn belly: a pale strip on the string side of the limb, stopping at the ear.
+        const belly = edges(.45, -.4);
+        const keep = Math.round(N * .74);
+        fill([...belly.slice(0, keep), ...belly.slice(belly.length - keep)], '#d7b483');
+        // The bone ear and a bronze collar where it joins the limb.
+        g.strokeStyle = '#efe4cc';
+        g.lineWidth = res * .03;
+        g.lineCap = 'round';
+        g.beginPath();
+        screen.slice(Math.round(N * .76)).forEach((point, i) => g[i ? 'lineTo' : 'moveTo'](...point));
+        g.stroke();
+        disc(centre[Math.round(N * .74)], .026, '#cf963c', .01);
+        stroke(centre.slice(1, Math.round(N * .7)), .008, '#8a5634');
       }
-      fine([at(.16 - flex * .4, .87), nock, at(.16 - flex * .4, -.87)], '#f6ecd2', .014);
-      taper(at(0, -.15), at(0, .15), .1, .1, '#2a160e');
-      for (const h of [-.07, 0, .07]) fine([at(-.02, h - .03), at(.02, h + .03)], '#6b4128', .012);
-      for (const h of [-.15, .15]) disc(at(0, h), .04, '#cf963c', .01);
+      const tipTop = curveAt(1, 1), tipBottom = curveAt(1, -1);
+      const nock = al(0);
+      stroke([tipTop, nock, tipBottom], .012, '#f6ecd2');
+      // Grip: wrapped leather between two bronze caps, with an arrow rest.
+      taper(at(-.01, -.12), at(-.01, .12), .1, .1, '#2a160e');
+      for (const h of [-.06, 0, .06]) stroke([at(-.03, h - .025), at(.01, h + .025)], .01, '#6b4128');
+      for (const h of [-.12, .12]) disc(at(-.01, h), .036, '#cf963c', .01);
       if (loosed) return;
-      // The arrow sits on the string until loosed: shaft, fletching at the nock, a broad head.
-      const tip = add(nock, aim.map(x => x * .86));
+      // The nocked arrow: shaft from the string past the grip, fletching at the nock, broadhead.
+      const tip = add(nock, aim.map(x => x * (draw + .5)));
       taper(nock, tip, .028, .026, '#d6b27a');
       for (const s of [1, -1]) poly([add(nock, aim.map(x => x * .03)), add(add(nock, aim.map(x => x * .17)), up.map(x => x * .006 * s)),
         add(add(nock, aim.map(x => x * .02)), up.map(x => x * .07 * s))], s > 0 ? '#c83b3b' : '#f2ead8', .01);
       poly([add(tip, up.map(x => x * -.05)), add(tip, aim.map(x => x * .14)), add(tip, up.map(x => x * .05)), add(tip, aim.map(x => x * .03))], metal.steel, .012);
-      if (charge > .5) shine(add(tip, aim.map(x => x * .06)), .14 + charge * .16, `rgba(${look.glow},${.4 + charge * .4})`);
+      if (pull > .5) shine(add(tip, aim.map(x => x * .06)), .14 + pull * .16, `rgba(${look.glow},${.4 + pull * .4})`);
     }
   };
 
@@ -846,6 +890,205 @@
       const s = i % 2 ? 1 : -1;
       stroke([pt(s * .1, .1), pt(s * .35, .35 - i * .2), pt(s * .7, i > 1 ? -.6 : .55)], .03, ink);
     }
+  }
+
+  // ---- Champion limbs ----
+
+  // Width (world units) along an arm, from the shoulder to the wrist: deltoid, biceps peak, a narrow
+  // elbow, the forearm swelling below it and narrowing to the wrist.
+  function armProfile(shoulder, elbow, wrist) {
+    const l1 = Math.hypot(...sub(elbow, shoulder)), l2 = Math.hypot(...sub(wrist, elbow));
+    const tE = l1 / (l1 + l2 || 1);
+    const upper = [[0, .27], [.16, .245], [.38, .2], [.58, .205], [.84, .155], [1, .132]];
+    const lower = [[0, .132], [.16, .172], [.42, .158], [.78, .118], [1, .102]];
+    const f = t => t < tE ? curve(upper, t / tE) : curve(lower, (t - tE) / (1 - tE));
+    f.elbow = tE;
+    return f;
+  }
+  function curve(keys, u) {
+    for (let i = 1; i < keys.length; i++) {
+      if (u <= keys[i][0]) {
+        const [a, wa] = keys[i - 1], [b, wb] = keys[i];
+        return mix(wa, wb, ease((u - a) / (b - a || 1)));
+      }
+    }
+    return keys[keys.length - 1][1];
+  }
+
+  // A smooth limb: the bone chain sampled in screen space, each sample pushed out both ways by the
+  // width profile, inked and filled as one shape with rounded ends. Returns the samples so armor,
+  // sleeves and muscle lines can follow the same contour.
+  function drawLimb(chain, profile, color, n = 22) {
+    const S = [];
+    let normal = [0, -1];
+    for (let i = 0; i <= n; i++) {
+      const v = along(chain, i / n);
+      S.push({ x: px(v), y: py(v), w: profile(i / n) * res / 2 });
+    }
+    for (let i = 0; i <= n; i++) {
+      const a = S[Math.max(0, i - 1)], b = S[Math.min(n, i + 1)];
+      const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy);
+      if (l > .6) normal = [-dy / l, dx / l];
+      S[i].nx = normal[0]; S[i].ny = normal[1];
+    }
+    // Average neighboring normals so the contour turns smoothly round the elbow.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 1; i < n; i++) {
+        const x = S[i - 1].nx + S[i].nx * 2 + S[i + 1].nx, y = S[i - 1].ny + S[i].ny * 2 + S[i + 1].ny, l = Math.hypot(x, y) || 1;
+        S[i].nx = x / l; S[i].ny = y / l;
+      }
+    }
+    S.n = n;
+    S.elbow = profile.elbow ?? .5;
+    const outline = () => {
+      g.beginPath();
+      S.forEach((s, i) => g[i ? 'lineTo' : 'moveTo'](s.x + s.nx * s.w, s.y + s.ny * s.w));
+      for (let i = n; i >= 0; i--) g.lineTo(S[i].x - S[i].nx * S[i].w, S[i].y - S[i].ny * S[i].w);
+      g.closePath();
+      for (const s of [S[0], S[n], S[Math.round(S.elbow * n)]]) { g.moveTo(s.x + s.w, s.y); g.arc(s.x, s.y, s.w, 0, Math.PI * 2); }
+    };
+    g.lineJoin = 'round';
+    g.strokeStyle = ink;
+    g.lineWidth = res * fw;
+    outline();
+    g.stroke();
+    g.fillStyle = color;
+    outline();
+    g.fill('nonzero');
+    return S;
+  }
+
+  const sampleAt = (S, t) => S[Math.max(0, Math.min(S.n, Math.round(t * S.n)))];
+
+  // Form shading on a limb: a soft shadow down the side turned away from the light (upper left)
+  // and a thin highlight along the lit side, so a round arm reads round.
+  function limbShade(S, shadow, light) {
+    let score = 0;
+    for (const s of S) score += s.ny + s.nx * .6;
+    const away = score > 0 ? 1 : -1;
+    g.beginPath();
+    for (let i = 0; i <= S.n; i++) g[i ? 'lineTo' : 'moveTo'](S[i].x + S[i].nx * S[i].w * away * .1, S[i].y + S[i].ny * S[i].w * away * .1);
+    for (let i = S.n; i >= 0; i--) g.lineTo(S[i].x + S[i].nx * S[i].w * away * .96, S[i].y + S[i].ny * S[i].w * away * .96);
+    g.closePath();
+    g.fillStyle = shadow;
+    g.fill();
+    g.strokeStyle = light;
+    g.lineWidth = res * .018;
+    g.lineCap = 'round';
+    g.beginPath();
+    for (let i = 1; i < S.n; i++) g[i > 1 ? 'lineTo' : 'moveTo'](S[i].x - S[i].nx * S[i].w * away * .55, S[i].y - S[i].ny * S[i].w * away * .55);
+    g.stroke();
+  }
+
+  // A strip of the limb between t0 and t1, a little wider than the skin, for armor and cloth.
+  function limbBand(S, t0, t1, scale, color, line) {
+    const i0 = Math.max(0, Math.round(t0 * S.n)), i1 = Math.min(S.n, Math.max(i0 + 1, Math.round(t1 * S.n)));
+    g.beginPath();
+    for (let i = i0; i <= i1; i++) g[i === i0 ? 'moveTo' : 'lineTo'](S[i].x + S[i].nx * S[i].w * scale, S[i].y + S[i].ny * S[i].w * scale);
+    for (let i = i1; i >= i0; i--) g.lineTo(S[i].x - S[i].nx * S[i].w * scale, S[i].y - S[i].ny * S[i].w * scale);
+    g.closePath();
+    g.fillStyle = color;
+    g.fill();
+    if (!line) return;
+    g.strokeStyle = ink;
+    g.lineWidth = res * line;
+    g.stroke();
+  }
+
+  // A line along the limb at a fraction of its half-width (side), or, when t0 = t1, straight across
+  // it at that station (span is how far across, as a fraction of the half-width).
+  function limbLine(S, t0, t1, side, color, width, span = 1, crossWidth = .014) {
+    g.strokeStyle = color;
+    g.lineCap = 'round';
+    g.beginPath();
+    if (t0 === t1) {
+      const s = sampleAt(S, t0);
+      g.lineWidth = res * crossWidth;
+      g.moveTo(s.x + s.nx * s.w * span, s.y + s.ny * s.w * span);
+      g.lineTo(s.x - s.nx * s.w * span, s.y - s.ny * s.w * span);
+    } else {
+      g.lineWidth = res * width;
+      const i0 = Math.round(t0 * S.n), i1 = Math.round(t1 * S.n);
+      for (let i = i0; i <= i1; i++) g[i === i0 ? 'moveTo' : 'lineTo'](S[i].x + S[i].nx * S[i].w * side, S[i].y + S[i].ny * S[i].w * side);
+    }
+    g.stroke();
+  }
+
+  function limbDot(S, t, r, color) {
+    const s = sampleAt(S, t);
+    g.beginPath();
+    g.arc(s.x, s.y, r * res, 0, Math.PI * 2);
+    g.fillStyle = color;
+    g.fill();
+  }
+
+  // A closed fist past the wrist: squared back of the hand, a row of four knuckles, finger
+  // creases and the thumb folded across.
+  function fist(wrist, hand, left, color, c) {
+    const wx = px(wrist), wy = py(wrist), hx = px(hand), hy = py(hand);
+    let dx = hx - wx, dy = hy - wy;
+    const l = Math.hypot(dx, dy);
+    if (l < .5) { dx = 0; dy = 1; } else { dx /= l; dy /= l; }
+    const k = res, side = left ? -1 : 1;
+    const at = (a, b) => [wx + (dx * a - dy * b * side) * k, wy + (dy * a + dx * b * side) * k];
+    const shape = [[-.02, -.06], [.05, -.078], [.13, -.08], [.18, -.066], [.205, -.03], [.21, .01], [.2, .05], [.16, .074], [.08, .08], [.01, .07], [-.02, .05]];
+    g.beginPath();
+    shape.forEach((point, i) => g[i ? 'lineTo' : 'moveTo'](...at(...point)));
+    g.closePath();
+    g.lineJoin = 'round';
+    g.strokeStyle = ink;
+    g.lineWidth = res * .03;
+    g.stroke();
+    g.fillStyle = color;
+    g.fill();
+    // Knuckles and finger creases.
+    g.strokeStyle = c.shade;
+    g.lineWidth = res * .01;
+    g.lineCap = 'round';
+    for (const b of [-.045, -.012, .02, .05]) {
+      g.beginPath();
+      g.arc(...at(.165, b), res * .018, 0, Math.PI * 2);
+      g.stroke();
+    }
+    for (const b of [-.028, .004, .036]) {
+      g.beginPath(); g.moveTo(...at(.17, b)); g.lineTo(...at(.205, b)); g.stroke();
+    }
+    // The thumb, folded over the front of the fingers.
+    g.beginPath();
+    const thumb = [[.04, -.07], [.1, -.1], [.16, -.088], [.17, -.06], [.1, -.058]];
+    thumb.forEach((point, i) => g[i ? 'lineTo' : 'moveTo'](...at(...point)));
+    g.closePath();
+    g.strokeStyle = ink;
+    g.lineWidth = res * .02;
+    g.stroke();
+    g.fillStyle = color;
+    g.fill();
+    g.strokeStyle = 'rgba(255,230,200,.35)';
+    g.lineWidth = res * .012;
+    g.beginPath(); g.moveTo(...at(.03, -.04)); g.lineTo(...at(.15, -.05)); g.stroke();
+  }
+
+  // The fingers wrapped round a grip, drawn over the weapon so the hand visibly holds it.
+  function gripWrap(hand, axis, color, c) {
+    const hx = px(hand), hy = py(hand);
+    let ax = px(add(hand, axis)) - hx, ay = py(add(hand, axis)) - hy;
+    const l = Math.hypot(ax, ay);
+    if (l < 1) return;
+    ax /= l; ay /= l;
+    const at = (a, b) => [hx + (ax * a - ay * b) * res, hy + (ay * a + ax * b) * res];
+    g.beginPath();
+    const corners = [[-.075, -.05], [.075, -.05], [.085, 0], [.075, .055], [-.075, .055], [-.085, 0]];
+    corners.forEach((point, i) => g[i ? 'lineTo' : 'moveTo'](...at(...point)));
+    g.closePath();
+    g.strokeStyle = ink;
+    g.lineWidth = res * .022;
+    g.lineJoin = 'round';
+    g.stroke();
+    g.fillStyle = color;
+    g.fill();
+    g.strokeStyle = c.shade;
+    g.lineWidth = res * .01;
+    for (const a of [-.037, 0, .037]) { g.beginPath(); g.moveTo(...at(a, -.045)); g.lineTo(...at(a, .05)); g.stroke(); }
   }
 
   function championFigure(spec, facing, r) {
@@ -1028,8 +1271,8 @@
         [spine(-.02, .17, chestZ + .14), spine(-.03, 0, chestZ + .22), .17, .2, varro ? c.skin : body],
         [spine(0, 0, chestZ + .12), j.neck, .2, .17, c.skin],
         // Depth front to back, so the side view has a chest and a seat, not a pole.
-        [spine(-.09, 0, chestZ - .1), spine(.1, 0, chestZ - .06), .38, .4, body],
-        [spine(-.08, 0, hipZ + .06), spine(.06, 0, hipZ + .08), .3, .28, varro ? c.skin : c.leatherDeep]
+        [spine(-.07, 0, chestZ - .08), spine(.07, 0, chestZ - .05), .34, .36, body],
+        [spine(-.07, 0, hipZ + .06), spine(.02, 0, hipZ + .08), .26, .24, varro ? c.skin : c.leatherDeep]
       ]);
       if (varro && front) {
         // Bare chest: pectorals, a six-pack, obliques, collarbones and an old scar.
@@ -1080,79 +1323,87 @@
     // Arms and shoulders.
     for (const [shoulder, elbow, hand, left] of [[j.shoulderL, j.elbowL, j.handL, true], [j.shoulderR, j.elbowR, j.handR, false]]) {
       part(lerp(shoulder, hand, .55), () => {
-        const bicep = lerp(shoulder, elbow, .45), forearm = lerp(elbow, hand, .3);
-        const sleeve = varro ? c.skin : look.main;
-        // Deltoid cap, the biceps swelling on the front of the upper arm, then a forearm that is
-        // thick below the elbow and narrows to the wrist.
-        const outward = vector(0, left ? -.03 : .03, .02), ahead = vector(.035, 0, 0);
-        fused([[add(shoulder, outward), lerp(shoulder, elbow, .38), .27, .19, sleeve],
-          [lerp(shoulder, elbow, .3), elbow, .19, .13, c.skin],
-          [add(lerp(shoulder, elbow, .38), ahead), add(lerp(shoulder, elbow, .78), ahead), .17, .12, c.skin],
-          [elbow, forearm, .13, .17, c.skin], [forearm, hand, .17, .105, c.skin]]);
-        fine([add(lerp(shoulder, elbow, .42), ahead), add(lerp(shoulder, elbow, .82), ahead)], c.shade, .016);
-        fine([lerp(elbow, hand, .12), lerp(elbow, hand, .55)], c.shade, .013);
+        const wrist = add(hand, sub(elbow, hand).map(v => v * .12 / (Math.hypot(...sub(elbow, hand)) || 1)));
+        const S = drawLimb([shoulder, elbow, wrist], armProfile(shoulder, elbow, wrist), c.skin);
+        const tE = S.elbow;
+        limbShade(S, 'rgba(90,30,24,.3)', c.glint);
+        // Muscle lines: the biceps-triceps split, the elbow crease, the forearm's long muscle.
+        limbLine(S, tE * .3, tE * .9, .38, c.shade, .016);
+        limbLine(S, tE * .55, tE * .95, -.45, c.shade, .012);
+        limbLine(S, tE + (1 - tE) * .08, tE + (1 - tE) * .6, .3, c.shade, .012);
+        limbLine(S, tE - .02, tE + .03, -.1, c.deep, .012);
         if (varro && !left) {
-          // Manica: overlapping steel bands from shoulder to wrist on the sword arm.
-          const path = [add(shoulder, [0, 0, .03]), elbow, hand];
-          for (let i = 0; i < 8; i++) {
-            const t = .03 + i * .115;
-            taper(along(path, t), along(path, t + .13), .23 - i * .013, .21 - i * .013, i % 2 ? metal.iron : metal.steel);
-            fine([along(path, t + .02), along(path, t + .1)], i % 2 ? metal.steel : metal.edge, .012);
-            disc(along(path, t + .06), .016, i % 2 ? metal.steel : metal.dark, false);
+          // Manica: overlapping steel lames that follow the arm, upper ones over lower ones.
+          for (let i = 7; i >= 0; i--) {
+            const t0 = .04 + i * .112;
+            limbBand(S, t0, t0 + .13, 1.1, i % 2 ? metal.iron : metal.steel, .012);
+            limbLine(S, t0 + .02, t0 + .1, .55, i % 2 ? metal.steel : metal.edge, .01);
+            limbLine(S, t0 + .125, t0 + .125, 0, metal.dark, 0, 1.1);
           }
-          for (const t of [.42, .5]) fine(across(along(path, t), .11, .02), c.leather, .022);
+          for (const t of [tE - .03, tE + .04]) limbLine(S, t, t, 0, c.leather, 0, 1.15, .02);
+          limbBand(S, .9, 1, 1.12, c.leather, .012);
         } else if (varro) {
-          taper(lerp(elbow, hand, .3), lerp(elbow, hand, .6), .16, .15, c.linen);
-          for (const t of [.36, .44, .52]) fine(across(lerp(elbow, hand, t), .075, .02), c.linenShade, .01);
-          taper(lerp(elbow, hand, .62), lerp(elbow, hand, .86), .17, .14, c.leather);
-          fine([lerp(elbow, hand, .68), lerp(elbow, hand, .8)], c.bronze, .02);
+          limbBand(S, tE + (1 - tE) * .35, tE + (1 - tE) * .72, 1.06, c.linen, .012);
+          for (const f of [.43, .53, .63]) limbLine(S, tE + (1 - tE) * f, tE + (1 - tE) * f, 0, c.linenShade, 0, 1.06, .01);
+          limbBand(S, tE + (1 - tE) * .76, 1, 1.1, c.leather, .012);
+          limbLine(S, tE + (1 - tE) * .8, .97, 0, c.bronze, .02);
         } else {
-          // Sleeve hem, a laced bracer on the bow arm, a glove on the draw hand.
-          fine(across(bicep, .1), metal.gold, .02);
-          taper(lerp(elbow, hand, .3), lerp(elbow, hand, .85), .18, .13, c.leatherDeep);
-          const lace = [];
-          for (let i = 0; i < 5; i++) lace.push(add(lerp(elbow, hand, .35 + i * .11), vector(0, i % 2 ? .05 : -.05, .02)));
-          fine(lace, c.leatherLight, .012);
-          for (const t of [.36, .58, .8]) disc(add(lerp(elbow, hand, t), [0, 0, .03]), .014, c.bronze, false);
+          // A short sleeve that rounds over the deltoid, gathered at a gilded hem, under two layered
+          // leather shoulder plates that follow the arm's curve. Then a laced bracer on the bow arm.
+          const cap = (scale, color) => {
+            const s0 = S[0];
+            g.beginPath();
+            g.arc(s0.x, s0.y, s0.w * scale, 0, Math.PI * 2);
+            g.fillStyle = color;
+            g.fill();
+            g.strokeStyle = ink;
+            g.lineWidth = res * .014;
+            g.stroke();
+          };
+          cap(1.1, look.main);
+          limbBand(S, 0, tE * .5, 1.1, look.main, .014);
+          for (const f of [.2, .34]) limbLine(S, tE * f, tE * (f + .1), f > .3 ? -.5 : .45, look.deep, .012);
+          limbLine(S, tE * .5, tE * .5, 0, metal.gold, 0, 1.1, .022);
+          cap(1.24, c.leatherDeep);
+          limbBand(S, 0, tE * .3, 1.24, c.leatherDeep, .014);
+          cap(1.12, c.leather);
+          limbBand(S, 0, tE * .2, 1.14, c.leather, .014);
+          limbLine(S, tE * .2, tE * .2, 0, c.leatherLight, 0, 1.1, .012);
+          limbLine(S, tE * .3, tE * .3, 0, c.leather, 0, 1.2, .012);
+          limbDot(S, tE * .1, .018, c.bronze);
+          limbDot(S, tE * .25, .016, c.bronze);
+          if (left) {
+            limbBand(S, tE + (1 - tE) * .3, 1, 1.1, c.leatherDeep, .012);
+            for (let k = 0; k < 4; k++) limbLine(S, tE + (1 - tE) * (.38 + k * .15), tE + (1 - tE) * (.45 + k * .15), k % 2 ? .4 : -.4, c.leatherLight, .01);
+            for (const f of [.4, .62, .84]) limbDot(S, tE + (1 - tE) * f, .016, c.bronze);
+          } else limbBand(S, tE + (1 - tE) * .78, 1, 1.08, c.leather, .012);
         }
-        // A proper fist: a squared hand past the wrist with the thumb wrapped over.
-        const knuckle = lerp(hand, add(hand, sub(hand, elbow)), .17);
-        const glove = varro && !left ? '#3a2218' : !varro && !left ? c.leather : c.skin;
-        fused([[lerp(hand, elbow, .05), knuckle, .15, .14, glove]]);
-        disc(add(lerp(hand, knuckle, .4), vector(.02, left ? -.06 : .06, .03)), .045, glove, .012);
-        for (const k of [-.035, 0, .035]) fine([add(knuckle, vector(0, k, .03)), add(knuckle, vector(0, k, -.03))], c.shade, .009);
+        fist(wrist, hand, left, varro ? c.skin : left ? c.skin : c.leather, c);
       }, .07);
       part(shoulder, () => {
         const at = (forward, right, up) => add(shoulder, vector(forward, right * (left ? -1 : 1), up));
         if (varro && !left) {
-          // A bronze shoulder plate caps the manica.
-          poly(Array.from({ length: 10 }, (_, i) => {
-            const a = i / 9 * Math.PI;
-            return at(Math.cos(a) * .17 - .01, .08 + Math.sin(a) * .16, .02 + Math.sin(a) * .12 - (1 - Math.sin(a)) * .06);
-          }), c.bronze);
-          fine([at(.12, .06, .06), at(0, .2, .13), at(-.12, .1, .07)], c.bronzeLight, .016);
-          fine([at(.14, .02, -.02), at(0, .14, .02), at(-.14, .04, -.02)], c.bronzeDeep, .014);
-        } else if (varro) disc(shoulder, .1, c.skin, false);
+          // A domed bronze cap over the deltoid, banded like the manica below it.
+          const top = add(shoulder, vector(0, .05, .04));
+          disc(top, .155, c.bronze, .016);
+          disc(add(top, vector(.02, .02, .02)), .118, c.bronzeDeep, false);
+          disc(add(top, vector(.03, .01, .04)), .1, c.bronze, false);
+          fine([at(.1, .0, .1), at(.02, .1, .16), at(-.08, .14, .1)], c.bronzeLight, .016);
+          for (const a2 of [0, 2.1, 4.2]) disc(add(top, vector(Math.cos(a2) * .12, Math.sin(a2) * .12, 0)), .014, c.bronzeLight, false);
+        } else if (varro) fine([add(shoulder, vector(.06, -.08, .03)), add(shoulder, vector(-.02, -.12, -.04))], c.shade, .014);
         else {
-          // Three overlapping leather lames, the lowest the widest, riveted in bronze.
-          for (let k = 2; k >= 0; k--) {
-            const drop = k * .075, grow = 1 + k * .12;
-            poly(Array.from({ length: 9 }, (_, i) => {
-              const a = i / 8 * Math.PI;
-              return at(Math.cos(a) * .13 * grow, .07 + Math.sin(a) * .13 * grow + k * .03, .06 - drop + Math.sin(a) * .1 - (1 - Math.sin(a)) * .04);
-            }), k % 2 ? c.leatherDeep : c.leather, .014);
-            fine(Array.from({ length: 5 }, (_, i) => {
-              const a = .5 + i / 4 * 2.1;
-              return at(Math.cos(a) * .13 * grow, .07 + Math.sin(a) * .13 * grow + k * .03, .07 - drop + Math.sin(a) * .1);
-            }), c.leatherLight, .01);
-            disc(at(0, .2 + k * .045, .1 - drop), .018, c.bronze, false);
-          }
+          // Cassian's shoulder plates are drawn with the arm, following its contour.
         }
       }, .12);
     }
 
     part(j.head, () => (varro ? murmilloHead : archerHead)(r, look, c, facing), .16);
-    if (!p.thrown) part(lerp(j.handR, add(j.handR, j.aim), .45), () => weapon(spec.weapon, j.handR, j.aim, j.side, look, p.charge), .13);
+    if (!p.thrown) part(lerp(j.handR, add(j.handR, j.aim), .45), () => {
+      weapon(spec.weapon, j.handR, j.aim, j.side, look, spec.weapon === 'recurve' && p.draw !== undefined ? { draw: p.draw, charge: p.charge } : p.charge);
+      // Fingers close over the grip, drawn after the weapon so the hand holds it.
+      if (spec.weapon === 'recurve') gripWrap(j.handL, upOf(j.aim, j.side), c.skin, c);
+      else gripWrap(j.handR, j.aim, varro ? c.skin : c.leather, c);
+    }, .13);
     if (spec.shield) part(j.handL, () => scutum(r, spec, look, facing, c), .18);
 
     parts.sort((a, b) => a.depth - b.depth);
