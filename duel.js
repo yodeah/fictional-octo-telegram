@@ -32,7 +32,7 @@ const ArenaDuel = (() => {
     carry = 0;
     state = 'ready';
     // Every optional field needs a default here: the engine reuses its fighters, and old saved fights lack the new ones.
-    const copies = configs.map(config => ({ lifesteal: 0, spellList: [], tactic: 'balanced', aimAt: 'any', pace: 1, triggers: null, ...config, gear: { ...config.gear }, wins: 0 }));
+    const copies = configs.map(config => ({ lifesteal: 0, spellList: [], tactic: 'balanced', aimAt: 'any', pace: 1, triggers: null, zeal: false, ...config, gear: { ...config.gear }, wins: 0 }));
     seeded(() => startBout(copies));
     fighters.forEach((fighter, index) => {
       fighter.hp = Math.max(1, Math.round(fighter.maxHP * (configs[index].health ?? 1)));

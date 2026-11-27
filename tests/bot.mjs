@@ -1,3 +1,34 @@
+// The sensible player's answer to a stranger: try the fights ahead with and without the bargain.
+export function wouldAccept(game, run, trials = 25) {
+  const { Rules, ArenaDuel } = game;
+  const wins = (hero, foe) => {
+    let total = 0;
+    for (let i = 0; i < trials; i++) {
+      ArenaDuel.setup(2000 + i * 613, [hero, foe]);
+      total += ArenaDuel.resolve().won;
+    }
+    return total / trials;
+  };
+  // A blind draw is only worth it when losing the duel is unlikely and would not be the end.
+  if (run.visitor.key === 'dealer') {
+    if (!run.mercy || run.health <= .9) return false;
+    // Nobody knows the stranger yet, so picture a few.
+    let total = 0;
+    for (let seed = 1; seed <= 5; seed++) {
+      const pictured = { ...JSON.parse(JSON.stringify(run)), rng: seed * 977 + run.day, visitor: { key: 'dealer', card: 'duel' } };
+      Rules.acceptBargain(pictured);
+      total += wins(Rules.heroConfig(pictured), pictured.duel);
+    }
+    return total / 5 >= .75;
+  }
+  const after = JSON.parse(JSON.stringify(run));
+  Rules.acceptBargain(after);
+  // The crone's trades of Charm never show in a fight, so Charm counts as a little on its own.
+  const worth = holder => wins(Rules.heroConfig(holder), run.offers.blood) + 2 * wins(Rules.heroConfig(holder), Rules.championConfig(run.act))
+    + Rules.stat(holder, 'cha') * .01;
+  return worth(after) > worth(run);
+}
+
 // Two players for whole-run tests: one makes sensible choices, one picks at random.
 export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
   const { Rules, ArenaDuel, weapons, armors } = game;
@@ -12,9 +43,10 @@ export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
     if (total(next) > total(stats)) stats = next;
   }
   const run = Rules.newRun({ name: 'Bot', race, stats, seed, startAct });
-  const kinds = { spar: 0, blood: 0, champion: 0 };
-  const losses = { spar: 0, blood: 0, champion: 0 };
+  const kinds = { spar: 0, blood: 0, champion: 0, duel: 0 };
+  const losses = { spar: 0, blood: 0, champion: 0, duel: 0 };
   let seconds = 0;
+  const bargains = {};
 
   const duel = (hero, foe, fightSeed) => {
     ArenaDuel.setup(fightSeed, [hero, foe]);
@@ -66,6 +98,19 @@ export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
       Rules.learnSpell(run, pick(run.spellChoices));
       continue;
     }
+    if (run.duel) {
+      fight('duel');
+      continue;
+    }
+    if (run.visitor) {
+      const { key } = run.visitor;
+      const yes = smart ? wouldAccept(game, run, 15) : random() < .5;
+      bargains[key] = bargains[key] || [0, 0];
+      bargains[key][yes ? 0 : 1]++;
+      if (yes) Rules.acceptBargain(run);
+      else Rules.declineBargain(run);
+      continue;
+    }
     shop();
     // The surgeon is only worth the money right before a champion.
     if (smart && Rules.championReady(run)) for (const { part } of Rules.woundsOf(run).slice()) {
@@ -94,5 +139,5 @@ export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
     else if (odds(run.offers.spar) >= .5) fight('spar');
     else Rules.work(run);
   }
-  return { over: run.over || 'stalled', act: run.act, day: run.day, fights: run.fights, kinds, losses, seconds };
+  return { over: run.over || 'stalled', act: run.act, day: run.day, fights: run.fights, kinds, losses, seconds, bargains };
 }

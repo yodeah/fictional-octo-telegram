@@ -18,5 +18,12 @@ for (const smart of [true, false]) {
     const total = results.reduce((s, r) => s + r.kinds[kind], 0);
     console.log('  ', kind, total, 'win rate', total ? (1 - results.reduce((s, r) => s + r.losses[kind], 0) / total).toFixed(2) : '-');
   }
+  const struck = {};
+  for (const result of results) for (const [key, [yes, no]] of Object.entries(result.bargains)) {
+    struck[key] = struck[key] || [0, 0];
+    struck[key][0] += yes;
+    struck[key][1] += no;
+  }
+  console.log('   bargains [accepted, refused]', JSON.stringify(struck));
   console.log('   ms', Date.now() - started);
 }

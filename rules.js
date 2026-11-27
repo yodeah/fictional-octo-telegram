@@ -80,6 +80,16 @@ const Rules = (() => {
   const opponentNames = ['Brann', 'Sekka', 'Otho', 'Mirel', 'Dagan', 'Ysolde', 'Korvo', 'Nim', 'Tavish', 'Ruga', 'Petra', 'Hask', 'Ilo', 'Marrok', 'Sava', 'Corm'];
   const opponentColors = [[49, 102, 110], [70, 92, 140], [92, 112, 66], [120, 80, 130], [140, 108, 52], [60, 110, 96]];
   const debtEvery = 5;
+  // Strangers who turn up between days. Each can be refused; the price is always on the table first.
+  const visitorChance = .25;
+  const visitors = {
+    crone: { name: 'The Marsh Crone', act: 0, color: [96, 120, 70], story: 'An old woman with reeds in her hair takes your hand. “I can move what is in you. Not make more. Move.”' },
+    peddler: { name: 'The One-Eyed Peddler', act: 0, color: [150, 118, 62], story: 'He unwraps a glass eye. “Wear it on a cord. You will see every gap in a guard, and nothing far away.”' },
+    envoy: { name: 'The Red Envoy', act: 1, color: [150, 36, 40], story: 'A sealed letter, still warm. “My master has a word that ends fights. It is paid for in the usual coin.”' },
+    dealer: { name: 'The Deck Dealer', act: 1, color: [92, 62, 130], story: 'Three cards lie face down on a barrel. “One draw. I do not know which is which, and neither do you.”' },
+    flagellant: { name: 'The Flagellant', act: 1, color: [124, 112, 100], story: 'Scars cover his back. “Take the lash with me today, and pain will never slow you again.”' }
+  };
+  const zealHealth = .94;
 
   const clone = value => JSON.parse(JSON.stringify(value));
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -104,6 +114,8 @@ const Rules = (() => {
   }
 
   const stat = (run, key) => run.stats[key] + (races[run.race].stats[key] || 0);
+  // Saves from before strangers existed have met none.
+  const metOf = run => run.met || {};
 
   function trained(run, key) {
     let total = 0;
@@ -119,7 +131,8 @@ const Rules = (() => {
   }
 
   // From the second act the market sells one torn page per act.
-  const pageCost = run => 50 + 30 * run.learned.length;
+  // Only spells that come from pages raise the price; the Red Envoy's does not.
+  const pageCost = run => 50 + 30 * run.learned.filter(key => spellPool.includes(key)).length;
   const pageOnSale = run => run.act >= 1 && run.pageAct !== run.act && spellPool.some(key => !run.learned.includes(key));
 
   function buyPage(run) {
@@ -135,15 +148,18 @@ const Rules = (() => {
     const { weapon, reserve, shield, armor } = run.equipped;
     const special = [weapon, reserve].find(key => trophies[key]) || 'none';
     const hurt = part => woundsOf(run).some(wound => wound.part === part) ? .9 : 1;
+    const eye = metOf(run).peddler;
+    const zeal = Boolean(metOf(run).flagellant);
     return {
       name: run.name,
       level: 1 + run.wins,
       strength: Math.round((24 + stat(run, 'str') * 1.7 + trained(run, 'power')) * hurt('arm')),
-      attack: Math.round((24 + stat(run, 'agi') * 1.7 + trained(run, 'skill')) * hurt('head')),
-      ranged: Math.round((24 + stat(run, 'agi') * 1.9 + trained(run, 'skill')) * hurt('head')),
+      attack: Math.round((24 + stat(run, 'agi') * 1.7 + trained(run, 'skill')) * hurt('head')) + (eye ? 16 : 0),
+      ranged: Math.round((24 + stat(run, 'agi') * 1.9 + trained(run, 'skill')) * hurt('head')) - (eye ? 20 : 0),
       magic: Math.round(30 + stat(run, 'mind') * 2.2),
       defense: Math.round(8 + stat(run, 'agi') * .35 + stat(run, 'end') * .2 + trained(run, 'guard')),
-      maxHP: Math.round(((72 + stat(run, 'end') * 2.7) * 1.5 + trained(run, 'toughness') + run.wins) * hurt('body')),
+      maxHP: Math.round(((72 + stat(run, 'end') * 2.7) * 1.5 + trained(run, 'toughness') + run.wins) * hurt('body') * (zeal ? zealHealth : 1)),
+      zeal,
       tactic: run.tactic || 'balanced',
       aimAt: run.aimAt || 'any',
       pace: hurt('leg') < 1 ? .9 : 1,
@@ -203,7 +219,7 @@ const Rules = (() => {
       train: { power: startAct * 2, skill: startAct * 2, guard: startAct * 2, toughness: startAct * 2 },
       gold: 40 + startAct * 120, day: 1, act: startAct, renown: 0, health: 1, mercy: true, debtMisses: 0,
       inventory: ['club'], equipped: { weapon: 'club', reserve: 'none', shield: 'none', armor: 'rags' },
-      tactic: 'balanced', aimAt: 'any', wounds: [],
+      tactic: 'balanced', aimAt: 'any', wounds: [], met: {}, visitor: null, duel: null,
       spells: [], triggers: {}, learned: [], spellChoices: null, spellsOwed: startAct, wins: 0, fights: 0, pending: null, over: null
     };
     if (startAct > 0) {
@@ -219,7 +235,7 @@ const Rules = (() => {
   const shopStock = run => Object.keys(catalog).filter(key => catalog[key].act <= run.act);
   const slotOf = key => trophies[key] ? 'weapon' : catalog[key].slot;
   const trainingCost = run => 8 + 2 * Object.values(run.train).reduce((sum, count) => sum + count, 0);
-  const purse = (run, kind) => kind === 'champion' ? 110 + 70 * run.act : kind === 'blood' ? 70 + 36 * run.act : 32 + 18 * run.act;
+  const purse = (run, kind) => kind === 'champion' ? 110 + 70 * run.act : kind === 'spar' ? 32 + 18 * run.act : 70 + 36 * run.act;
   const wage = run => 14 + 7 * run.act;
   const debtDue = run => 25 + 20 * run.act;
   const daysToDebt = run => debtEvery - ((run.day - 1) % debtEvery);
@@ -288,6 +304,90 @@ const Rules = (() => {
     });
   }
 
+  // Strangers roll their own dice, so meeting them never changes the foes or fight seeds a run would get.
+  const fateOf = run => run.fate || (run.fate = { rng: (run.rng ^ 0x5EED5EED) >>> 0 });
+
+  const canVisit = (run, key) => run.act >= visitors[key].act && (key === 'dealer' ? metOf(run).dealer !== run.act + 1 : !metOf(run)[key]);
+
+  // The whole offer is fixed on arrival and saved, so reloading cannot change it.
+  function visitorOffer(run, key) {
+    const fate = fateOf(run);
+    const offer = { key };
+    if (key === 'crone') {
+      const keys = Object.keys(statNames);
+      offer.up = pick(fate, keys);
+      const others = keys.filter(item => item !== offer.up);
+      const spare = others.filter(item => run.stats[item] > 5);
+      offer.down = pick(fate, spare.length ? spare : others);
+    }
+    if (key === 'flagellant') {
+      const whole = Object.keys(wounds).filter(part => !woundsOf(run).some(item => item.part === part));
+      offer.part = pick(fate, whole.length ? whole : Object.keys(wounds));
+    }
+    if (key === 'dealer') offer.card = pick(fate, ['fortune', 'curse', 'duel']);
+    return offer;
+  }
+
+  function arrive(run) {
+    const waiting = run.visitor;
+    run.visitor = null;
+    if (run.over || waiting || run.day < 3) return;
+    const keys = Object.keys(visitors).filter(key => canVisit(run, key));
+    if (keys.length && roll(fateOf(run)) < visitorChance) run.visitor = visitorOffer(run, pick(fateOf(run), keys));
+  }
+
+  const fortune = run => 2 * purse(run, 'blood');
+
+  // What a visitor gives and what it costs, in words, shown before the choice.
+  function visitorTerms(run) {
+    const offer = run.visitor;
+    if (offer.key === 'crone') return { gain: '+3 ' + statNames[offer.up] + ', for good.', price: '−3 ' + statNames[offer.down] + ', for good.' };
+    if (offer.key === 'peddler') return { gain: '+16 melee skill, and every champion’s gear and weakness on the wall.', price: '−20 ranged skill, for good.' };
+    if (offer.key === 'envoy') return { gain: 'Red Verdict, a heavy spell (34 damage, 18 mana). It takes ' + (run.spells.length < 3 ? 'a free slot.' : 'your third slot.'),
+      price: 'Every cast costs you 11 health.' };
+    if (offer.key === 'dealer') return { gain: 'One card in three is a fortune: ' + fortune(run) + ' gold.',
+      price: 'One in three is a curse (half your gold and a wound). One in three is a duel to the death with a stranger, before you do anything else.' };
+    return { gain: 'For good: below half health your blows deal 25% more.',
+      price: wounds[offer.part].name + ' today (' + wounds[offer.part].text + ' for ' + woundDays + ' days), and scars that cost 6% of your health for good.' };
+  }
+
+  function acceptBargain(run) {
+    const offer = run.visitor;
+    if (!offer || run.over || run.pending) return null;
+    run.visitor = null;
+    run.met = { ...metOf(run), [offer.key]: offer.key === 'dealer' ? run.act + 1 : true };
+    const events = [];
+    if (offer.key === 'crone') {
+      run.stats[offer.up] += 3;
+      run.stats[offer.down] -= 3;
+      events.push('The Crone lets go of your hand. ' + statNames[offer.up] + ' rises, ' + statNames[offer.down] + ' drains away.');
+    } else if (offer.key === 'peddler') {
+      events.push('The glass eye hangs cold at your throat.');
+    } else if (offer.key === 'envoy') {
+      run.learned = run.learned.concat('verdict');
+      run.spells = run.spells.slice(0, 2).concat('verdict');
+      events.push('The word burns itself into you. Red Verdict is yours.');
+    } else if (offer.key === 'flagellant') {
+      events.push('You kneel beside him until dusk.');
+      wound(run, offer.part, events);
+    } else if (offer.card === 'fortune') {
+      run.gold += fortune(run);
+      events.push('Fortune. The Dealer pays out ' + fortune(run) + ' gold without a word.');
+    } else if (offer.card === 'curse') {
+      run.gold = Math.floor(run.gold / 2);
+      events.push('Curse. Your purse is half as heavy when you look down.');
+      wound(run, pick(fateOf(run), Object.keys(wounds)), events);
+    } else {
+      run.duel = makeOpponent(run, 'blood');
+      events.push('The Duel. ' + run.duel.name + ' steps out of the crowd and draws.');
+    }
+    return events;
+  }
+
+  function declineBargain(run) {
+    run.visitor = null;
+  }
+
   function endDay(run, events, rested = false) {
     healWounds(run, events, rested);
     run.health = rested ? 1 : clamp(run.health + .22, 0, 1);
@@ -308,24 +408,28 @@ const Rules = (() => {
     }
     run.day++;
     refreshOffers(run);
+    arrive(run);
     return events;
   }
 
+  // A drawn duel waits before anything else can take the day.
+  const busy = run => run.over || run.pending || run.duel;
+
   function train(run, key) {
     const cost = trainingCost(run);
-    if (run.over || run.pending || run.gold < cost) return null;
+    if (busy(run) || run.gold < cost) return null;
     run.gold -= cost;
     run.train[key]++;
     return endDay(run, ['You spend the day on drills: ' + drills[key].name.toLowerCase() + '.']);
   }
 
   function rest(run) {
-    if (run.over || run.pending) return null;
+    if (busy(run)) return null;
     return endDay(run, ['You sleep, eat and let your wounds close.'], true);
   }
 
   function work(run) {
-    if (run.over || run.pending) return null;
+    if (busy(run)) return null;
     const pay = wage(run);
     run.gold += pay;
     return endDay(run, ['You haul cargo on the docks for ' + pay + ' gold.']);
@@ -334,7 +438,10 @@ const Rules = (() => {
   // The fight is fixed here (both fighters and the seed) and saved before it is shown.
   function startFight(run, kind) {
     if (run.over || run.pending || (kind === 'champion' && !championReady(run))) return null;
-    const foe = kind === 'champion' ? championConfig(run.act) : run.offers[kind];
+    if (kind === 'duel' ? !run.duel : run.duel) return null;
+    // Walking onto the sand sends away a stranger still waiting.
+    run.visitor = null;
+    const foe = kind === 'champion' ? championConfig(run.act) : kind === 'duel' ? run.duel : run.offers[kind];
     run.pending = { kind, seed: Math.floor(roll(run) * 4294967296), hero: heroConfig(run), foe: clone(foe) };
     return run.pending;
   }
@@ -342,6 +449,7 @@ const Rules = (() => {
   function finishFight(run, result) {
     const { kind, foe } = run.pending;
     run.pending = null;
+    if (kind === 'duel') run.duel = null;
     run.fights++;
     const events = [];
     if (result.won) {
@@ -365,7 +473,7 @@ const Rules = (() => {
         offerSpells(run);
         events.push('A page of their spellbook falls open. Choose a spell.');
       } else {
-        run.renown += kind === 'blood' ? 2 : 1;
+        run.renown += kind === 'spar' ? 1 : 2;
       }
     } else if (kind === 'spar') {
       run.health = .3;
@@ -382,7 +490,11 @@ const Rules = (() => {
     }
     endDay(run, events);
     // Added after the day passes, so a new wound keeps its full length.
-    if (result.health < woundBelow && !run.over) wound(run, wounds[result.worst] ? result.worst : 'body', events);
+    if (result.health < woundBelow && !run.over) {
+      wound(run, wounds[result.worst] ? result.worst : 'body', events);
+      // His price must not be a wound you have just picked up.
+      if (run.visitor?.key === 'flagellant' && woundsOf(run).some(item => item.part === run.visitor.part)) run.visitor = visitorOffer(run, 'flagellant');
+    }
     return events;
   }
 
@@ -403,7 +515,7 @@ const Rules = (() => {
   }
 
   return {
-    races, statNames, triggerKeys, spellPool, triggerFor, setTrigger, pageCost, pageOnSale, buyPage, wounds, woundDays, woundBelow, tacticKeys, aimKeys, woundsOf, surgeonCost, treat, setTactic, setAim, drills, catalog, trophies, champions, renownNeeded,
+    races, statNames, visitors, metOf, visitorOffer, visitorTerms, acceptBargain, declineBargain, triggerKeys, spellPool, triggerFor, setTrigger, pageCost, pageOnSale, buyPage, wounds, woundDays, woundBelow, tacticKeys, aimKeys, woundsOf, surgeonCost, treat, setTactic, setAim, drills, catalog, trophies, champions, renownNeeded,
     rollStats, stat, newRun, heroConfig, championConfig, price, sellPrice, shopStock, slotOf, trainingCost, purse, wage,
     debtDue, daysToDebt, championReady, buy, sell, equip, equipped, train, rest, work, startFight, finishFight, learnSpell, toggleSpell
   };

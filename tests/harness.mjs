@@ -48,5 +48,5 @@ export function load() {
   };
   const source = files.map(file => readFileSync(fileURLToPath(new URL(file, root)), 'utf8').replace(/^'use strict';/, '')).join('\n;\n');
   const names = Object.keys(globals);
-  return new Function(...names, source + '\nreturn { ArenaDuel, Rules, weapons, armors, shields, spells, specials, tactics, aimZones, spellTriggers, fighters, elements };')(...names.map(name => globals[name]));
+  return new Function(...names, source + '\nreturn { ArenaDuel, Rules, weapons, armors, shields, spells, specials, visitors: Rules.visitors, tactics, aimZones, spellTriggers, fighters, elements };')(...names.map(name => globals[name]));
 }

@@ -45,6 +45,7 @@ const Game = (() => {
     wounds: ['Lost health', 'You carry lost health into the next fight. A day heals some; resting heals all.'],
     injury: ['Injuries', 'A wound costs you something until it heals. Resting heals it twice as fast, or pay the surgeon.'],
     tactics: ['Tactics', 'Pick a stance and a target before the bell. The trainer judges the fight with your choice.'],
+    strangers: ['Strangers', 'Some days a stranger finds you. You see the price before you agree, and you may always say no.'],
     spells: ['Spells', 'Your first spell wakes your mana. You can ready up to three. Before each bout you choose when each one is cast.'],
     triggers: ['Triggers', '“Their call” leaves the moment to your gladiator. Any other trigger holds the spell until it comes true, then casts it at once. If two come true together, the lower-numbered slot goes first.']
   };
@@ -192,12 +193,25 @@ const Game = (() => {
       const { kind, foe, read } = preview;
       const risk = kind === 'spar' ? 'First blood. Losing costs the purse and leaves you hurt and wounded.'
         : run.mercy ? 'To the death. If you fall, the crowd may spare you this once, for half your gold.' : 'To the death. There is no mercy left. If you fall, ' + escape(run.name) + ' is gone.';
-      return scene('arena') + '<h2>' + { spar: 'Sparring', blood: 'Blood bout', champion: 'Champion' }[kind] + ' · purse about ' + Rules.purse(run, kind) + ' gold</h2>'
+      return scene('arena') + '<h2>' + { spar: 'Sparring', blood: 'Blood bout', champion: 'Champion', duel: 'The Duel' }[kind] + ' · purse about ' + Rules.purse(run, kind) + ' gold</h2>'
         + card({ ...Rules.heroConfig(run) }, '<p class="small">You, at ' + Math.round(run.health * 100) + '% health</p>') + woundList(run)
         + card(foe, '<p class="weak">' + weakness(foe) + '</p>' + (kind === 'champion' ? '<p class="small">' + Rules.champions[run.act].hint + '</p>' : ''))
         + tip('tactics') + tacticsPanel() + triggerPanel()
         + '<p class="read ' + (read?.[0] || '') + '">Trainer: ' + (read ? read[1] : 'Let me watch you both…') + '</p><p class="small ' + (kind === 'spar' ? '' : 'warn') + '">' + risk + (kind === 'spar' ? '' : ' Win with under a fifth of your health and you carry a wound.') + '</p>'
-        + button('fight', 'Walk onto the sand', 'class="primary"') + button('back', 'Not today');
+        + button('fight', 'Walk onto the sand', 'class="primary"') + (kind === 'duel' ? '' : button('back', 'Not today'));
+    },
+
+    visitor: () => {
+      const run = save.run;
+      const offer = run.visitor;
+      const visitor = Rules.visitors[offer.key];
+      const terms = Rules.visitorTerms(run);
+      const now = offer.key === 'crone' ? '<p class="small">You have ' + Rules.statNames[offer.up] + ' ' + Rules.stat(run, offer.up) + ' and ' + Rules.statNames[offer.down] + ' ' + Rules.stat(run, offer.down) + '.</p>' : '';
+      const journal = notes.length ? '<ul class="notes">' + notes.map(note => '<li>' + escape(note) + '</li>').join('') + '</ul>' : '';
+      return '<div class="scene">' + Art.stranger(visitor.color, offer.key) + '</div>' + journal + tip('strangers') + '<h2>' + visitor.name + '</h2><p class="story">' + visitor.story + '</p>'
+        + '<div class="card"><p class="eyebrow">YOU GAIN</p><p>' + terms.gain + '</p></div><div class="card wound"><p class="eyebrow">THE PRICE</p><p>' + terms.price + '</p></div>' + now
+        + '<p class="small">Gold ' + run.gold + ' · health ' + Math.round(run.health * 100) + '% · ' + (run.mercy ? 'mercy unspent' : 'no mercy left') + '</p>'
+        + button('accept', 'Strike the bargain', 'class="primary"') + button('decline', 'Send them away');
     },
 
     outcome: () => {
@@ -222,6 +236,7 @@ const Game = (() => {
   };
 
   function spellText(spell) {
+    if (spell.damage && spell.hpCost) return spell.damage + ' damage · ' + spell.cost + ' mana and ' + spell.hpCost + ' health.';
     if (spell.heal) return 'Heals ' + spell.heal + ' or more. ' + spell.cost + ' mana.';
     if (spell.manaRestore) return spell.effect + '. ' + spell.cost + ' mana.';
     if (spell.absorb) return 'A shield that soaks damage. ' + spell.cost + ' mana.';
@@ -269,14 +284,19 @@ const Game = (() => {
     return '<h2>What you carry</h2>' + select('weapon', 'Main weapon') + '<p class="small">' + weaponText(run.equipped.weapon) + '</p>' + select('reserve', 'Backup weapon', 'none') + select('shield', 'Shield', 'none') + select('armor', 'Armor', 'rags')
       + '<p class="small">A backup lets your gladiator switch as the fight changes, but slows them a little.</p>'
       + (run.learned.length ? '<h2>Spells (3 slots)</h2><div class="stack">' + run.learned.map(key => button('spell', '<b>' + (run.spells.includes(key) ? 'Slot ' + (run.spells.indexOf(key) + 1) + ' · ' : '') + spells[key].name + '</b><span>' + spellText(spells[key]) + '</span>', 'class="item" data-key="' + key + '" aria-pressed="' + run.spells.includes(key) + '"')).join('') + '</div>' : '')
+      + (Object.keys(Rules.metOf(run)).length ? '<h2>Bargains struck</h2><p class="small">' + Object.keys(Rules.metOf(run)).map(key => Rules.visitors[key].name).join(' · ') + '</p>' : '')
       + (spare.length ? '<h2>Sell</h2><div class="stack">' + spare.map(key => button('sell', itemName(key) + ' for ' + Rules.sellPrice(key) + ' gold', 'data-key="' + key + '"')).join('') + '</div>' : '');
   }
 
   function wallPanel(run) {
     return '<h2>The wall of champions</h2>' + Rules.champions.map((champion, index) => {
       const state = index < run.act ? 'slain' : index === run.act ? 'next' : 'waiting';
+      // The glass eye shows every champion's gear; without it only the next one is sized up.
+      const config = Rules.championConfig(index);
+      const eye = Rules.metOf(run).peddler;
+      const sight = champion.hint + ' ' + weakness(config) + (eye ? ' ' + [config.gear.special, config.gear.armor, config.gear.shield].map(itemName).join(', ') + ', ' + config.maxHP + ' health.' : '');
       return '<div class="card champion ' + state + '">' + Art.portrait(champion.color, champion.trim, index) + '<div><p class="eyebrow">' + champion.title + '</p><h3>' + champion.name + '</h3><p class="small">'
-        + (state === 'slain' ? 'Slain. Their weapon hangs in your gear.' : state === 'next' ? champion.hint + ' ' + weakness(Rules.championConfig(index)) : 'You know only the name. Kill those before them.') + '</p></div></div>';
+        + (state === 'slain' ? 'Slain. Their weapon hangs in your gear.' : state === 'next' || eye ? sight : 'You know only the name. Kill those before them.') + '</p></div></div>';
     }).join('');
   }
 
@@ -298,6 +318,12 @@ const Game = (() => {
     if (run.pending) return startWatching();
     if (run.over) return go('over');
     if (run.spellChoices) return go('spell');
+    if (run.duel) {
+      preview = { kind: 'duel', foe: run.duel, read: null };
+      go('confirm');
+      return judge();
+    }
+    if (run.visitor) return go('visitor');
     go('hub');
   }
 
@@ -337,6 +363,7 @@ const Game = (() => {
     bury(save.run);
     store();
     if (save.run.over) return go('outcome');
+    if (save.run.visitor) return resume();
     render(true);
     window.scrollTo(0, 0);
   }
@@ -397,6 +424,16 @@ const Game = (() => {
     tactic: key => retune(Rules.setTactic, key),
     aim: key => retune(Rules.setAim, key),
     page: () => { if (Rules.buyPage(save.run)) { store(); resume(); } },
+    accept: () => {
+      const events = Rules.acceptBargain(save.run);
+      if (!events) return;
+      notes = events;
+      tab = 'arena';
+      store();
+      // A drawn duel shows its card first, then goes to the bout screen.
+      go(save.run.duel ? 'outcome' : 'hub');
+    },
+    decline: () => { Rules.declineBargain(save.run); notes = []; store(); resume(); },
     treat: part => { Rules.treat(save.run, part); store(); render(true); },
     back: () => go('hub'),
     fight: () => {

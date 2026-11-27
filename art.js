@@ -54,5 +54,21 @@ const Art = (() => {
       + rect(38, 36, 4, 30, rgb(trim)) + circle(32, 45, 2, '#ff7a4a') + circle(48, 45, 2, '#ff7a4a') + path('M8 80 q32 -22 64 0Z', rgb(color)) + '</svg>';
   }
 
-  return { scene: name => scenes[name](), portrait };
+  // A hooded stranger seen across a barrel, tinted to tell them apart.
+  function stranger(color, key) {
+    const rgb = 'rgb(' + color.join(',') + ')';
+    const held = {
+      crone: circle(268, 128, 13, '#8fbf6a', 'opacity=".85"') + path('M262 118 q6 -20 12 0', 'none', 'stroke="#d9e8b0" stroke-width="2"'),
+      peddler: circle(268, 126, 11, '#e8e0d0') + circle(268, 126, 5, '#3f7a8c') + circle(268, 126, 2, '#0c0806'),
+      envoy: rect(248, 116, 42, 26, '#d8c8a8') + circle(269, 129, 7, '#8e1f1f'),
+      dealer: rect(232, 120, 22, 32, '#d8c8a8', 'transform="rotate(-12 243 136)"') + rect(258, 118, 22, 32, '#d8c8a8') + rect(284, 120, 22, 32, '#d8c8a8', 'transform="rotate(12 295 136)"'),
+      flagellant: path('M262 96 q34 14 6 34 t14 30 M262 96 q18 30 -8 48 M262 96 q44 22 38 52', 'none', 'stroke="#3a2618" stroke-width="4"')
+    }[key];
+    return svg(sky('s', '#15121c', '#5a3a30') + torch(52) + torch(348)
+      + path('M130 190 Q140 96 200 74 Q260 96 270 190Z', rgb) + path('M168 108 Q166 46 200 42 Q234 46 232 108 Q200 130 168 108', rgb)
+      + path('M178 100 Q178 66 200 62 Q222 66 222 100 Q200 116 178 100', '#1d130d') + circle(192, 90, 2.6, '#ffd9a0') + circle(208, 90, 2.6, key === 'peddler' ? '#1d130d' : '#ffd9a0')
+      + rect(0, 150, 400, 40, '#3a2618') + rect(0, 150, 400, 5, '#6b4a2a') + held + hands(), 'A stranger waiting for your answer');
+  }
+
+  return { scene: name => scenes[name](), stranger, portrait };
 })();

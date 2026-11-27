@@ -30,7 +30,7 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - [ ] **2. Phone hosting.** Public repository and GitHub Pages from the work branch are live (checked 2026-11-26): https://yodeah.github.io/fictional-octo-telegram/. Home-screen icon and manifest added (2026-11-26). Nothing is left for an agent: the box stays open until you have played from the link on your phone, and the next agent starts stage 3. *Done when the link plays on your phone.*
 - [x] **3. Tactics and injuries** (10, 11). Stance and target on the bout screen; wounds with a surgeon (2026-11-26). Each stance has a matchup only it wins, in `tests/tactics.test.mjs`.
 - [x] **4. Spellbook rework** (13). Market pages, three slots, a trigger per spell chosen on the bout screen (2026-11-26). `tests/spells.test.mjs` shows triggers changing win rates.
-- [ ] **5. Strangers and bargains** (14). Five visitors, each with a shown price. *Done when no bargain is always right or always wrong for the test bot.*
+- [x] **5. Strangers and bargains** (14). Five visitors between days, each with a shown price (2026-11-26). `tests/bargains.test.mjs` shows each one right in one situation and wrong in another, for the test bot and in measured odds.
 - [ ] **6. Spectate and bet** (15). Watch champions and others; watching reveals their gear.
 - [ ] **7. Crowd and Charm** (16). Crowd favour changes pay and mercy; Charm changes prices.
 - [ ] **8. Shop and inventory depth** (17). Limited bag, repairs, trophies, champion specials with descriptions.
@@ -70,6 +70,18 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - All 12 spells can now turn up on pages. The market sells one page per act from act 2 (`Rules.buyPage`). The test bot buys none and sets no triggers.
 - Opponents and champions always cast on their own judgement.
 - Trigger matchups, like stance matchups, are sensitive to combat edits: recheck rates on 100 seeds before changing one.
+
+**Strangers and bargains (stage 5)**
+- `visitors`, `visitorOffer`, `visitorTerms` and `acceptBargain` in `rules.js`. Terms are text built from the same numbers as the effects, except a few written into both: check them together.
+- A visitor arrives in `endDay` (day 3 on, 25%, never two days running) and leaves at the next day or fight. Ignoring one is refusing.
+- They roll on `run.fate`, apart from `run.rng`, so meeting one never changes a run's foes or fight seeds. A drawn duel does use `run.rng`.
+- The offer, the deck card included, is fixed on arrival and saved. `run.met`, `run.visitor`, `run.duel` and `run.fate` may be missing in old saves; use `Rules.metOf(run)`.
+- `run.duel` blocks every day action until the duel is fought. Fight kind `duel` pays and risks like a blood bout.
+- Engine additions: `fighter.zeal` (default `false` in `duel.js`, damage ×`zealDamage` below half health, not on specials or burning) and the `verdict` spell (`hpCost` on a damage spell; not in `Rules.spellPool`).
+- The Peddler’s “see every enemy” became the champion wall: ordinary foes already show their gear.
+- `wouldAccept` in `tests/bot.mjs` judges by trial fights against the blood bout and champion ahead. `tests/report.mjs` prints how often each bargain is taken and refused.
+- Sensible bot, 30 runs (seeds 1–30): 17 won before stage 4, 13 after it, 13 with stage 5 refusing every stranger, 10 with the bot judging bargains. So strangers by themselves change nothing, and the bot's short-sighted yeses cost it about 3 runs: it judges only the next blood bout and champion, on small samples, for permanent trades. The stage 4 drop may be the two new spells on pages or noise. Left for the stage 12 balance pass.
+- Stage 6 (spectate) should reuse `run.fate`-style separate dice if it adds random events.
 
 **2D art (merged 2026-11-26)**
 - 2D is the default; the **Art** button on the fight screen (or `?style=3d`) brings back the 3D meshes. The choice is kept in `localStorage` under `arena-art`.

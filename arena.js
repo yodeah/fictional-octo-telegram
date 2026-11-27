@@ -137,6 +137,8 @@ const spells = {
   arc: { name: 'Arc Flash', icon: 'ϟ', cost: 20, cooldown: 4, damage: 13, energyDrain: 14, lightning: true, color: '#d3c6ff', effect: 'Drains up to 14 energy from the target', block: .12 },
   thunder: { name: 'Thunderclap', icon: '✹', cost: 41, cooldown: 10, damage: 30, lightning: true, color: '#edd8ff', effect: 'Heavy burst damage', block: .14 },
   tailwind: { name: 'Tailwind', icon: '✧', cost: 23, cooldown: 11, energyRestore: 27, haste: 4.5, color: '#cce8a0', effect: 'Restores energy and speeds movement for 4.5 seconds' },
+  // Only the Red Envoy teaches this one. Its damage spells with an hpCost take that health with each cast.
+  verdict: { name: 'Red Verdict', icon: '✹', cost: 18, cooldown: 7, damage: 34, hpCost: 11, color: '#ff5a5a', effect: 'Each cast costs 11 health', block: .08 },
   spark: { name: 'Staff Spark', damage: 8, cost: 0, cooldown: 0, color: '#d1b7ff', block: .10 }
 };
 const spellbooks = {
@@ -182,6 +184,7 @@ const spellTriggers = {
   tired: { name: 'Below 40 energy', when: fighter => fighter.energy < 40 }
 };
 const triggerOf = (fighter, key) => spellTriggers[fighter.triggers?.[key]]?.when;
+const zealDamage = 1.25;
 const manaRegen = 3.6;
 const energyRegen = 5;
 const switchCost = 7;
@@ -2500,7 +2503,8 @@ function spendEnergy(fighter, cost) {
 }
 
 function canCast(fighter, key) {
-  return fighter.mp >= spells[key].cost && elapsed >= (fighter.cooldowns[key] || 0);
+  const spell = spells[key];
+  return fighter.mp >= spell.cost && elapsed >= (fighter.cooldowns[key] || 0) && !(spell.damage && spell.hpCost >= fighter.hp);
 }
 
 function updateMana() {
@@ -2861,6 +2865,13 @@ function payForSpell(action) {
   attacker.mp -= spell.cost;
   attacker.cooldowns[spellKey] = elapsed + spell.cooldown;
   updateMana();
+  if (spell.damage && spell.hpCost) {
+    // Blows taken during the cast must not let the price kill the caster.
+    const price = Math.min(spell.hpCost, attacker.hp - 1);
+    attacker.hp -= price;
+    updateHealth();
+    floatLabel(attacker, '−' + price, spell.color, { tag: 'BLOOD PRICE', power: price / attacker.maxHP });
+  }
 }
 
 function applySupportSpell(fighter, spell, power) {
@@ -3050,7 +3061,9 @@ function impact(action, contact) {
   const absorption = style === 'magic' ? 1 : 1 - Math.max(0, defense(defender) - 45) / 275;
   const typeDefense = armors[defender.gear.armor].defenseBonus[action.attackType];
   const rolledDamage = Math.max(1, Math.round(damage * suddenDeath() * multiplier * matchup * absorption * (1 - typeDefense / 600)
-    * (defender.stunnedUntil > elapsed ? 1.14 : 1) * tacticOf(defender).taken));
+    * (defender.stunnedUntil > elapsed ? 1.14 : 1) * tacticOf(defender).taken
+    // The Flagellant's edge: harder blows once below half health.
+    * (attacker.zeal && attacker.hp < attacker.maxHP / 2 ? zealDamage : 1)));
   const absorbed = Math.min(defender.ward, rolledDamage);
   defender.ward -= absorbed;
   const actualDamage = survivable(defender, attacker, Math.min(rolledDamage - absorbed, defender.hp));
