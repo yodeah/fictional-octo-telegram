@@ -42,6 +42,7 @@ As in the main game, fights are fully idle. Choose a class for each side (or lea
 This follows the pipeline of the original Hades, where characters were [built in 3D and pre-rendered into 2D frames from many angles](https://www.hyperlific.com/articles/jen-zees-2d-defiance-and-the-hand-that-paints-hades-ii/) over [hand-painted 2D environments](https://mcvuk.com/business-news/behind-the-art-of-hades-we-value-artistic-integrity-and-excellence-in-artistic-craft-at-supergiant-however-were-first-and-foremost-a-game-design-lead-team/), with a pen-and-ink look.
 
 - **Fighters are 2D sprites.** A small rig poses each frame once; it is painted in flat color with a heavy shadow side, a hot rim light and an ink outline, then cached. There are 16 facing directions and animations for idle, run, dash, windup, strike, recover, hurt, stagger and death.
+- **Each class has its own headgear**: crests, pelts, horns, hoods, crowns and halos over the team color.
 - **Baked on first use**, about 1 ms a frame, with at most 900 frames kept.
 - **Scenery and effects are prepainted** too: floor, planters, foreground growth, vignette, glows, sweep crescents and impact bursts are stamped, not rebuilt.
 - **Camera:** fixed high angle that zooms in while keeping both fighters in view.
