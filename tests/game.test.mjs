@@ -109,3 +109,16 @@ test('good choices can beat the game and random ones cannot', () => {
   assert.ok(sensible >= 4, 'sensible player won ' + sensible + ' of 10');
   assert.ok(random <= 1, 'random player won ' + random + ' of 10');
 });
+
+test('how long the page has been open never changes a fight', () => {
+  const run = start();
+  const hero = Rules.heroConfig(run);
+  for (let seed = 1; seed <= 20; seed++) {
+    const play = () => { ArenaDuel.setup(seed, [hero, Rules.championConfig(seed % 4)]); return ArenaDuel.resolve(); };
+    game.setPageClock(0);
+    const fresh = play();
+    game.setPageClock(97.3);
+    assert.deepEqual(play(), fresh);
+  }
+  game.setPageClock(0);
+});

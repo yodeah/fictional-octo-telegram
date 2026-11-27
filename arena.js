@@ -937,7 +937,8 @@ function fighterPose(fighter) {
   const stride = fighter.stride * 2 * Math.PI;
   const sway = Math.sin(stride) * gait;
   const weightShift = Math.cos(stride * 2) * gait;
-  const breath = Math.sin(visualClock * 3 + fighter.direction) * .025;
+  // Hit detection reads this pose, so only an idle fighter breathes with the page clock: a seed must repeat its fight.
+  const breath = Math.sin((state === 'ready' ? visualClock * 3 : 0) + fighter.direction) * .025;
   const stun = ease((elapsed - fighter.stunStarted) / .16) * ease((fighter.stunnedUntil - elapsed) / .24);
   const bash = action?.bash ? release * (1 - smooth((at - swingAt - .06) / .32)) : 0;
   const drop = guard * .085 + strike * .065 + weightShift * .021 - casting * .08 + stun * .36 + (zone === 'leg' ? recoil * .16 : 0);

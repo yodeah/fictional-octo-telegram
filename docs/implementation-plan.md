@@ -92,6 +92,10 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - Restoring a save code taken before a bet still shows who wins. Fights have the same hole.
 - The test bot never watches.
 
+**Repeatable fights (fixed 2026-11-27)**
+- Until now `fighterPose` took its breathing from the page clock, so in a browser the same seed could fight differently after a reload. Headless tests never saw it, because that clock stays at 0 there. Anything `checkContact` reads must come from fight state alone; `tests/game.test.mjs` checks the page clock.
+- A browser replay now matches Node exactly. Idle breathing still shows before a bout, not during one.
+
 **2D art (merged 2026-11-26)**
 - 2D is the default; the **Art** button on the fight screen (or `?style=3d`) brings back the 3D meshes. The choice is kept in `localStorage` under `arena-art`.
 - New weapons, shields and armor need an entry in the 2D files, or they keep their 3D mesh. Rags borrow the leather set.
