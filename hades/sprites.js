@@ -9,7 +9,7 @@
   const SIZE = 1.38;      // fighters are painted a little larger than their collision circle
   const DIRECTIONS = 16;
   const LIMIT = 900;      // cached frames
-  const frames = { idle: 4, run: 8, dash: 2, windup: 4, active: 3, recover: 3, hurt: 1, stun: 4, dead: 6 };
+  const frames = { idle: 4, run: 8, dash: 2, windup: 4, active: 3, recover: 3, hurt: 1, stun: 6, dead: 6 };
   const ink = '#0a0710';
   const looks = [
     { main: '#c3283a', deep: '#6d1230', light: '#ff6a52', trim: '#ffc54d', skin: '#f0b186', shade: '#a8604f',
@@ -38,7 +38,7 @@
   // Weapon and body parameters for one frame. yaw turns around the body (positive to the right),
   // pitch lifts the weapon, out is the hand's distance in front.
   function posture(weapon, anim, shape, t) {
-    const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0 };
+    const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0 };
     if (weapon === 'spear') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
     if (['maul', 'greatsword', 'mace', 'axe'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
@@ -51,7 +51,13 @@
       p.pitch = Math.min(p.pitch, .5); p.yaw += wave * .12;
     } else if (anim === 'dash') { p.lean = .55; p.crouch = .22; p.stride = 1 - t * .5; p.sway = .9; p.yaw = 1.3; p.pitch = .1; }
     else if (anim === 'hurt') { p.lean = -.28; p.crouch = .08; p.yaw += .5; p.sway = .3; }
-    else if (anim === 'stun') { p.lean = .12 + wave * .14; p.crouch = .16; p.pitch = -.5; p.sway = .1; }
+    else if (anim === 'stun') {
+      // Stance broken: buckled onto the back knee, weapon arm hanging so the blade drags, guard
+      // sagging, head lolling, the body reeling around in a slow circle as it fights for balance.
+      const reel = Math.cos(t * Math.PI * 2);
+      p.lean = .2 + wave * .16; p.crouch = .26 + reel * .04; p.kneel = .75 + wave * .15; p.loll = reel;
+      p.pitch = -1.05; p.yaw = .9 + reel * .12; p.out = .06; p.high = .58; p.droop = 1; p.sway = .16 + wave * .08; p.bob = -.02;
+    }
     else if (anim === 'dead') { p.fall = ease(t); p.pitch = mix(p.pitch, -.2, t); p.yaw += t; p.sway = .2; }
     else {
       const key = (rest, coil, follow) => anim === 'windup' ? mix(rest, coil, ease(t))
@@ -110,13 +116,13 @@
     const j = {
       hipL: P(shift, -.15, hipZ), hipR: P(shift, .15, hipZ),
       footL: P(.12 + st * .52 + p.lunge * .5, -.24, Math.max(0, st) * .2),
-      footR: P(-.16 - st * .52 - p.lunge * .2, .24, Math.max(0, -st) * .2),
+      footR: P(-.16 - st * .52 - p.lunge * .2 - p.kneel * .34, .24, Math.max(0, -st) * .2),
       kneeL: P(.2 + st * .28 + p.crouch * .5, -.24, hipZ * .52 + Math.max(0, st) * .1),
-      kneeR: P(.04 - st * .22 + p.crouch * .4, .24, hipZ * .52 + Math.max(0, -st) * .1),
+      kneeR: P(.04 - st * .22 + p.crouch * .4 - p.kneel * .1, .24, hipZ * .52 + Math.max(0, -st) * .1 - p.kneel * .36),
       waist: P(shift + lean * .3, 0, hipZ + .1),
       chest: P(shift + lean * .72, 0, chestZ),
       neck: P(shift + lean * .9, 0, chestZ + .2),
-      head: P(shift + lean * 1.02 + .06, 0, chestZ + .42),
+      head: P(shift + lean * 1.02 + .06 + p.kneel * .05, p.loll * .09, chestZ + .42 - p.kneel * .05 - Math.abs(p.loll) * .03),
       shoulderL: P(shift + lean * .76, -.36, chestZ + .1), shoulderR: P(shift + lean * .76, .36, chestZ + .1)
     };
     const reach = .22 + p.out + p.lunge * .4;
@@ -125,7 +131,7 @@
     j.aim = vector(Math.cos(p.yaw) * Math.cos(p.pitch), Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch));
     j.side = vector(-Math.sin(p.yaw), Math.cos(p.yaw), 0);
     const twoHanded = ['maul', 'greatsword', 'spear', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
-    j.handL = spec.shield ? P(shift + .4 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3, 1.04 - p.crouch + p.bob)
+    j.handL = spec.shield ? P(shift + .4 - p.droop * .14 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3 - p.droop * .08, 1.04 - p.crouch + p.bob - p.droop * .3)
       : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (['crossbow', 'bow', 'recurve'].includes(spec.weapon) ? .42 : .26)))
         : P(shift + .12 - st * .3, -.52, .9 + p.bob + (anim === 'run' ? .1 : 0));
     j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(-.14, -.2, -.1));
