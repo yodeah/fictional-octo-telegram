@@ -408,6 +408,14 @@
         p.vx = Math.cos(heading + turn) * speed; p.vy = Math.sin(heading + turn) * speed;
       }
       p.life -= dt;
+      // A shot that slips past the target close by counts as a dodge.
+      if (!p.passed && !target.dead) {
+        const speed = Math.hypot(p.vx, p.vy), dx = target.x - p.x, dy = target.y - p.y;
+        if ((dx * p.vx + dy * p.vy) / speed < -radius && Math.abs(dx * p.vy - dy * p.vx) / speed < 1.4) {
+          p.passed = true;
+          emit(duel, 'dodge', { who: target.index });
+        }
+      }
       const steps = Math.ceil(Math.hypot(p.vx, p.vy) * dt / .3);
       for (let i = 0; i < steps && p.life > 0; i++) {
         p.x += p.vx * dt / steps; p.y += p.vy * dt / steps;
@@ -455,7 +463,7 @@
     if (!threat || f.threatSeen === threat.id) return false;
     f.threatSeen = threat.id;
     const move = moves[f.move];
-    const nerve = (f.move === 'dash' ? .3 : .34) * threat.weight;
+    const nerve = (f.kit.champion ? .5 : f.move === 'dash' ? .3 : .34) * threat.weight;
     if (duel.random() > nerve || f.charges < 1) return false;
     const side = duel.random() < .5 ? 1 : -1;
     const angle = f.move === 'dash' ? threat.angle + side * Math.PI / 2 : bestHeading(duel, f, rival, move.distance);
@@ -482,21 +490,64 @@
     return unit(nearest.x + Math.cos(around) * reach - f.x, nearest.y + Math.sin(around) * reach - f.y);
   }
 
+  // Champions read incoming shots. A bolt or spell already in the air is sidestepped off its line.
+  // Against a shot still being aimed they walk one way while the aim tracks them, then cut back the
+  // other way once it locks, so the lead it took sends the shot wide. Returns a heading or null.
+  function juke(duel, f, rival) {
+    for (const p of duel.projectiles) {
+      if (p.owner === f.index) continue;
+      const dx = f.x - p.x, dy = f.y - p.y, speed = Math.hypot(p.vx, p.vy);
+      const ahead = (dx * p.vx + dy * p.vy) / speed;
+      const off = (dx * p.vy - dy * p.vx) / speed;
+      if (ahead > -.2 && ahead / speed < .75 && Math.abs(off) < radius + .5) {
+        const side = Math.sign(off) || f.strafe;
+        return [p.vy / speed * side, -p.vx / speed * side];
+      }
+    }
+    const a = rival.action;
+    if (!a || a.shape !== 'bolt' || a.t >= a.windup || a.windup - a.t > .5 || !lineOfSight(rival, f)) return null;
+    if (f.jukeFor !== a.id) {
+      f.jukeFor = a.id;
+      f.jukeSide = duel.random() < .5 ? 1 : -1;
+    }
+    const [tx, ty] = unit(f.x - rival.x, f.y - rival.y);
+    const locked = a.t >= a.windup * .85;
+    const side = f.jukeSide * (locked ? -1 : 1);
+    // Keep away from the wall when choosing a side.
+    const edge = Math.hypot((f.x - ty * side * 1.5) / arena.a, (f.y + tx * side * 1.5) / arena.b);
+    if (edge > .9) f.jukeSide *= -1;
+    return [-ty * f.jukeSide * (locked ? -1 : 1), tx * f.jukeSide * (locked ? -1 : 1)];
+  }
+
   // Desired walking direction, as a unit vector scaled by 0..1.
   function steer(duel, f, rival) {
     const d = dist(f, rival);
-    const [tx, ty] = unit(rival.x - f.x, rival.y - f.y);
+    let [tx, ty] = unit(rival.x - f.x, rival.y - f.y);
     const weapon = weapons[f.weapon];
+    const smart = f.kit.champion;
     let x = 0, y = 0;
     if (duel.time > f.strafeUntil) {
-      f.strafeUntil = duel.time + .8 + duel.random() * 1.4;
-      if (duel.random() < .5) f.strafe *= -1;
+      // A champion closing on a shooter weaves in shorter, sharper zigzags.
+      const weave = smart && weapon.style === 'melee' && styleOf(rival) !== 'melee';
+      f.strafeUntil = duel.time + (weave ? .45 + duel.random() * .45 : .8 + duel.random() * 1.4);
+      if (weave || duel.random() < .5) f.strafe *= -1;
+    }
+    if (smart) {
+      const dodge = juke(duel, f, rival);
+      if (dodge) return dodge;
     }
     const sight = lineOfSight(f, rival, radius * .8);
     if (!sight) return route(f, rival);
     f.detour = 0;
     if (weapon.style === 'melee') {
       const want = weapon.shape === 'slam' ? weapon.reach : weapon.reach * .78;
+      if (smart && d > want + .5) {
+        // Run at where the rival is going, from the middle of the floor, to pin them against the wall.
+        const lead = Math.min(.8, d / f.kit.speed * .5);
+        const [cx, cy] = unit(-rival.x, -rival.y);
+        const pin = Math.min(1.2, d * .2) * Math.min(1, Math.hypot(rival.x / arena.a, rival.y / arena.b) * 1.6);
+        [tx, ty] = unit(rival.x + rival.vx * lead + cx * pin - f.x, rival.y + rival.vy * lead + cy * pin - f.y);
+      }
       if (d > want) { x = tx; y = ty; }
       else if (d < want * .6) { x = -tx * .5; y = -ty * .5; }
       // Circle in close, and come at shooters on a slight curve.
@@ -546,6 +597,19 @@
         startAttack(duel, f, rival);
       }
       return;
+    }
+    // A champion bursts in on an opening: a shooter still recovering from a shot, out of escapes or
+    // staggered, or anyone staggered within reach of a dash.
+    if (f.kit.champion && free && f.charges > 0 && duel.time >= f.nextClose && d > 2.6 && d < 6.8 && lineOfSight(f, rival, .5)) {
+      const ra = rival.action;
+      const staggered = rival.stunnedUntil > duel.time + .25 || rival.frozenUntil > duel.time + .25;
+      const opening = staggered || styleOf(rival) !== 'melee'
+        && (ra && ra.t > ra.windup + ra.active || rival.charges < 1 || rival.readyAt > duel.time + .25);
+      if (opening) {
+        f.nextClose = duel.time + 2;
+        const lead = d / (moves[f.move].distance / moves[f.move].time) * 1.2;
+        return void startDash(duel, f, Math.atan2(rival.y + rival.vy * lead - f.y, rival.x + rival.vx * lead - f.x), 'close');
+      }
     }
     // Melee: burst across the gap at a shooter, otherwise walk in.
     if (free && f.charges > (styleOf(rival) === 'melee' ? 1 : 0) && duel.time >= f.nextClose && d > 3.4 && d < 8 && lineOfSight(f, rival, .5)

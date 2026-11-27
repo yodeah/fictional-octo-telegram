@@ -97,6 +97,7 @@
     if (e.type === 'hit' && e.damage) log(`${by} hits ${who} for ${e.damage}${e.rear ? ' from behind' : e.critical ? ', a critical blow' : ''}.`);
     else if (e.type === 'block') log(`${who} ${e.perfect ? 'times a perfect block' : 'blocks'}.`);
     else if (e.type === 'swap') log(`${who} switches to the ${weapons[e.weapon].name.toLowerCase()}.`);
+    else if (e.type === 'dodge') log(`${who} dodges the shot.`);
     else if (e.type === 'dashstrike') log(`${who} dash-strikes.`);
     else if (e.type === 'blink' || e.type === 'roll') log(`${who} ${e.type}s away.`);
     else if (e.type === 'stagger') log(`${who} staggers.`);

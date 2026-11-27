@@ -1300,6 +1300,8 @@
         jolt(.25);
       }
       if (e.shape === 'nova') rings.push({ x: who.x, y: who.y, z: .5, r: .4, to: e.reach, age: 0, life: .35, color: '#d7c2ff' });
+    } else if (e.type === 'dodge') {
+      floater(who, 'DODGE', '#c8f5ff', .55);
     } else if (e.type === 'swap') {
       floater(who, weapons[e.weapon].name.toUpperCase(), '#d9f4e8', .62);
     } else if (e.type === 'dashstrike') {
