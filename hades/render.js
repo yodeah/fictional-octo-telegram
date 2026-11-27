@@ -68,12 +68,7 @@
     }
     cavern(g);
     const rx = arena.a + .75, ry = (arena.b + .75) * K;
-    // Platform side, then top.
-    for (let i = 10; i >= 1; i--) {
-      ellipsePath(g, 0, i * .11, rx, ry);
-      g.fillStyle = i > 8 ? '#06151b' : i % 4 === 0 ? '#16363b' : '#1d4447';
-      g.fill();
-    }
+    platformWall(g, rx, ry);
     ellipsePath(g, 0, 0, rx, ry);
     g.fillStyle = '#2d6a63';
     g.fill();
@@ -95,20 +90,102 @@
     g.fillStyle = light;
     g.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
     g.restore();
-    // Gold rim with studs.
-    ellipsePath(g, 0, 0, rx - .06, ry - .04);
-    g.strokeStyle = ink;
-    g.lineWidth = .24;
-    g.stroke();
-    g.strokeStyle = '#a9803c';
-    g.lineWidth = .12;
-    g.stroke();
-    for (let i = 0; i < 36; i++) {
-      const a = i / 36 * Math.PI * 2;
-      blob(g, Math.cos(a) * (rx - .06), Math.sin(a) * (ry - .04), .13, ink);
-      blob(g, Math.cos(a) * (rx - .06), Math.sin(a) * (ry - .04) - .02, .08, '#e9c36c');
-    }
+    platformRim(g, rx, ry);
     surroundings(g, r, rx, ry);
+  }
+
+  // The drop below the floor: a lit stone wall with arched niches, falling into shadow.
+  function platformWall(g, rx, ry) {
+    const deep = 1.5;
+    ellipsePath(g, 0, deep + .12, rx + .22, ry + .1);
+    g.fillStyle = 'rgba(0,8,16,.6)';
+    g.fill();
+    const slices = 30;
+    for (let i = slices; i >= 0; i--) {
+      const t = i / slices;
+      ellipsePath(g, 0, t * deep, rx, ry);
+      g.fillStyle = `hsl(${184 + t * 55}, 38%, ${25 - t * 17}%)`;
+      g.fill();
+    }
+    const at = (a, down) => [Math.cos(a) * rx, Math.sin(a) * ry + down];
+    const count = 34;
+    for (let i = 0; i <= count / 2; i++) {
+      const a = i / (count / 2) * Math.PI;
+      // Buttresses between the niches.
+      const [x, y] = at(a, 0);
+      shapeAt(g, [[x - .13, y + .18], [x + .13, y + .18], [x + .09, y + deep * .92], [x - .09, y + deep * .92]], '#2c5c62', .05);
+      g.fillStyle = 'rgba(170,245,225,.22)';
+      g.fillRect(x - .09, y + .22, .05, deep * .6);
+      const mid = a + Math.PI / count;
+      if (mid > Math.PI - .05) continue;
+      const [mx, my] = at(mid, 0);
+      const wide = .26 * Math.max(.3, Math.sin(mid));
+      shapeAt(g, [[mx - wide, my + 1.05], [mx - wide, my + .55], [mx, my + .32], [mx + wide, my + .55], [mx + wide, my + 1.05]], '#061820', .06);
+      const lit = i % 3 === 1;
+      blob(g, mx, my + .72, .24, lit ? 'rgba(255,160,90,.28)' : 'rgba(110,255,220,.18)');
+      blob(g, mx, my + .74, .07, lit ? '#ffc07a' : '#8ff7da');
+    }
+    for (const [down, wide, color] of [[.16, .13, '#8a6a30'], [deep * .94, .1, '#4c4a3a']]) {
+      g.beginPath();
+      g.ellipse(0, down, rx, ry, 0, 0, Math.PI);
+      g.strokeStyle = ink;
+      g.lineWidth = wide + .08;
+      g.stroke();
+      g.strokeStyle = color;
+      g.lineWidth = wide;
+      g.stroke();
+    }
+  }
+
+  // The edge of the floor: a Greek key inlaid in gold, a heavy lip and jeweled bosses.
+  function platformRim(g, rx, ry) {
+    const keys = 58;
+    // u runs around the ring (one key per unit), v from the edge inward.
+    const at = (u, v) => {
+      const a = u / keys * Math.PI * 2;
+      return [Math.cos(a) * (rx - v), Math.sin(a) * (ry - v * K)];
+    };
+    const path = points => {
+      g.beginPath();
+      points.forEach(([u, v], i) => g[i ? 'lineTo' : 'moveTo'](...at(u, v)));
+    };
+    const ring = v => Array.from({ length: keys * 4 + 1 }, (_, i) => [i / 4, v]);
+    g.lineJoin = 'round';
+    path([...ring(.12), ...ring(.72).reverse()]);
+    g.closePath();
+    g.fillStyle = 'rgba(8,26,34,.82)';
+    g.fill();
+    for (const v of [.2, .66]) {
+      path(ring(v));
+      g.strokeStyle = 'rgba(201,164,84,.85)';
+      g.lineWidth = .045;
+      g.stroke();
+    }
+    for (let i = 0; i < keys; i++) {
+      path([[i, .58], [i, .28], [i + .76, .28], [i + .76, .5], [i + .26, .5], [i + .26, .39], [i + .5, .39]]);
+      g.strokeStyle = '#d2ab58';
+      g.lineWidth = .055;
+      g.stroke();
+      path([[i, .58], [i + 1, .58]]);
+      g.stroke();
+    }
+    ellipsePath(g, 0, 0, rx - .06, ry - .04);
+    for (const [wide, color] of [[.32, ink], [.2, '#8f6c2e'], [.07, '#f0cf7e']]) {
+      g.strokeStyle = color;
+      g.lineWidth = wide;
+      g.stroke();
+    }
+    for (let i = 0; i < 24; i++) {
+      const [x, y] = at(i / 24 * keys, .06);
+      const big = i % 3 === 0, size = big ? .27 : .15;
+      blob(g, x, y, size, ink);
+      blob(g, x, y - .02, size * .74, '#c79c48');
+      blob(g, x - size * .18, y - size * .22, size * .22, '#ffeaa8');
+      if (!big) continue;
+      blob(g, x, y - .02, size * .42, ink);
+      blob(g, x, y - .02, size * .32, i % 6 ? '#6ff0cd' : '#ff6a7c');
+      blob(g, x - .03, y - .06, size * .1, '#ffffff');
+    }
   }
 
   // The far side of the cavern, painted back to front: each layer nearer, darker and sharper.
