@@ -27,7 +27,30 @@
 
   const makeCanvas = () => document.createElement('canvas');
   const work = makeCanvas(), mask = makeCanvas(), solid = makeCanvas();
-  const g = work.getContext('2d'), m = mask.getContext('2d'), s = solid.getContext('2d');
+  const m = mask.getContext('2d'), s = solid.getContext('2d');
+  const paint = work.getContext('2d');
+  let g = paint;
+  // Thin gear (the bow) is drawn a second time, as a bare silhouette, into a mask that keeps the
+  // shadow crescent off it and softens the rim there, so its own light and dark faces survive.
+  const keep = makeCanvas(), kp = keep.getContext('2d');
+  let keptAny = false, masking = false;
+  function kept(draw) {
+    draw();
+    if (!keptAny) {
+      // The mask only grows, so most bakes neither resize nor clear it.
+      const w = work.width, h = work.height;
+      if (keep.width < w || keep.height < h) { keep.width = Math.max(keep.width, w); keep.height = Math.max(keep.height, h); }
+      else kp.clearRect(0, 0, w, h);
+    }
+    const queued = lights.length;
+    g = kp;
+    masking = true;
+    draw();
+    masking = false;
+    g = paint;
+    lights.length = queued;
+    keptAny = true;
+  }
 
   const mix = (a, b, t) => a + (b - a) * t;
   const ease = t => t * t * (3 - 2 * t);
@@ -168,7 +191,7 @@
     j.side = vector(-Math.sin(p.yaw), Math.cos(p.yaw), 0);
     const twoHanded = ['maul', 'greatsword', 'spear', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
     j.handL = spec.shield ? P(shift + .4 - p.droop * .14 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3 - p.droop * .08, 1.04 + chestUp - p.crouch + p.bob - p.droop * .3)
-      : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (['crossbow', 'bow', 'recurve'].includes(spec.weapon) ? .42 : .26)))
+      : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (spec.weapon === 'recurve' ? BRACE : ['crossbow', 'bow'].includes(spec.weapon) ? .42 : .26)))
         : P(shift + .12 - st * .3 + p.swing * .1, -.48, .9 + tall * .6 + p.bob + (anim === 'run' ? .1 : 0));
     j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(-.14, -.2, -.1));
     j.elbowR = add(lerp(j.shoulderR, j.handR, .5), vector(-.14, .2, -.1));
@@ -176,10 +199,12 @@
     if (fine && spec.weapon === 'recurve' && !['dead', 'stun', 'dash', 'hurt'].includes(anim)) {
       // At rest the archer holds the bow low in front, arrow nocked and string hand on it. A shot
       // raises the bow to the target in the first part of the windup, turns the shoulders side-on
-      // and draws the string back to the cheek; after the release the bow settles low again.
+      // and draws the string back to the cheek. On the release the string hand flies back past the
+      // ear; in the first half of the recovery it comes back to the string, then a fresh arrow is
+      // nocked as the bow settles low again.
       const running = anim === 'run', shooting = shape === 'bolt';
       const raise = !shooting ? 0 : anim === 'windup' ? ease(Math.min(1, t / .45)) : anim === 'active' ? 1 : 1 - ease(t);
-      const twist = running ? .55 : mix(.7, .95, raise), sideways = Math.sin(twist) * .34, across = Math.cos(twist) * .34;
+      const twist = running ? .55 : mix(.7, 1.05, raise), sideways = Math.sin(twist) * .34, across = Math.cos(twist) * .34;
       const shoulderZ = chestZ + .1;
       j.shoulderL = P(shift + lean * .76 + sideways, -across, shoulderZ);
       j.shoulderR = P(shift + lean * .76 - sideways, across, shoulderZ);
@@ -187,9 +212,14 @@
       const pitch = mix(low, p.pitch * .3, raise);
       j.aim = vector(Math.cos(pitch), 0, Math.sin(pitch));
       j.side = vector(0, 1, 0);
-      const draw = mix(.2, .3 + Math.max(0, p.charge) * .28, raise);
+      let draw = BRACE;
+      if (shooting && anim === 'windup') draw = mix(BRACE, .32 + p.charge * (FULL_DRAW - .32), raise);
+      else if (shooting && anim === 'active') draw = FULL_DRAW + .14 * ease(Math.min(1, t * 2.5));
+      else if (shooting && anim === 'recover' && t < .5) { draw = mix(FULL_DRAW + .14, BRACE, ease(t / .5)); p.charge = -.01; }
       p.draw = draw;
-      j.handL = add(j.shoulderL, j.aim.map(v => v * mix(.5, .62, raise)));
+      // Aimed, the arrow runs from the cheek to the bow hand, so full draw brings the string to the jaw.
+      const cheek = P(shift + lean * 1.02 + .13, .07, chestZ + .3);
+      j.handL = lerp(add(j.shoulderL, j.aim.map(v => v * .5)), add(cheek, j.aim.map(v => v * FULL_DRAW)), raise);
       j.handR = add(j.handL, j.aim.map(v => -v * draw));
       j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(-.05, -.14, -.06));
       drawHint = add(lerp(j.shoulderR, j.handR, .5), raise > .3 ? vector(-.25, .3, .06) : vector(-.05, .25, -.12));
@@ -725,6 +755,34 @@
     return u.map(v => v / size * (u[2] < 0 ? -1 : 1));
   }
 
+  // The bow's own frame: A along the shot, U along the limbs, L across them. The bow is rolled
+  // around the arrow so its plane turns toward the high camera: canted when the shot runs toward
+  // or away from the camera, leaning back a little when it crosses the screen, and never edge-on.
+  // Lengths in bow units (the aim vector's length): brace height, full draw to the cheek, arrow.
+  const CANT = .75, BRACE = .2, FULL_DRAW = .7, ARROW = .82;
+  const CAM = [0, Z / Math.hypot(Z, K), K / Math.hypot(Z, K)];   // toward the camera
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  function bowAxes(aim, side, cant = CANT) {
+    const s = Math.hypot(...aim) || 1;
+    const A = aim.map(v => v / s);
+    const up = upOf(aim, side);
+    const d = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    // Limbs at right angles to both the arrow and the line of sight show the bow's full face.
+    let face = cross(A, CAM);
+    const size = Math.hypot(...face);
+    let U = up;
+    if (cant && size > 1e-3) {
+      face = face.map(v => v / size);
+      // Keep the top limb up; if that's a tie, cant it toward the drawing hand.
+      if (d(face, up) + .3 * d(face, side) / (Math.hypot(...side) || 1) < 0) face = face.map(v => -v);
+      const k = cant * Math.min(1, size / .35);
+      U = up.map((v, i) => v + face[i] * k);
+      const l = Math.hypot(...U);
+      U = U.map(v => v / l);
+    }
+    return { A, s, U, L: cross(A, U) };
+  }
+
   const championGear = {
     gladius(al, aim, side, look) {
       // A short, broad stabbing blade with a ball pommel and an oval guard.
@@ -769,77 +827,210 @@
       fine([al(-.08), al(.04)], look.light, .02);
     },
     recurve(al, aim, side, look, charge) {
-      // A horn-and-sinew composite recurve. Each limb is one tapered curve: it sweeps back toward
-      // the archer, then the stiff bone ear kicks forward. Dark sinew on the back, pale horn on the
-      // belly, a leather grip with bronze caps. The string hand is at the nock (this weapon's hand),
-      // the grip is the draw length ahead of it; drawing bends the limbs further back.
-      const state = typeof charge === 'object' ? charge : { draw: .3 + Math.max(0, charge) * .28, charge };
-      const loosed = state.charge < 0;
-      const pull = Math.max(0, state.charge);
-      const draw = state.draw, flex = pull * .09;
-      const up = upOf(aim, side);
+      // A horn-and-sinew composite recurve, designed as a side profile first: a thick wrapped grip,
+      // working limbs that sweep back toward the archer to the string bridges, and stiff bone ears
+      // that flick forward again. The profile is mapped onto the bow plane, canted, and each limb is
+      // drawn as a solid strip with faces: dark sinew back, pale horn belly, laminated sides.
+      // The string hand is at the nock (this weapon's hand) and the grip is `draw` ahead of it.
+      const state = typeof charge === 'object' ? charge : { draw: BRACE, charge };
+      const loosed = state.charge < 0 || state.stowed;
+      const { A, U, L, s } = bowAxes(aim, side, state.stowed ? 0 : CANT);
+      const draw = state.draw, brace = BRACE * s;
+      const f = loosed ? 0 : clamp01((draw - BRACE) / (FULL_DRAW - BRACE));
       const grip = al(draw);
-      const at = (forward, high) => grip.map((v, i) => v + aim[i] * forward + up[i] * high);
-      // Centre line of one limb at s (0 grip, 1 tip), in bow units.
-      const curveAt = (s, sign) => {
-        const bow = s < .78 ? -(.13 + flex) * Math.sin(Math.PI * s / .78) * (1 - s * .35) : 0;
-        const ear = s > .7 ? (.15 - flex * .6) * ((s - .7) / .3) ** 1.6 : 0;
-        return at(bow + ear, sign * (.08 + s * .78));
-      };
-      const N = 14;
-      for (const sign of [1, -1]) {
-        const centre = Array.from({ length: N + 1 }, (_, i) => curveAt(i / N, sign));
-        const screen = centre.map(v => [px(v), py(v)]);
-        const width = i => (.075 - .045 * (i / N)) * res / 2;
-        const edges = (scale, shift) => {
-          const left = [], right = [];
-          screen.forEach(([x, y], i) => {
-            const [ax, ay] = screen[Math.max(0, i - 1)], [bx, by] = screen[Math.min(N, i + 1)];
-            const l = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / l, ny = (bx - ax) / l;
-            const w = width(i) * scale, o = width(i) * shift;
-            left.push([x + nx * (w + o), y + ny * (w + o)]);
-            right.push([x - nx * (w - o), y - ny * (w - o)]);
-          });
-          return [...left, ...right.reverse()];
-        };
-        const fill = (points, color, line) => {
-          g.beginPath();
-          points.forEach((point, i) => g[i ? 'lineTo' : 'moveTo'](...point));
-          g.closePath();
-          if (line) { g.strokeStyle = ink; g.lineWidth = res * line; g.lineJoin = 'round'; g.stroke(); }
-          g.fillStyle = color;
-          g.fill();
-        };
-        fill(edges(1, 0), '#3b2117', .03);
-        // The horn belly: a pale strip on the string side of the limb, stopping at the ear.
-        const belly = edges(.45, -.4);
-        const keep = Math.round(N * .74);
-        fill([...belly.slice(0, keep), ...belly.slice(belly.length - keep)], '#d7b483');
-        // The bone ear and a bronze collar where it joins the limb.
-        g.strokeStyle = '#efe4cc';
-        g.lineWidth = res * .03;
-        g.lineCap = 'round';
-        g.beginPath();
-        screen.slice(Math.round(N * .76)).forEach((point, i) => g[i ? 'lineTo' : 'moveTo'](...point));
-        g.stroke();
-        disc(centre[Math.round(N * .74)], .026, '#cf963c', .01);
-        stroke(centre.slice(1, Math.round(N * .7)), .008, '#8a5634');
+      const at = (x, y) => grip.map((v, i) => v + A[i] * x + U[i] * y);
+      const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      const scaled = (v, k) => v.map(x => x * k);
+      const toward = (a, ...terms) => terms.reduce((p, [v, k]) => p.map((x, i) => x + v[i] * k), a);
+      const minPx = (w, px) => Math.max(w, px / res);
+
+      // Side profile of the upper limb in world units: x toward the target, y along the limb axis.
+      const gh = .1, ear = .25;
+      const bridge = [mix(.03 - brace, -.1 - brace, f), mix(.66, .55, f)];
+      const back = mix(.72, 1.1, f), flick = mix(.5, .06, f);
+      const T3 = [-Math.sin(back), Math.cos(back)], E = [Math.sin(flick), Math.cos(flick)];
+      const P1 = [0, gh + (bridge[1] - gh) * .38], P2 = [bridge[0] - T3[0] * .16, bridge[1] - T3[1] * .16];
+      const bez = (u, a, b, c, d) => [0, 1].map(k => (1 - u) ** 3 * a[k] + 3 * (1 - u) ** 2 * u * b[k] + 3 * (1 - u) * u * u * c[k] + u ** 3 * d[k]);
+      const profile = [{ p: [0, 0], t: .11, w: .078, kind: 'grip' }, { p: [0, gh], t: .11, w: .078, kind: 'grip' }];
+      for (let i = 1; i <= 8; i++) {
+        const u = i / 8;
+        profile.push({ p: bez(u, [0, gh], P1, P2, bridge), t: mix(.086, .05, u), w: mix(.076, .048, u), kind: 'limb' });
       }
-      const tipTop = curveAt(1, 1), tipBottom = curveAt(1, -1);
-      const nock = al(0);
-      stroke([tipTop, nock, tipBottom], .012, '#f6ecd2');
-      // Grip: wrapped leather between two bronze caps, with an arrow rest.
-      taper(at(-.01, -.12), at(-.01, .12), .1, .1, '#2a160e');
-      for (const h of [-.06, 0, .06]) stroke([at(-.03, h - .025), at(.01, h + .025)], .01, '#6b4128');
-      for (const h of [-.12, .12]) disc(at(-.01, h), .036, '#cf963c', .01);
-      if (loosed) return;
-      // The nocked arrow: shaft from the string past the grip, fletching at the nock, broadhead.
-      const tip = add(nock, aim.map(x => x * (draw + .5)));
-      taper(nock, tip, .028, .026, '#d6b27a');
-      for (const s of [1, -1]) poly([add(nock, aim.map(x => x * .03)), add(add(nock, aim.map(x => x * .17)), up.map(x => x * .006 * s)),
-        add(add(nock, aim.map(x => x * .02)), up.map(x => x * .07 * s))], s > 0 ? '#c83b3b' : '#f2ead8', .01);
-      poly([add(tip, up.map(x => x * -.05)), add(tip, aim.map(x => x * .14)), add(tip, up.map(x => x * .05)), add(tip, aim.map(x => x * .03))], metal.steel, .012);
-      if (pull > .5) shine(add(tip, aim.map(x => x * .06)), .14 + pull * .16, `rgba(${look.glow},${.4 + pull * .4})`);
+      const knee = [bridge[0] + T3[0] * .045, bridge[1] + T3[1] * .045];
+      const end = [knee[0] + E[0] * (ear - .045), knee[1] + E[1] * (ear - .045)];
+      for (let i = 1; i <= 4; i++) {
+        const u = i / 4;
+        const q = [0, 1].map(k => (1 - u) ** 2 * bridge[k] + 2 * (1 - u) * u * knee[k] + u * u * end[k]);
+        profile.push({ p: q, t: mix(.054, .044, u), w: mix(.044, .036, u), kind: 'ear' });
+      }
+      const n = profile.length - 1, bridgeAt = n - 4;
+
+      const colors = {
+        grip: { back: '#3f2417', belly: '#3f2417', side: '#2e1a10', sideBack: '#2e1a10' },
+        limb: { back: '#4b2416', belly: '#e9c992', side: '#d6ac72', sideBack: '#3a1c11' },
+        ear: { back: '#d9c59b', belly: '#f1e4c6', side: '#e4d3ad', sideBack: '#e4d3ad' }
+      };
+      const limbs = [1, -1].map(sign => {
+        const C = [], N = [], T = [], wide = [], deep = [];
+        profile.forEach((sample, i) => {
+          const a = profile[Math.max(0, i - 1)].p, b = profile[Math.min(n, i + 1)].p;
+          const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, tx = (b[0] - a[0]) / l, ty = (b[1] - a[1]) / l;
+          C.push(at(sample.p[0], sample.p[1] * sign));
+          T.push(toward([0, 0, 0], [A, tx], [U, ty * sign]));
+          N.push(toward([0, 0, 0], [A, ty], [U, -tx * sign]));
+          deep.push(minPx(sample.t, 3.2) / 2);
+          wide.push(minPx(sample.w, 2.6) / 2);
+        });
+        // Each face is a strip: [normal at sample i, edge point at sample i on side a = -1 or 1].
+        const faces = [
+          { key: 'back', normal: i => N[i], edge: (i, a) => toward(C[i], [N[i], deep[i]], [L, a * wide[i]]) },
+          { key: 'belly', normal: i => scaled(N[i], -1), edge: (i, a) => toward(C[i], [N[i], -deep[i]], [L, a * wide[i]]) },
+          { key: 'side', normal: () => L, edge: (i, a) => toward(C[i], [L, wide[i]], [N[i], a * deep[i]]), split: 1 },
+          { key: 'side', normal: () => scaled(L, -1), edge: (i, a) => toward(C[i], [L, -wide[i]], [N[i], a * deep[i]]), split: -1 }
+        ];
+        const runs = [];
+        for (const face of faces) {
+          let from = null;
+          for (let i = 0; i <= n; i++) {
+            const open = i < n && dot(add(face.normal(i), face.normal(i + 1)), CAM) > 0;
+            const kind = i < n ? profile[i + 1].kind : null;
+            if (from !== null && (!open || kind !== profile[from + 1].kind)) {
+              runs.push({ face, from, to: i, kind: profile[from + 1].kind });
+              from = null;
+            }
+            if (open && from === null) from = i;
+          }
+        }
+        return { sign, C, N, T, wide, deep, runs, faces };
+      });
+      const strip = (face, from, to, a0 = -1, a1 = 1) => {
+        const points = [];
+        for (let i = from; i <= to; i++) points.push(face.edge(i, a0));
+        for (let i = to; i >= from; i--) points.push(face.edge(i, a1));
+        return points;
+      };
+      const path = points => { g.beginPath(); points.forEach((v, i) => g[i ? 'lineTo' : 'moveTo'](px(v), py(v))); g.closePath(); };
+      // Where the limb's silhouette reaches across the screen at sample i: a band from edge to edge.
+      const across = (limb, i) => {
+        const tx = px(limb.T[i]) - px([0, 0, 0]), ty = py(limb.T[i]) - py([0, 0, 0]);
+        const l = Math.hypot(tx, ty) || 1, nx = -ty / l, ny = tx / l;
+        let lo = null, hi = null;
+        for (const a of [-1, 1]) for (const b of [-1, 1]) {
+          const v = toward(limb.C[i], [limb.N[i], a * limb.deep[i]], [L, b * limb.wide[i]]);
+          const d = (px(v) - px(limb.C[i])) * nx + (py(v) - py(limb.C[i])) * ny;
+          if (!lo || d < lo.d) lo = { d, v };
+          if (!hi || d > hi.d) hi = { d, v };
+        }
+        return [lo.v, hi.v];
+      };
+
+      const drawLimbs = () => {
+        if (masking) {
+          g.fillStyle = '#000';
+          for (const limb of limbs) for (const run of limb.runs) { path(strip(run.face, run.from, run.to)); g.fill(); }
+          return;
+        }
+        // Ink under every face first, then the faces, so the strip reads as one solid piece.
+        g.strokeStyle = ink;
+        g.lineWidth = res * (lw + .012);
+        g.lineJoin = 'round';
+        for (const limb of limbs) for (const run of limb.runs) { path(strip(run.face, run.from, run.to)); g.stroke(); }
+        for (const limb of limbs) for (const run of limb.runs) {
+          const palette = colors[run.kind];
+          path(strip(run.face, run.from, run.to));
+          g.fillStyle = palette[run.face.key];
+          g.fill();
+          if (run.face.split && run.kind === 'limb') {
+            // The laminate seen from the side: horn toward the string, sinew toward the target.
+            path(strip(run.face, run.from, run.to, .1, 1));
+            g.fillStyle = palette.sideBack;
+            g.fill();
+          }
+        }
+        for (const limb of limbs) {
+          // Gold inlay down the sinew back, a shine down the horn belly.
+          for (const run of limb.runs) {
+            if (run.kind !== 'limb') continue;
+            const centre = [];
+            for (let i = run.from; i <= run.to; i++) {
+              if (run.face.key === 'back') centre.push(toward(limb.C[i], [limb.N[i], limb.deep[i]]));
+              else if (run.face.key === 'belly') centre.push(toward(limb.C[i], [limb.N[i], -limb.deep[i]], [L, limb.wide[i] * .25]));
+              else centre.push(toward(limb.C[i], [L, run.face.split * limb.wide[i]], [limb.N[i], -limb.deep[i] * .5]));
+            }
+            stroke(centre, minPx(.013, 1), run.face.key === 'back' ? '#d6a04a' : '#fff1d2');
+          }
+          // Bronze collars where the grip fades into the limbs, a bone string bridge at the knee,
+          // a dark sinew binding where the ear is set into the limb, and a nock knob at the tip.
+          const [c0, c1] = across(limb, 1);
+          taper(c0, c1, minPx(.034, 1.6), minPx(.034, 1.6), '#cf963c', .01);
+          const [b0, b1] = across(limb, bridgeAt + 1);
+          taper(b0, b1, minPx(.026, 1.3), minPx(.026, 1.3), '#24120b', false);
+          disc(toward(limb.C[bridgeAt], [limb.N[bridgeAt], -limb.deep[bridgeAt] * .8]), minPx(.018, 1.2), '#f4ead2', .01);
+          disc(toward(limb.C[n], [limb.T[n], -.006]), minPx(.025, 1.5), '#f4ead2', .01);
+        }
+        // Leather wrap across the grip.
+        const [w0, w1] = across(limbs[0], 0);
+        for (const h of [-.07, -.025, .025, .07]) stroke([toward(w0, [U, h - .012]), toward(w1, [U, h + .012])], minPx(.012, 1), '#8a5634');
+      };
+
+      // The string: from each tip, over the bridge while it still rests on the ear, to the nock.
+      // Loosed (or stowed), it snaps straight at brace height and the arrow is gone.
+      const nock = loosed ? at(-brace, 0) : al(0);
+      const drawString = () => {
+        const points = [];
+        for (const limb of limbs) {
+          const tip = toward(limb.C[n], [limb.N[n], -limb.deep[n]]);
+          const rest = toward(limb.C[bridgeAt], [limb.N[bridgeAt], -limb.deep[bridgeAt]]);
+          const y = (v) => dot(sub(v, grip), U) * limb.sign, x = v => dot(sub(v, grip), A);
+          const line = x(nock) + (x(tip) - x(nock)) * (y(rest) - y(nock)) / ((y(tip) - y(nock)) || 1);
+          points.push(x(rest) < line - .004 ? [tip, rest] : [tip]);
+        }
+        const route = [...points[0], nock, ...points[1].reverse()];
+        const width = minPx(.018, 1.25);
+        stroke(route, width + minPx(.016, 1), ink);
+        if (!masking) stroke(route, width, '#fff6e2');
+      };
+
+      // The arrow keeps its length, so it visibly slides back through the bow as the string comes
+      // to the cheek: shaft, two-colored fletching at the nock and a steel broadhead past the grip.
+      const arrow = loosed ? null : (() => {
+        const tip = add(nock, scaled(A, ARROW * s));
+        const screen = v => [px(v) - px([0, 0, 0]), py(v) - py([0, 0, 0])];
+        const [ax, ay] = screen(A);
+        const wing = [U, L].map(v => { const [vx, vy] = screen(v); return { v, d: Math.abs(ax * vy - ay * vx) }; })
+          .sort((a, b) => b.d - a.d)[0].v;
+        const shaft = minPx(.032, 1.8);
+        return {
+          rear() {
+            taper(add(nock, scaled(A, .01)), grip, shaft, shaft, '#c8975c', .012);
+            for (const k of [1, -1]) poly([toward(nock, [A, .04]), toward(nock, [A, .25]), toward(nock, [A, .21], [wing, k * .045]),
+              toward(nock, [A, .06], [wing, k * .065])], k > 0 ? '#c83b3b' : '#f2ead8', .01);
+            disc(nock, minPx(.02, 1.3), '#2a160e', false);
+          },
+          front() {
+            taper(grip, toward(tip, [A, -.15]), shaft, shaft, '#c8975c', .012);
+            taper(toward(tip, [A, -.2]), toward(tip, [A, -.13]), shaft * 1.3, shaft * 1.2, '#3c2a20', .01);
+            poly([toward(tip, [A, -.16], [wing, .018]), toward(tip, [A, -.08], [wing, .062]), tip,
+              toward(tip, [A, -.08], [wing, -.062]), toward(tip, [A, -.16], [wing, -.018])], '#e3eef2', .012);
+            fine([toward(tip, [A, -.15]), toward(tip, [A, -.02])], '#5c7080', minPx(.012, .9));
+            const pull = Math.max(0, state.charge);
+            if (pull > .5) shine(toward(tip, [A, -.04]), .14 + pull * .16, `rgba(${look.glow},${.4 + pull * .4})`);
+          }
+        };
+      })();
+
+      // Paint back to front: the string side is nearer the camera when the archer faces away.
+      if (dot(A, CAM) > 0) {
+        drawString();
+        if (arrow) arrow.rear();
+        drawLimbs();
+        if (arrow) arrow.front();
+      } else {
+        if (arrow) arrow.front();
+        drawLimbs();
+        drawString();
+        if (arrow) arrow.rear();
+      }
     }
   };
 
@@ -1175,6 +1366,13 @@
 
     // The spare weapon and Cassian's quiver ride on the back or hip.
     part(P(-.42, 0, 1.1), () => {
+      if (spec.spare === 'recurve') {
+        // Strapped flat across the back, strung but empty, upper limb over the left shoulder, so
+        // from behind it shows its full profile; the quiver crosses over it.
+        const aim = vector(0, .9, .42);
+        kept(() => weapon('recurve', add(P(lean * .5 - .36, -.02, chestZ - .1), aim.map(v => -v * BRACE)), aim, vector(-1, 0, 0), look,
+          { draw: BRACE, charge: -1, stowed: true }));
+      }
       if (!varro) {
         const top = P(lean * .6 - .34, .2, chestZ + .16), bottom = P(-.32, -.14, hipZ);
         // Arrows fan out of the mouth, each with a two-colored fletching.
@@ -1196,8 +1394,6 @@
           const grip = P(lean * .5 - .3 - s * .04, -s * .17, hipZ + .12);
           weapon('pilum', grip, vector(-.22 - s * .12, s * .45, .86).map(v => v * .68), vector(0, .9, -.4), look, 0);
         }
-      } else if (spec.spare === 'recurve') {
-        weapon('recurve', P(lean * .6 - .68, .02, chestZ - .1), vector(.15, -.2, -.3).map(v => v * 1.3), vector(0, .1, 1), look, 0);
       }
     });
     if (spec.spare === 'gladius' || spec.spare === 'sica') {
@@ -1399,9 +1595,10 @@
 
     part(j.head, () => (varro ? murmilloHead : archerHead)(r, look, c, facing), .16);
     if (!p.thrown) part(lerp(j.handR, add(j.handR, j.aim), .45), () => {
-      weapon(spec.weapon, j.handR, j.aim, j.side, look, spec.weapon === 'recurve' && p.draw !== undefined ? { draw: p.draw, charge: p.charge } : p.charge);
+      const held = () => weapon(spec.weapon, j.handR, j.aim, j.side, look, spec.weapon === 'recurve' && p.draw !== undefined ? { draw: p.draw, charge: p.charge } : p.charge);
+      if (spec.weapon === 'recurve') kept(held); else held();
       // Fingers close over the grip, drawn after the weapon so the hand holds it.
-      if (spec.weapon === 'recurve') gripWrap(j.handL, upOf(j.aim, j.side), c.skin, c);
+      if (spec.weapon === 'recurve') gripWrap(j.handL, bowAxes(j.aim, j.side).U, c.skin, c);
       else gripWrap(j.handR, j.aim, varro ? c.skin : c.leather, c);
     }, .13);
     if (spec.shield) part(j.handL, () => scutum(r, spec, look, facing, c), .18);
@@ -1500,6 +1697,10 @@
       add(j.handR, j.aim.map(v => v * weaponLength[spec.weapon])), add(j.handR, j.aim.map(v => v * -.9)),
       r.P(-.55 - r.p.sway * 1.15, 0, .1), r.P(-.5 - r.p.sway, .5, .1), r.P(-.5 - r.p.sway, -.5, .1),
       r.P(.45, .55, .05), r.P(.45, -.55, .05), r.P(-.4, .55, 1.5), r.P(-.4, -.55, 1.5), add(r.j.head, [0, 0, .75])];
+    if (spec.weapon === 'recurve') {
+      const grip = add(j.handR, j.aim.map(v => v * (r.p.draw ?? BRACE))), { U } = bowAxes(j.aim, j.side);
+      points.push(add(grip, U.map(v => v * .95)), add(grip, U.map(v => v * -.95)));
+    }
     let left = 0, right = 0, top = 0, bottom = 0;
     for (const v of points) {
       const x = v[0], y = v[1] * K - v[2] * Z;
@@ -1527,6 +1728,16 @@
     m.fillRect(0, 0, w, h);
   }
 
+  // Takes the kept gear out of the current crescent, fully or in part.
+  function unshade(amount) {
+    if (!keptAny) return;
+    m.globalCompositeOperation = 'destination-out';
+    m.globalAlpha = amount;
+    m.drawImage(keep, 0, 0);
+    m.globalAlpha = 1;
+    m.globalCompositeOperation = 'source-over';
+  }
+
   function bake(spec, direction, anim, shape, t) {
     const start = performance.now();
     const facing = direction / DIRECTIONS * Math.PI * 2;
@@ -1536,6 +1747,7 @@
     ox = -box.left * res;
     oy = -box.top * res;
     fit(work, g, w, h);
+    keptAny = false;
     lights = [];
     const fineInk = isChampion(spec.kit);
     lw = fineInk ? .02 : .028;
@@ -1547,6 +1759,7 @@
     const d = Math.max(2, Math.round(res * .085));
     g.globalCompositeOperation = 'source-atop';
     crescent(w, h, -d, -d, 'rgba(18,4,38,.55)');
+    unshade(1);
     g.drawImage(mask, 0, 0);
     const down = g.createLinearGradient(0, 0, 0, h);
     down.addColorStop(0, 'rgba(255,240,210,.10)');
@@ -1556,6 +1769,7 @@
     g.fillRect(0, 0, w, h);
     const rim = Math.max(1.5, res * .034);
     crescent(w, h, rim, rim, look.rim);
+    unshade(.55);
     g.drawImage(mask, 0, 0);
     if (spec.frozen) {
       g.fillStyle = 'rgba(165,225,255,.62)';

@@ -1471,12 +1471,22 @@
     ctx.restore();
   }
 
+  // Where each arrow was first seen, so it can leave the bow at the archer's cheek and drop to
+  // chest height over its flight.
+  const launches = new WeakMap();
+
   function drawProjectile(p, duel) {
     const spell = spells[p.spellKey];
     const speed = Math.hypot(p.vx, p.vy), dx = p.vx / speed, dy = p.vy / speed;
     if (!spell && (p.weapon === 'recurve' || p.weapon === 'pilum')) {
       // A real arrow or javelin: shaft, head, fletching or weight, and a hot streak behind it.
-      const javelin = p.weapon === 'pilum', long = javelin ? 1.5 : .9, z = 1.25;
+      const javelin = p.weapon === 'pilum', long = javelin ? 1.5 : 1.1;
+      let z = 1.25;
+      if (!javelin) {
+        if (!launches.has(p)) launches.set(p, [p.x, p.y]);
+        const [x0, y0] = launches.get(p);
+        z = 2.1 - .4 * Math.min(1, Math.hypot(p.x - x0, p.y - y0) / 7);
+      }
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const tail = ctx.createLinearGradient(sx(p.x), sy(p.y, z), sx(p.x - dx * 2.6), sy(p.y - dy * 2.6, z));
@@ -1487,7 +1497,7 @@
       ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(sx(p.x), sy(p.y, z)); ctx.lineTo(sx(p.x - dx * 2.6), sy(p.y - dy * 2.6, z)); ctx.stroke();
       ctx.restore();
-      limb([[p.x - dx * long, p.y - dy * long, z], [p.x - dx * .1, p.y - dy * .1, z]], javelin ? .08 : .055, javelin ? '#7a432c' : '#d6b27a', false);
+      limb([[p.x - dx * long, p.y - dy * long, z], [p.x - dx * .1, p.y - dy * .1, z]], javelin ? .08 : .055, javelin ? '#7a432c' : '#c8975c', false);
       if (javelin) {
         limb([[p.x - dx * .55, p.y - dy * .55, z], [p.x, p.y, z]], .045, '#8497a8', false);
         orb([p.x - dx * .6, p.y - dy * .6, z], .06, '#5c7080', false);
