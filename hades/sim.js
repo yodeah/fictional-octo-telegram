@@ -179,6 +179,18 @@
     if (spell) emit(duel, 'cast', { who: f.index, spell: spellKey });
   }
 
+  // A melee dash that ends beside the rival flows into a quicker, harder blow.
+  function dashStrike(duel, f, rival) {
+    const weapon = weapons[f.kit.weapon];
+    if (helpless(duel, f) || rival.dead || f.energy < weapon.energy * .45
+      || dist(f, rival) > weapon.reach + (weapon.shape === 'slam' ? .6 : .9)) return;
+    startAttack(duel, f, rival);
+    f.action.windup *= .5;
+    f.action.power = 1.2;
+    f.action.name = 'Dash-strike';
+    emit(duel, 'dashstrike', { who: f.index });
+  }
+
   // Whether the attack's current shape covers a body at this spot.
   function covers(f, action, target, pad = radius) {
     const dx = target.x - f.x, dy = target.y - f.y, d = Math.hypot(dx, dy);
@@ -341,7 +353,7 @@
     const bash = action.kind === 'bash', nova = action.kind === 'nova';
     const [dirX, dirY] = unit(rival.x - f.x, rival.y - f.y);
     strike(duel, f, rival, {
-      damage: bash ? 7 * (action.riposte ? 1.5 : 1) : nova ? 6 : weapon.damage * (.7 + .3 * action.fatigue),
+      damage: bash ? 7 * (action.riposte ? 1.5 : 1) : nova ? 6 : weapon.damage * (.7 + .3 * action.fatigue) * (action.power || 1),
       style: nova ? 'magic' : 'melee', stance: bash ? 44 : nova ? 18 : weapon.stance,
       block: bash ? .05 : weapon.block, heavy: !bash && !nova && weapon.heavy, breaks: !bash && !nova && weapon.breaks,
       push: nova ? 1.9 : action.riposte ? 1.7 : bash ? 1.1 : 0, unblockable: nova, dirX, dirY
@@ -552,7 +564,11 @@
     if (f.dash) {
       f.x += f.dash.vx * dt; f.y += f.dash.vy * dt;
       f.vx = f.dash.vx * .2; f.vy = f.dash.vy * .2;
-      if (duel.time >= f.dash.until) f.dash = null;
+      if (duel.time >= f.dash.until) {
+        const kind = f.dash.kind;
+        f.dash = null;
+        if (kind === 'dash') dashStrike(duel, f, rival);
+      }
     } else {
       let wantX = 0, wantY = 0;
       if (!helpless(duel, f) && !rival.dead) {

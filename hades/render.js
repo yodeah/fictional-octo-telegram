@@ -749,6 +749,9 @@
         jolt(.25);
       }
       if (e.shape === 'nova') rings.push({ x: who.x, y: who.y, z: .5, r: .4, to: e.reach, age: 0, life: .35, color: '#d7c2ff' });
+    } else if (e.type === 'dashstrike') {
+      floater(who, 'DASH-STRIKE', looks[e.who].trim, .75);
+      rings.push({ x: who.x, y: who.y, z: .05, r: .3, to: 1.5, age: 0, life: .28, color: looks[e.who].trim });
     } else if (e.type === 'dash' || e.type === 'roll') {
       ghosts.push({ who: e.who, left: moves[e.type].time, next: 0, shots: [] });
       spray(e.from.x, e.from.y, .15, 12, ['#a8e8d8', '#e9fff8'], { dirX: -Math.cos(e.angle), dirY: -Math.sin(e.angle), speed: 2, up: .8, gravity: 1, size: .1, life: .35 });

@@ -15,7 +15,7 @@ open hades.html
 As in the main game, fights are fully idle. Choose a class for each side (or leave **Random**), then watch.
 
 - **Classes:** Duelist, Hoplite, Raider, Breaker, Executioner (melee); Marksman, Skirmisher (ranged); Cryomancer, Stormcaller, Sanguinist, Ember Priest (magic).
-- **Quick movement:** melee **dashes** to close in or sidestep, shooters **roll** away, mages **blink**. Each has limited charges (the pips under the health bar), costs energy and gives a moment of invulnerability. An escape also grants a short burst of speed.
+- **Quick movement:** melee **dashes** to close in or sidestep, shooters **roll** away, mages **blink**. Each has limited charges (the pips under the health bar), costs energy and gives a moment of invulnerability. An escape also grants a short burst of speed. A melee dash that ends beside the rival flows into a **dash-strike**: half the windup, 20% more damage.
 - **Shared with the side-view battler:** HP, mana, energy, stance and stagger, shield blocks, perfect blocks and riposte bashes, shields broken by axes and mauls, the combat triangle (gentler here), spellbooks, crowded shots and blood.
 - **New with a floor to move on:** attacks have a shape (sweep, thrust, slam, bolt) written on the ground during the windup, shields only cover the front, hits from behind are stronger, stone planters block shots, and being knocked into stone staggers.
 - After 45 seconds damage rises steadily, so a cautious bout still ends.

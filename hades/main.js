@@ -93,6 +93,7 @@
     const by = duel.fighters[e.by]?.name;
     if (e.type === 'hit' && e.damage) log(`${by} hits ${who} for ${e.damage}${e.rear ? ' from behind' : e.critical ? ', a critical blow' : ''}.`);
     else if (e.type === 'block') log(`${who} ${e.perfect ? 'times a perfect block' : 'blocks'}.`);
+    else if (e.type === 'dashstrike') log(`${who} dash-strikes.`);
     else if (e.type === 'blink' || e.type === 'roll') log(`${who} ${e.type}s away.`);
     else if (e.type === 'stagger') log(`${who} staggers.`);
     else if (e.type === 'freeze') log(`${who} is frozen.`);
