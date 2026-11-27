@@ -158,3 +158,37 @@ li.empty{color:var(--muted)}
 .bench-text{margin:0 0 6px;font:600 13px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
 .bench-buttons{display:flex;flex-wrap:wrap;gap:6px}
 .bench-buttons button{flex:1;min-height:36px;padding:4px 8px;border:1px solid #e1b48866;background:#271c14;color:#f7d6a4;font-size:14px}
+/* A phone on its side: the scoreboard, arena and controls share exactly one screen, with the
+   combat log below. Page headings make way for the fight. */
+@media(orientation:landscape) and (max-height:500px){
+  .topbar,.intro,.triangle{display:none}
+  main{max-width:none;padding:0}
+  .match{display:flex;flex-direction:column;height:100vh;height:100dvh;border:0}
+  .scoreboard{flex:none;grid-template-columns:1fr 64px 1fr;padding:4px 10px 5px}
+  .scoreboard .fighter{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:8px;align-content:start}
+  .scoreboard .fighter>*{grid-column:1/-1}
+  .scoreboard :is(.mana,.energy,.stance){grid-column:auto;margin-top:2px;gap:4px}
+  .scoreboard :is(.mana,.energy,.stance) span{min-width:0;font-size:11px}
+  .fighter-info{margin-bottom:2px}.fighter h2{font-size:17px}.fighter span{font-size:12px}
+  .versus{grid-column:2;grid-row:1;align-self:start;font-size:13px}
+  .scoreboard .fighter.red{grid-column:1;grid-row:1}.scoreboard .fighter.blue{grid-column:3;grid-row:1}
+  .details-toggle{grid-column:2;grid-row:1;align-self:end;margin:0;min-height:22px;padding:0 4px;font-size:0}
+  .details-toggle::after{content:'Gear';font-size:11px}
+  .details-toggle[aria-expanded="true"]::after{content:'Hide';font-size:11px}
+  .stage{flex:1;min-height:0}
+  canvas{height:100%}
+  .controls{flex:none;flex-wrap:nowrap;gap:5px;padding:4px 8px;overflow-x:auto}
+  .actions,.options{flex-wrap:nowrap;gap:4px}
+  .controls button,.toggle,.quality select{min-height:34px;padding:0 8px;font-size:12px}
+  .controls .primary{min-width:76px}
+  .quality{font-size:0}
+  .stage-status,.stage-action{top:6px;padding:3px 6px;font-size:11px}
+  .stage-status{left:8px}.stage-action{right:8px}
+  .result{top:6px;padding:2px 10px}.result strong{font-size:18px}.result span{font-size:11px}
+  .hitboxes,.venue-control{bottom:5px;padding:2px 6px;font-size:11px}
+  /* With gear and spells open, the panel takes the height it needs and the page scrolls. */
+  .match:has(.scoreboard[data-details="shown"]){height:auto}
+  .match:has(.scoreboard[data-details="shown"]) .stage{flex:none;height:78vh}
+  .scoreboard[data-details="shown"] .fighter{display:block}
+  .scoreboard[data-details="shown"] .details-toggle{align-self:start;margin-top:22px}
+}
