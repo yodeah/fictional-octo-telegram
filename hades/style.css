@@ -1,0 +1,60 @@
+:root { color-scheme: dark; --gold: #d9a84e; --ink: #06141c; }
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(circle at 50% 0, #123b42, #06121a 65%); color: #e8f4ee; min-height: 100vh;
+  font: 14px/1.4 "Avenir Next", "Trebuchet MS", system-ui, sans-serif; }
+main { width: min(1500px, 100%, calc((100vh - 130px) * 1.9)); min-width: min(100%, 700px); margin: 0 auto; padding: 8px 12px 20px; }
+header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font: 700 22px/1.3 "Copperplate", "Cinzel", Georgia, serif; letter-spacing: .08em; color: #ffd98a; }
+h1 small { font: 12px "Avenir Next", sans-serif; color: #7fb8ad; letter-spacing: .02em; }
+header p { margin: 0; color: #9fd0c4; }
+.stage { position: relative; aspect-ratio: 1.9; border: 2px solid var(--gold); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 0 0 4px var(--ink), 0 0 0 5px #6f5428, 0 18px 50px #000a; margin-top: 8px; }
+canvas { display: block; width: 100%; height: 100%; }
+.hud { position: absolute; top: 8px; width: min(290px, 31%); text-shadow: 0 1px 2px #000, 0 0 6px #000; pointer-events: none; }
+.hud.left { left: 10px; }
+.hud.right { right: 10px; text-align: right; }
+.hud h2 { margin: 0 0 2px; font: 700 15px "Copperplate", "Cinzel", Georgia, serif; letter-spacing: .06em; }
+.hud h2 small { color: #ffd98a; font-size: 12px; }
+.hud h2 em { color: #ffb36b; font: italic 12px "Avenir Next", sans-serif; }
+.hud p { margin: 3px 0 0; font-size: 11px; color: #bfe0d6; }
+.bar, .gauge { position: relative; background: #06141cd9; border: 1px solid #000; margin-top: 3px; }
+.bar { height: 19px; border: 2px solid var(--gold); }
+.bar i, .gauge i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--fill); }
+.right .bar i, .right .gauge i { left: auto; right: 0; }
+.bar i { --fill: linear-gradient(#ff7a6a, #b8232f); }
+.right .bar i { --fill: linear-gradient(#7fd0ff, #2462b8); }
+.bar span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 800; }
+.gauge { height: 7px; }
+.mana { --fill: #8d7bff; width: 82%; }
+.energy { --fill: #78dc8c; width: 74%; }
+.stance { --fill: #e8c36a; width: 66%; height: 5px; }
+.right .gauge { margin-left: auto; }
+.pips { display: flex; gap: 4px; margin-top: 5px; min-height: 8px; }
+.right .pips { justify-content: flex-end; }
+.pips i { width: 16px; height: 6px; transform: skewX(-24deg); background: #1d3b3c; border: 1px solid #000; }
+.pips i.ready { background: #d9fff1; box-shadow: 0 0 6px #8fffd8; }
+.banner, .result { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none;
+  font-family: "Copperplate", "Cinzel", Georgia, serif; text-shadow: 0 2px 0 #000, 0 0 18px #000; white-space: nowrap; }
+.banner { bottom: 12%; font-size: clamp(14px, 2.4vw, 28px); letter-spacing: .12em; color: #ffe6ae; animation: banner 2.4s forwards; }
+@keyframes banner { 0% { opacity: 0; letter-spacing: .4em; } 20%, 70% { opacity: 1; letter-spacing: .12em; } 100% { opacity: 0; } }
+.result { top: 36%; animation: rise .5s ease-out; }
+.result span { display: block; font-size: clamp(28px, 6vw, 70px); letter-spacing: .2em; color: #ffd36b; }
+.result strong { font-size: clamp(14px, 2vw, 22px); }
+.result[hidden], .banner[hidden] { display: none; }
+@keyframes rise { from { opacity: 0; margin-top: 24px; } }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+button, select { font: inherit; color: inherit; background: #0d2a31; border: 1px solid #8b6c33; border-radius: 4px; padding: 6px 12px; }
+button { cursor: pointer; }
+button:hover:enabled { background: #16434a; }
+button:disabled, select:disabled { opacity: .45; cursor: default; }
+button.primary { background: linear-gradient(#e6b757, #a7762c); color: #1d1204; font-weight: 800; min-width: 120px; }
+button.primary:hover:enabled { background: linear-gradient(#ffd176, #bd8a37); }
+a { color: #8fd8c8; margin-left: auto; }
+#log { list-style: none; padding: 0; margin: 12px 0 0; max-height: 84px; overflow: auto; color: #8fb4ac; font-size: 12px; }
+@media (max-width: 760px) {
+  main { min-width: 0; width: 100%; padding: 6px; }
+  .stage { aspect-ratio: 1.45; }
+  .hud p, .hud h2 small { display: none; }
+  .hud h2 { font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .banner, .result { animation-duration: .01s; } .banner { display: none; } }

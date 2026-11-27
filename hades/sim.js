@@ -1,0 +1,605 @@
+// The duel itself: movement, quick escapes, attacks, spells, blocking, stance and death.
+// No DOM here. createDuel() returns a state that step() advances; everything the picture needs to
+// react to is pushed to duel.events. A seed makes a bout repeatable.
+(function (root) {
+  const D = typeof module !== 'undefined' ? require('./data.js') : root.HadesData;
+  const { weapons, shields, armors, spells, moves, kits, arena } = D;
+
+  const radius = .46;
+  const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+  const length = (x, y) => Math.hypot(x, y);
+  const unit = (x, y) => { const d = Math.hypot(x, y) || 1; return [x / d, y / d]; };
+  const angleDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+  function seeded(seed) {
+    let s = seed >>> 0;
+    return () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const kitStyle = kit => weapons[kits[kit].weapon].style;
+
+  function createFighter(index, kitKey, name) {
+    const kit = kits[kitKey];
+    const move = moves[kit.move];
+    const x = index ? 6 : -6;
+    return {
+      index, name, kitKey, kit, x, y: 0, vx: 0, vy: 0, facing: index ? Math.PI : 0,
+      hp: kit.hp, maxHP: kit.hp, mana: 70, energy: 100, stance: 0, ward: 0, wardUntil: 0,
+      shieldHits: shields[kit.shield].durability, move: kit.move, charges: move.charges, rechargeAt: 0,
+      action: null, dash: null, readyAt: .5 + index * .12, stunnedUntil: 0, frozenUntil: 0, chilledUntil: 0,
+      hastedUntil: 0, safeUntil: 0, detour: 0, fleetUntil: 0, hinderedUntil: 0, counterUntil: 0, riposte: false, lastStanceHit: -9, lastHurt: -9,
+      cooldowns: {}, novaReady: 0, strafe: index ? 1 : -1, strafeUntil: 0, threatSeen: null, stride: 0, gait: 0,
+      dead: false, dealt: 0, escapes: 0, nextClose: 0
+    };
+  }
+
+  function createDuel(kitA, kitB, seed = Date.now(), names = ['Varro', 'Cassian']) {
+    return {
+      time: 0, seed, random: seeded(seed), winner: null, events: [], projectiles: [], nextId: 1,
+      fighters: [createFighter(0, kitA, names[0]), createFighter(1, kitB, names[1])]
+    };
+  }
+
+  const emit = (duel, type, data) => duel.events.push({ type, time: duel.time, ...data });
+  const other = (duel, f) => duel.fighters[1 - f.index];
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const shieldUp = f => f.shieldHits > 0;
+  const defense = f => 30 + armors[f.kit.armor].defense + (shieldUp(f) ? shields[f.kit.shield].defense : 0);
+  const stanceLimit = f => 59 + defense(f) * .23;
+  const mobility = (duel, f) => armors[f.kit.armor].mobility * (shieldUp(f) ? shields[f.kit.shield].mobility : 1)
+    * (f.hastedUntil > duel.time ? 1.18 : 1) * (f.fleetUntil > duel.time ? 1.25 : 1)
+    * (f.hinderedUntil > duel.time ? .62 : 1) * (f.chilledUntil > duel.time ? .66 : 1);
+  const helpless = (duel, f) => f.dead || f.stunnedUntil > duel.time || f.frozenUntil > duel.time;
+  // Long bouts turn into sudden death so two cautious fighters cannot circle forever.
+  const frenzy = duel => 1 + Math.max(0, duel.time - 45) * .025;
+
+  function lineOfSight(from, to, pad = .12) {
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const len2 = dx * dx + dy * dy || 1;
+    return arena.pillars.every(p => {
+      const t = clamp(((p.x - from.x) * dx + (p.y - from.y) * dy) / len2, 0, 1);
+      return Math.hypot(from.x + dx * t - p.x, from.y + dy * t - p.y) > p.r + pad;
+    });
+  }
+
+  // Keeps a point on the floor and out of pillars. Returns true when it hit the outer wall.
+  function constrain(body, r = radius) {
+    let wall = false;
+    const a = arena.a - r, b = arena.b - r;
+    const d = Math.hypot(body.x / a, body.y / b);
+    if (d > 1) { body.x /= d; body.y /= d; wall = true; }
+    for (const p of arena.pillars) {
+      const gap = Math.hypot(body.x - p.x, body.y - p.y), min = p.r + r;
+      if (gap < min) {
+        const [ux, uy] = unit(body.x - p.x, body.y - p.y);
+        body.x = p.x + ux * min; body.y = p.y + uy * min;
+        wall = true;
+      }
+    }
+    return wall;
+  }
+
+  // How good a spot is to flee to: far from the rival, not pinned against the wall.
+  function escapeScore(x, y, rival) {
+    const spot = { x, y };
+    constrain(spot);
+    const edge = Math.hypot(spot.x / arena.a, spot.y / arena.b);
+    return Math.hypot(spot.x - rival.x, spot.y - rival.y) - Math.max(0, edge - .62) * 7
+      - Math.hypot(spot.x - x, spot.y - y) * .8;
+  }
+
+  function bestHeading(duel, f, rival, reach) {
+    let best = 0, bestScore = -Infinity;
+    for (let i = 0; i < 16; i++) {
+      const angle = i / 16 * Math.PI * 2;
+      const score = escapeScore(f.x + Math.cos(angle) * reach, f.y + Math.sin(angle) * reach, rival) + duel.random() * .8;
+      if (score > bestScore) { bestScore = score; best = angle; }
+    }
+    return best;
+  }
+
+  function startDash(duel, f, angle, purpose) {
+    const move = moves[f.move];
+    if (f.charges < 1 || f.energy < move.energy || f.dash || helpless(duel, f)) return false;
+    if (f.charges === move.charges) f.rechargeAt = duel.time + move.recharge;
+    f.charges--;
+    f.energy -= move.energy;
+    if (purpose !== 'close') f.escapes++;
+    // A dash cancels the fighter's own attack, windup or recovery.
+    f.action = null;
+    const from = { x: f.x, y: f.y };
+    const dx = Math.cos(angle), dy = Math.sin(angle);
+    f.safeUntil = duel.time + move.safe;
+    // Getting away leaves a short burst of speed to open the gap.
+    if (purpose === 'escape') f.fleetUntil = duel.time + 1.1;
+    if (f.move === 'blink') {
+      f.x += dx * move.distance; f.y += dy * move.distance;
+      constrain(f);
+      f.readyAt = Math.max(f.readyAt, duel.time + move.time);
+      emit(duel, 'blink', { who: f.index, from, to: { x: f.x, y: f.y } });
+      return true;
+    }
+    f.dash = { until: duel.time + move.time, vx: dx * move.distance / move.time, vy: dy * move.distance / move.time, kind: f.move };
+    f.facing = angle;
+    emit(duel, f.move, { who: f.index, from, angle });
+    return true;
+  }
+
+  // ---- Attacks ----
+
+  function supportScore(duel, f, spell) {
+    const health = f.hp / f.maxHP;
+    if (spell.heal) return health <= .62 ? 60 : 0;
+    if (spell.absorb) return health <= .8 && !f.ward ? 34 : 0;
+    if (spell.manaRestore) return f.mana <= 26 && health >= .45 ? 45 : 0;
+    if (spell.energyRestore) return f.energy <= 45 && f.hastedUntil <= duel.time ? 30 : 0;
+    return 0;
+  }
+
+  function pickSpell(duel, f, rival) {
+    let best = 'spark', bestScore = spells.spark.damage;
+    for (const key of f.kit.spells) {
+      const spell = spells[key];
+      if (f.mana < spell.cost || duel.time < (f.cooldowns[key] || 0)) continue;
+      const support = supportScore(duel, f, spell);
+      if (!support && !spell.damage) continue;
+      const control = (spell.freeze && rival.frozenUntil <= duel.time ? 14 : 0) + (spell.chill && dist(f, rival) < 5 ? 5 : 0)
+        + (spell.energyDrain && rival.energy > 30 ? 3 : 0) + (spell.lifesteal || 0) * (1 - f.hp / f.maxHP) * 20;
+      const score = support || spell.damage + control + duel.random() * 5;
+      if (score > bestScore) { bestScore = score; best = key; }
+    }
+    return best;
+  }
+
+  function startAttack(duel, f, rival, kind = 'attack') {
+    const weapon = weapons[f.kit.weapon];
+    const spellKey = kind === 'attack' && weapon.style === 'magic' ? pickSpell(duel, f, rival) : null;
+    const spell = spells[spellKey];
+    const bash = kind === 'bash', nova = kind === 'nova';
+    const cost = bash ? 14 : nova ? 8 : weapon.energy;
+    const fatigue = clamp(f.energy / cost, 0, 1);
+    const pace = (f.chilledUntil > duel.time ? 1.3 : 1) * (1.2 - .2 * fatigue);
+    const windup = (bash ? .2 : nova ? .34 : spell ? .46 + (spell.cost > 30 ? .22 : 0) : weapon.windup) * pace;
+    const recover = (bash ? .3 : nova ? .35 : weapon.recover) * pace;
+    if (!spell) f.energy = Math.max(0, f.energy - cost);
+    f.facing = Math.atan2(rival.y - f.y, rival.x - f.x);
+    f.action = {
+      id: duel.nextId++, kind, spellKey, shape: bash ? 'arc' : nova ? 'nova' : spell && !spell.damage ? 'self' : weapon.shape,
+      reach: bash ? 1.6 : nova ? 2.4 : weapon.reach, spread: bash ? 1.2 : weapon.spread, radius: weapon.radius,
+      t: 0, windup, active: .1, recover, hit: false, angle: f.facing, aimed: false, fatigue,
+      riposte: bash && f.riposte && f.counterUntil > duel.time,
+      name: bash ? 'Shield bash' : nova ? 'Arcane burst' : spell ? spell.name : weapon.name
+    };
+    if (bash) { f.riposte = false; f.counterUntil = 0; }
+    if (spell) emit(duel, 'cast', { who: f.index, spell: spellKey });
+  }
+
+  // Whether the attack's current shape covers a body at this spot.
+  function covers(f, action, target, pad = radius) {
+    const dx = target.x - f.x, dy = target.y - f.y, d = Math.hypot(dx, dy);
+    if (action.shape === 'nova') return d <= action.reach + pad;
+    if (action.shape === 'slam') {
+      return Math.hypot(target.x - f.x - Math.cos(action.angle) * action.reach,
+        target.y - f.y - Math.sin(action.angle) * action.reach) <= action.radius + pad * .5;
+    }
+    if (d > action.reach + pad) return false;
+    return d < radius * 1.6 || Math.abs(angleDiff(Math.atan2(dy, dx), action.angle)) <= action.spread / 2 + pad / Math.max(d, 1) * .6;
+  }
+
+  function release(duel, f, action) {
+    const rival = other(duel, f);
+    const weapon = weapons[f.kit.weapon];
+    const spell = spells[action.spellKey];
+    if (spell) {
+      f.mana -= spell.cost;
+      if (spell.cooldown) f.cooldowns[action.spellKey] = duel.time + spell.cooldown;
+    }
+    if (action.shape === 'self') return applySupport(duel, f, spell);
+    if (action.shape === 'bolt') {
+      const speed = spell?.speed || weapon.speed;
+      const jitter = spell ? .025 : weapon.style === 'ranged' ? (dist(f, rival) < 2.6 ? .2 : .05) : .05;
+      const angle = action.angle + (duel.random() - .5) * jitter * 2;
+      duel.projectiles.push({
+        id: duel.nextId++, owner: f.index, x: f.x + Math.cos(angle) * .7, y: f.y + Math.sin(angle) * .7,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: weapon.reach / speed + .25,
+        spellKey: action.spellKey, weapon: f.kit.weapon, fatigue: action.fatigue,
+        homing: spell ? .9 : 0, crowded: !spell && dist(f, rival) < 2.6
+      });
+      emit(duel, 'shoot', { who: f.index, spell: action.spellKey });
+      return;
+    }
+    emit(duel, 'swing', { who: f.index, shape: action.shape, angle: action.angle, reach: action.reach, spread: action.spread, radius: action.radius, heavy: weapon.heavy });
+  }
+
+  function applySupport(duel, f, spell) {
+    let text;
+    if (spell.heal) {
+      const amount = Math.min(Math.round(spell.heal * armors[f.kit.armor].power * 1.2), f.maxHP - f.hp);
+      f.hp += amount;
+      text = '+' + amount;
+    } else if (spell.absorb) {
+      f.ward = Math.round(spell.absorb * 1.3);
+      f.wardUntil = duel.time + spell.duration;
+      f.wardColor = spell.color;
+      text = 'WARDED';
+    } else if (spell.manaRestore) {
+      f.mana = Math.min(100, f.mana + spell.manaRestore);
+      f.hp = Math.max(1, f.hp - spell.hpCost);
+      text = '+MANA';
+    } else {
+      f.energy = Math.min(100, f.energy + spell.energyRestore);
+      f.hastedUntil = duel.time + spell.haste;
+      text = 'TAILWIND';
+    }
+    emit(duel, 'support', { who: f.index, color: spell.color, text, name: spell.name });
+  }
+
+  // ---- Damage ----
+
+  function breakStance(duel, f, duration) {
+    f.stance = 0;
+    f.action = null;
+    f.stunnedUntil = duel.time + duration;
+    f.readyAt = f.stunnedUntil + .08;
+    emit(duel, 'stagger', { who: f.index });
+  }
+
+  function addStance(duel, f, amount) {
+    if (f.stunnedUntil > duel.time || f.dead) return;
+    f.stance += amount;
+    f.lastStanceHit = duel.time;
+    if (f.stance >= stanceLimit(f)) breakStance(duel, f, 1.05);
+  }
+
+  // Resolves one blow. dir is the direction it travels, used for blocking, knockback and blood.
+  function strike(duel, attacker, defender, hit) {
+    if (defender.dead || attacker.dead && !hit.projectile) return 'none';
+    const facingBlow = Math.abs(angleDiff(defender.facing, Math.atan2(-hit.dirY, -hit.dirX))) < 1.25;
+    const guard = shields[defender.kit.shield];
+    const busy = defender.action && (defender.action.t < defender.action.windup + defender.action.active || defender.action.kind !== 'attack');
+    if (shieldUp(defender) && facingBlow && !busy && !defender.dash && !helpless(duel, defender)
+      && defender.energy >= guard.energy && !hit.unblockable && duel.random() < hit.block + guard.block) {
+      return blocked(duel, attacker, defender, hit);
+    }
+    const armor = armors[defender.kit.armor];
+    const absorption = hit.style === 'magic' ? 1 : 1 - Math.max(0, defense(defender) - 45) / 275;
+    const rear = Math.abs(angleDiff(defender.facing, Math.atan2(hit.dirY, hit.dirX))) < .9;
+    const critical = rear || duel.random() < .09;
+    let damage = Math.max(1, Math.round((hit.damage + duel.random() * 4) * armor.taken[hit.style] * absorption
+      * (armors[attacker.kit.armor].style === hit.style ? armors[attacker.kit.armor].power : 1)
+      * (critical ? 1.28 : 1) * (defender.stunnedUntil > duel.time ? 1.15 : 1) * frenzy(duel)));
+    const warded = Math.min(defender.ward, damage);
+    defender.ward -= warded;
+    damage = Math.min(damage - warded, defender.hp);
+    defender.hp -= damage;
+    defender.lastHurt = duel.time;
+    attacker.dealt += damage;
+    const spell = spells[hit.spellKey];
+    emit(duel, 'hit', {
+      who: defender.index, by: attacker.index, damage, warded, critical, rear, style: hit.style, color: spell?.color,
+      dirX: hit.dirX, dirY: hit.dirY, heavy: hit.heavy, x: defender.x, y: defender.y
+    });
+    if (spell && damage) {
+      if (spell.chill) defender.chilledUntil = duel.time + spell.chill;
+      if (spell.freeze) {
+        defender.frozenUntil = duel.time + spell.freeze;
+        defender.action = null;
+        defender.dash = null;
+        emit(duel, 'freeze', { who: defender.index });
+      }
+      if (spell.lifesteal) {
+        const healed = Math.min(Math.round(damage * spell.lifesteal), attacker.maxHP - attacker.hp);
+        if (healed > 0 && !attacker.dead) { attacker.hp += healed; emit(duel, 'heal', { who: attacker.index, amount: healed }); }
+      }
+      if (spell.energyDrain) defender.energy = Math.max(0, defender.energy - spell.energyDrain);
+    }
+    // A heavy weapon moves the body in the direction of the blow.
+    const push = hit.push || (hit.heavy ? 1.5 : hit.style === 'melee' ? .45 : .18);
+    if (hit.hinder && damage) defender.hinderedUntil = duel.time + hit.hinder;
+    defender.vx += hit.dirX * push * 7;
+    defender.vy += hit.dirY * push * 7;
+    if (defender.hp <= 0) {
+      defender.dead = true;
+      defender.action = null;
+      defender.dash = null;
+      duel.winner = attacker.index;
+      emit(duel, 'death', { who: defender.index, by: attacker.index, dirX: hit.dirX, dirY: hit.dirY, heavy: hit.heavy, style: hit.style });
+      return 'kill';
+    }
+    addStance(duel, defender, hit.stance * (critical ? 1.2 : 1) * (damage ? 1 : .35));
+    if (push > 1) defender.slamming = duel.time + .35;
+    return 'hit';
+  }
+
+  function blocked(duel, attacker, defender, hit) {
+    const guard = shields[defender.kit.shield];
+    defender.energy -= guard.energy;
+    const perfect = !hit.projectile && duel.random() < .34;
+    defender.counterUntil = duel.time + (perfect ? .9 : .55);
+    defender.riposte = perfect;
+    if (!defender.action) defender.readyAt = Math.min(defender.readyAt, duel.time + .08);
+    emit(duel, 'block', { who: defender.index, perfect, x: defender.x - hit.dirX * .6, y: defender.y - hit.dirY * .6, dirX: hit.dirX, dirY: hit.dirY });
+    defender.vx += hit.dirX * (hit.heavy ? 4 : 2);
+    defender.vy += hit.dirY * (hit.heavy ? 4 : 2);
+    if (hit.breaks && --defender.shieldHits === 0) emit(duel, 'shieldbreak', { who: defender.index });
+    addStance(duel, defender, hit.stance * (perfect ? .2 : .5));
+    if (perfect && attacker.action) attacker.action.recover += .35;
+    return 'block';
+  }
+
+  function meleeContact(duel, f, action) {
+    const rival = other(duel, f);
+    if (action.hit || rival.dead || rival.safeUntil > duel.time || !covers(f, action, rival)) return;
+    if (!lineOfSight(f, rival, 0)) return;
+    action.hit = true;
+    const weapon = weapons[f.kit.weapon];
+    const bash = action.kind === 'bash', nova = action.kind === 'nova';
+    const [dirX, dirY] = unit(rival.x - f.x, rival.y - f.y);
+    strike(duel, f, rival, {
+      damage: bash ? 7 * (action.riposte ? 1.5 : 1) : nova ? 6 : weapon.damage * (.7 + .3 * action.fatigue),
+      style: nova ? 'magic' : 'melee', stance: bash ? 44 : nova ? 18 : weapon.stance,
+      block: bash ? .05 : weapon.block, heavy: !bash && !nova && weapon.heavy, breaks: !bash && !nova && weapon.breaks,
+      push: nova ? 1.9 : action.riposte ? 1.7 : bash ? 1.1 : 0, unblockable: nova, dirX, dirY
+    });
+  }
+
+  function stepProjectiles(duel, dt) {
+    for (const p of duel.projectiles) {
+      const owner = duel.fighters[p.owner], target = duel.fighters[1 - p.owner];
+      const spell = spells[p.spellKey];
+      if (p.homing && !target.dead) {
+        const speed = Math.hypot(p.vx, p.vy), heading = Math.atan2(p.vy, p.vx);
+        const turn = clamp(angleDiff(Math.atan2(target.y - p.y, target.x - p.x), heading), -p.homing * dt, p.homing * dt);
+        p.vx = Math.cos(heading + turn) * speed; p.vy = Math.sin(heading + turn) * speed;
+      }
+      p.life -= dt;
+      const steps = Math.ceil(Math.hypot(p.vx, p.vy) * dt / .3);
+      for (let i = 0; i < steps && p.life > 0; i++) {
+        p.x += p.vx * dt / steps; p.y += p.vy * dt / steps;
+        const pillar = arena.pillars.some(q => Math.hypot(p.x - q.x, p.y - q.y) < q.r);
+        if (pillar || Math.hypot(p.x / arena.a, p.y / arena.b) > 1.06) {
+          p.life = 0;
+          emit(duel, 'fizzle', { x: p.x, y: p.y, color: spell?.color });
+        } else if (!target.dead && target.safeUntil <= duel.time && Math.hypot(p.x - target.x, p.y - target.y) < radius + .1) {
+          p.life = 0;
+          const weapon = weapons[p.weapon];
+          const [dirX, dirY] = unit(p.vx, p.vy);
+          strike(duel, owner, target, {
+            damage: spell ? spell.damage * weapon.spellPower * 1.04 : weapon.damage * (.7 + .3 * p.fatigue) * (p.crowded ? .6 : 1),
+            style: spell ? 'magic' : weapon.style, spellKey: p.spellKey, stance: spell ? 13 : weapon.stance,
+            block: spell ? .06 : weapon.block * .5, push: spell ? 0 : weapon.push, hinder: spell ? 0 : weapon.hinder,
+            projectile: true, dirX, dirY
+          });
+        }
+      }
+    }
+    duel.projectiles = duel.projectiles.filter(p => p.life > 0);
+  }
+
+  // ---- Decisions ----
+
+  // Something about to hit this fighter, identified so each threat is judged only once.
+  function threatTo(duel, f, rival) {
+    const a = rival.action;
+    if (a && !a.hit && a.t < a.windup && a.windup - a.t < .24 && a.shape !== 'bolt' && a.shape !== 'self' && covers(rival, a, f, radius + .15)) {
+      return { id: a.id, angle: Math.atan2(f.y - rival.y, f.x - rival.x), weight: weapons[rival.kit.weapon].heavy ? 1.5 : 1 };
+    }
+    for (const p of duel.projectiles) {
+      if (p.owner === f.index) continue;
+      const dx = f.x - p.x, dy = f.y - p.y, speed = Math.hypot(p.vx, p.vy);
+      const along = (dx * p.vx + dy * p.vy) / speed;
+      if (along > 0 && along / speed < .32 && Math.abs(dx * p.vy - dy * p.vx) / speed < .8) {
+        return { id: p.id, angle: Math.atan2(p.vy, p.vx), weight: spells[p.spellKey]?.freeze ? 1.6 : 1 };
+      }
+    }
+    return null;
+  }
+
+  function tryEvade(duel, f, rival) {
+    const threat = threatTo(duel, f, rival);
+    if (!threat || f.threatSeen === threat.id) return false;
+    f.threatSeen = threat.id;
+    const move = moves[f.move];
+    const nerve = (f.move === 'dash' ? .3 : .34) * threat.weight;
+    if (duel.random() > nerve || f.charges < 1) return false;
+    const side = duel.random() < .5 ? 1 : -1;
+    const angle = f.move === 'dash' ? threat.angle + side * Math.PI / 2 : bestHeading(duel, f, rival, move.distance);
+    return startDash(duel, f, angle, 'evade');
+  }
+
+  // Heading toward the rival that goes around whichever pillar is in the way.
+  function route(f, rival) {
+    const dx = rival.x - f.x, dy = rival.y - f.y;
+    const len2 = dx * dx + dy * dy || 1;
+    let nearest = null, nearestT = 2;
+    for (const p of arena.pillars) {
+      const t = clamp(((p.x - f.x) * dx + (p.y - f.y) * dy) / len2, 0, 1);
+      if (t < nearestT && Math.hypot(f.x + dx * t - p.x, f.y + dy * t - p.y) < p.r + radius + .1) {
+        nearest = p; nearestT = t;
+      }
+    }
+    if (!nearest) { f.detour = 0; return unit(dx, dy); }
+    // Pick a side once and keep it until the way is clear, so the walker never dithers.
+    f.detour ||= Math.sign(dx * (nearest.y - f.y) - dy * (nearest.x - f.x)) || f.strafe;
+    const away = Math.atan2(f.y - nearest.y, f.x - nearest.x);
+    const around = away + f.detour * .9;
+    const reach = nearest.r + radius + .35;
+    return unit(nearest.x + Math.cos(around) * reach - f.x, nearest.y + Math.sin(around) * reach - f.y);
+  }
+
+  // Desired walking direction, as a unit vector scaled by 0..1.
+  function steer(duel, f, rival) {
+    const d = dist(f, rival);
+    const [tx, ty] = unit(rival.x - f.x, rival.y - f.y);
+    const weapon = weapons[f.kit.weapon];
+    let x = 0, y = 0;
+    if (duel.time > f.strafeUntil) {
+      f.strafeUntil = duel.time + .8 + duel.random() * 1.4;
+      if (duel.random() < .5) f.strafe *= -1;
+    }
+    const sight = lineOfSight(f, rival, radius * .8);
+    if (!sight) return route(f, rival);
+    f.detour = 0;
+    if (weapon.style === 'melee') {
+      const want = weapon.shape === 'slam' ? weapon.reach : weapon.reach * .78;
+      if (d > want) { x = tx; y = ty; }
+      else if (d < want * .6) { x = -tx * .5; y = -ty * .5; }
+      // Circle in close, and come at shooters on a slight curve.
+      const side = d < weapon.reach + 1.2 ? .45 : kitStyle(rival.kitKey) !== 'melee' ? .3 : .1;
+      x += -ty * f.strafe * side; y += tx * f.strafe * side;
+    } else {
+      const near = 4.4, far = 6.6;
+      if (d < near) {
+        const away = bestHeading(duel, f, rival, 2.2);
+        x = Math.cos(away); y = Math.sin(away);
+      } else if (d > far) { x = tx; y = ty; }
+      else { x = -ty * f.strafe * .6; y = tx * f.strafe * .6; }
+    }
+    const edge = Math.hypot(f.x / arena.a, f.y / arena.b);
+    if (edge > .82) { x -= f.x / arena.a * (edge - .82) * 5; y -= f.y / arena.b * (edge - .82) * 5; }
+    const size = Math.hypot(x, y);
+    return size > 1 ? [x / size, y / size] : [x, y];
+  }
+
+  function decide(duel, f, rival) {
+    if (rival.dead) return;
+    const d = dist(f, rival);
+    const weapon = weapons[f.kit.weapon];
+    if (tryEvade(duel, f, rival)) return;
+    if (f.dash) return;
+    const free = !f.action && f.readyAt <= duel.time;
+    // A block opens a quick bash, even while recovering.
+    const canBash = shieldUp(f) && f.energy >= 14 && f.counterUntil > duel.time && d < 1.8
+      && (!f.action || f.action.t > f.action.windup + f.action.active);
+    if (canBash && (f.riposte || duel.random() < .08)) return startAttack(duel, f, rival, 'bash');
+
+    if (weapon.style !== 'melee') {
+      const meleeRival = kitStyle(rival.kitKey) === 'melee';
+      // Get out when crowded: roll or blink to the most open spot.
+      if (meleeRival && d < 2.7 && f.charges > 0 && (!f.action || f.action.t > f.action.windup * .4 || d < 1.9)) {
+        if (startDash(duel, f, bestHeading(duel, f, rival, moves[f.move].distance), 'escape')) return;
+      }
+      if (weapon.style === 'magic' && d < 2.2 && free && duel.time >= f.novaReady && f.charges < 1) {
+        f.novaReady = duel.time + 8;
+        return startAttack(duel, f, rival, 'nova');
+      }
+      if (!free) return;
+      const support = f.kit.spells?.some(key => !spells[key].damage && f.mana >= spells[key].cost
+        && duel.time >= (f.cooldowns[key] || 0) && supportScore(duel, f, spells[key]) > 0);
+      if (support && d > 3 || d <= weapon.reach && lineOfSight(f, rival) && !(d < 2.4 && duel.random() < .6)) {
+        startAttack(duel, f, rival);
+      }
+      return;
+    }
+    // Melee: burst across the gap at a shooter, otherwise walk in.
+    if (free && f.charges > (kitStyle(rival.kitKey) === 'melee' ? 1 : 0) && duel.time >= f.nextClose && d > 3.4 && d < 8 && lineOfSight(f, rival, .5)
+      && duel.random() < (kitStyle(rival.kitKey) === 'melee' ? .008 : .035)) {
+      f.nextClose = duel.time + 3.2;
+      return void startDash(duel, f, Math.atan2(rival.y - f.y, rival.x - f.x), 'close');
+    }
+    const inReach = weapon.shape === 'slam'
+      ? Math.abs(d - weapon.reach) < weapon.radius * .8 : d <= weapon.reach + radius * .3;
+    if (free && inReach && f.energy >= weapon.energy * .45) startAttack(duel, f, rival);
+  }
+
+  function stepFighter(duel, f, dt) {
+    const rival = other(duel, f);
+    const kit = f.kit, move = moves[f.move];
+    if (!f.dead) {
+      f.mana = Math.min(100, f.mana + dt * (weapons[kit.weapon].style === 'magic' ? 6 : 3));
+      f.energy = clamp(f.energy + dt * 11, 0, 100);
+      if (f.charges < move.charges && duel.time >= f.rechargeAt) {
+        f.charges++;
+        f.rechargeAt = duel.time + move.recharge;
+      }
+      if (f.wardUntil <= duel.time) f.ward = 0;
+      if (duel.time - f.lastStanceHit > 1.3) f.stance = Math.max(0, f.stance - dt * 14);
+    }
+    const fromX = f.x, fromY = f.y;
+    const frozen = f.frozenUntil > duel.time;
+    if (!frozen && !f.dead && f.stunnedUntil <= duel.time) decide(duel, f, rival);
+
+    const a = f.action;
+    if (a && !helpless(duel, f)) {
+      // The aim tracks the rival early in the windup, then locks so a dash can beat it.
+      if (a.t < a.windup * (a.shape === 'bolt' ? .85 : .55)) {
+        let aim = Math.atan2(rival.y - f.y, rival.x - f.x);
+        if (a.shape === 'bolt') {
+          const lead = dist(f, rival) / (spells[a.spellKey]?.speed || weapons[kit.weapon].speed) * .6;
+          aim = Math.atan2(rival.y + rival.vy * lead - f.y, rival.x + rival.vx * lead - f.x);
+        }
+        f.facing += clamp(angleDiff(aim, f.facing), -9 * dt, 9 * dt);
+        a.angle = f.facing;
+      }
+      const before = a.t;
+      a.t += dt;
+      if (before < a.windup && a.t >= a.windup) release(duel, f, a);
+      if (a.t >= a.windup && a.t < a.windup + a.active && !['bolt', 'self'].includes(a.shape)) meleeContact(duel, f, a);
+      if (f.action === a && a.t >= a.windup + a.active + a.recover) {
+        f.action = null;
+        f.readyAt = duel.time + .05 + duel.random() * (f.energy < 20 ? .5 : .22);
+      }
+    } else if (!f.dead && !frozen && f.stunnedUntil <= duel.time) {
+      f.facing += clamp(angleDiff(Math.atan2(rival.y - f.y, rival.x - f.x), f.facing), -10 * dt, 10 * dt);
+    }
+
+    // vx/vy is walking velocity plus any knockback; both ease out together.
+    if (f.dash) {
+      f.x += f.dash.vx * dt; f.y += f.dash.vy * dt;
+      f.vx = f.dash.vx * .2; f.vy = f.dash.vy * .2;
+      if (duel.time >= f.dash.until) f.dash = null;
+    } else {
+      let wantX = 0, wantY = 0;
+      if (!helpless(duel, f) && !rival.dead) {
+        const [sx, sy] = steer(duel, f, rival);
+        let factor = kit.speed * mobility(duel, f);
+        const now = f.action;
+        if (now) factor *= now.shape === 'bolt' || now.shape === 'self' ? .34 : now.t < now.windup ? .55 : .15;
+        wantX = sx * factor; wantY = sy * factor;
+      }
+      const grip = 1 - Math.exp(-dt * (f.dead ? 5 : 10));
+      f.vx += (wantX - f.vx) * grip;
+      f.vy += (wantY - f.vy) * grip;
+      if (frozen) f.vx = f.vy = 0;
+      f.x += f.vx * dt; f.y += f.vy * dt;
+    }
+    if (constrain(f) && f.slamming > duel.time && !f.dead) {
+      f.slamming = 0;
+      breakStance(duel, f, 1.1);
+      emit(duel, 'wallslam', { who: f.index, x: f.x, y: f.y });
+    }
+    const walked = Math.hypot(f.x - fromX, f.y - fromY);
+    f.stride += walked;
+    f.gait += (clamp(walked / dt / 3.5, 0, 1) - f.gait) * Math.min(1, dt * 12);
+  }
+
+  function separate(duel) {
+    const [a, b] = duel.fighters;
+    if (a.dead || b.dead || a.dash || b.dash) return;
+    const gap = dist(a, b), min = radius * 2;
+    if (gap < min) {
+      const [x, y] = unit(a.x - b.x || 1, a.y - b.y);
+      const push = (min - gap) / 2;
+      a.x += x * push; a.y += y * push; b.x -= x * push; b.y -= y * push;
+      constrain(a); constrain(b);
+    }
+  }
+
+  function step(duel, dt) {
+    duel.time += dt;
+    // Alternate who acts first so neither side wins ties.
+    const order = Math.floor(duel.time * 60) % 2 ? [0, 1] : [1, 0];
+    for (const i of order) stepFighter(duel, duel.fighters[i], dt);
+    separate(duel);
+    stepProjectiles(duel, dt);
+  }
+
+  const api = { createDuel, step, radius, stanceLimit };
+  if (typeof module !== 'undefined') module.exports = api;
+  else root.HadesSim = api;
+})(this);

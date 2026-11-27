@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06141c">
+  <title>Arena Ledger — Underworld Duel (2.5D proof of concept)</title>
+  <link rel="stylesheet" href="./hades/style.css">
+  <script src="./hades/data.js" defer></script>
+  <script src="./hades/sim.js" defer></script>
+  <script src="./hades/render.js" defer></script>
+  <script src="./hades/main.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Underworld Duel <small>2.5D proof of concept</small></h1>
+      <p>BOUT <strong id="bout">01</strong> · <span id="record">Varro 0 · Cassian 0</span></p>
+    </header>
+    <section class="stage">
+      <canvas id="arena" aria-label="Two gladiators dueling in an arena seen from above at an angle"></canvas>
+      <div class="hud left">
+        <h2><span id="name0"></span> <small id="class0"></small> <em id="status0"></em></h2>
+        <div class="bar" role="img" aria-label="Health"><i id="hp0"></i><span id="hpText0"></span></div>
+        <div class="gauge mana" title="Mana"><i id="mana0"></i></div>
+        <div class="gauge energy" title="Energy"><i id="energy0"></i></div>
+        <div class="gauge stance" title="Stance"><i id="stance0"></i></div>
+        <div class="pips" id="pips0" aria-label="Escape charges"></div>
+        <p id="gear0"></p>
+      </div>
+      <div class="hud right">
+        <h2><span id="name1"></span> <small id="class1"></small> <em id="status1"></em></h2>
+        <div class="bar" role="img" aria-label="Health"><i id="hp1"></i><span id="hpText1"></span></div>
+        <div class="gauge mana" title="Mana"><i id="mana1"></i></div>
+        <div class="gauge energy" title="Energy"><i id="energy1"></i></div>
+        <div class="gauge stance" title="Stance"><i id="stance1"></i></div>
+        <div class="pips" id="pips1" aria-label="Escape charges"></div>
+        <p id="gear1"></p>
+      </div>
+      <div class="banner" id="banner" hidden></div>
+      <div class="result" id="result" hidden><span>VICTORY</span><strong id="winner"></strong></div>
+    </section>
+    <section class="controls">
+      <button id="play" class="primary">Begin duel</button>
+      <button id="generate">New matchup</button>
+      <label>Varro <select id="kit0"></select></label>
+      <label>Cassian <select id="kit1"></select></label>
+      <button id="speed" aria-label="Playback speed">1×</button>
+      <label><input id="repeat" type="checkbox"> Auto-rematch</label>
+      <a href="./index.html">2D side-view arena</a>
+    </section>
+    <ol id="log" aria-label="Combat log"></ol>
+  </main>
+</body>
+</html>
