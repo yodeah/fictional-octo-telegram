@@ -724,7 +724,7 @@
     const info = shields[kit.shield];
     const held = kit.shield !== 'none' && f.shieldHits > 0 && !weapons[f.weapon].twoHanded;
     return {
-      team: f.index, armor: kit.armor, weapon: f.weapon, spare: f.weapon === kit.weapon ? kit.reserve : kit.weapon,
+      team: f.index, kit: f.kitKey, armor: kit.armor, weapon: f.weapon, spare: f.weapon === kit.weapon ? kit.reserve : kit.weapon,
       shield: held ? kit.shield : null, cracks: held ? info.durability - f.shieldHits : 0,
       frozen: f.frozenUntil > duel.time && !f.dead
     };

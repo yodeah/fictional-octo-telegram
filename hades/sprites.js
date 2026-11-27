@@ -346,11 +346,86 @@
         eyes();
         poly([at(.1, -.2, .12), at(.08, -.04, .24), at(.19, .02, .12), at(.12, .08, .2), at(.12, .2, .11), at(-.04, 0, .26)], look.hair);
       } else hair();
+      if (spec.kit !== 'duelist') return;
       // A gilded laurel.
       stroke([at(.13, -.2, .1), at(.21, 0, .12), at(.13, .2, .1)], .035, metal.gold);
       for (const side of [-.2, .2]) for (let i = 0; i < 3; i++) {
         poly([at(.08 - i * .09, side, .12 + i * .02), at(.02 - i * .09, side * 1.25, .22 + i * .02), at(-.02 - i * .09, side, .12 + i * .02)], metal.gold, false);
       }
+    }
+  }
+
+  // What sets each class apart at a glance, drawn over the head. The team color stays the base.
+  function headgear(r, spec, look, facing) {
+    const { j, vector } = r;
+    const at = (forward, right, up) => add(j.head, vector(forward, right, up));
+    const front = Math.sin(facing) > -.3;
+    const horn = (side, color, long) => {
+      poly([at(-.02, side * .18, .12), at(-.04, side * .42 * long, .24), at(.02, side * .46 * long, .52 * long),
+        at(-.1, side * .3 * long, .28), at(-.12, side * .14, .18)], color);
+    };
+    switch (spec.kit) {
+      case 'hoplite': // a sideways horsehair crest
+        poly([at(-.06, -.4, .18), at(-.1, -.32, .46), at(-.1, 0, .58), at(-.1, .32, .46), at(-.06, .4, .18), at(-.04, 0, .3)], look.main);
+        stroke([at(-.05, -.34, .26), at(-.08, 0, .46), at(-.05, .34, .26)], .035, look.light);
+        break;
+      case 'raider': // a wolf's head pulled over the brow
+        for (const side of [-1, 1]) poly([at(-.06, side * .1, .34), at(-.12, side * .34, .7), at(-.06, side * .34, .3)], '#6a657a');
+        disc(at(-.08, 0, .17), .27, '#a6a1b2');
+        poly([at(-.02, -.22, .3), at(.1, -.14, .16), at(.34, 0, .12), at(.1, .14, .16), at(-.02, .22, .3), at(-.04, 0, .42)], '#c4c0ce');
+        if (front) {
+          disc(at(.34, 0, .13), .045, ink, false);
+          for (const side of [-.11, .11]) disc(at(.14, side, .27), .036, '#ffd34a');
+          for (const side of [-.09, .09]) poly([at(.23, side - .035, .13), at(.25, side, .02), at(.23, side + .035, .13)], '#fff6e0');
+        }
+        break;
+      case 'breaker':
+        horn(-1, '#e9dcc0', 1.15);
+        horn(1, '#e9dcc0', 1.15);
+        break;
+      case 'executioner': // a black hood drawn over the helm, eyes burning in the slot
+        poly([at(.02, -.31, -.14), at(-.04, -.28, .22), at(-.1, 0, .44), at(-.04, .28, .22), at(.02, .31, -.14), at(.1, .17, .1), at(.18, 0, .12), at(.1, -.17, .1)], '#251a2c');
+        stroke([at(.06, -.2, .06), at(.19, 0, .13), at(.06, .2, .06)], .04, look.main);
+        break;
+      case 'marksman': // a brimmed cap with a long feather
+        poly(Array.from({ length: 12 }, (_, i) => at(Math.cos(i / 12 * 6.283) * .3 - .02, Math.sin(i / 12 * 6.283) * .34, .15)), look.deep);
+        disc(at(-.04, 0, .22), .17, look.main);
+        poly([at(-.1, .18, .22), at(-.42, .3, .54), at(-.6, .26, .5), at(-.3, .22, .36)], look.trim);
+        break;
+      case 'huntress': // a green hood with two tall feathers
+        for (const side of [-1, 1]) {
+          poly([at(-.08, side * .16, .26), at(-.22, side * .52, .72), at(-.26, side * .36, .34)], side < 0 ? look.trim : look.light);
+        }
+        disc(at(-.1, 0, .13), .255, '#2f7a58');
+        poly([at(.1, -.23, .08), at(.08, 0, .33), at(.1, .23, .08), at(.14, 0, .17)], '#46a377');
+        poly([at(-.26, -.1, .06), at(-.52 - r.p.sway * .2, 0, -.2), at(-.26, .1, .06)], '#2f7a58');
+        break;
+      case 'frostmage': // a crown of ice
+        for (const [side, tall] of [[-.22, .46], [-.11, .56], [0, .7], [.11, .56], [.22, .46]]) {
+          poly([at(0, side - .06, .22), at(-.04, side * 1.35, tall), at(0, side + .06, .22)], '#c9f2ff');
+        }
+        break;
+      case 'stormmage': // forked antennae with a spark between them
+        for (const side of [-1, 1]) {
+          stroke([at(-.04, side * .2, .2), at(-.06, side * .4, .34), at(-.04, side * .3, .44), at(-.06, side * .44, .64)], .075, ink);
+          stroke([at(-.04, side * .2, .2), at(-.06, side * .4, .34), at(-.04, side * .3, .44), at(-.06, side * .44, .64)], .04, '#e2d2ff');
+        }
+        shine(at(-.04, 0, .52), .3, 'rgba(190,160,255,.8)');
+        break;
+      case 'bloodmage':
+        horn(-1, '#c22a45', 1);
+        horn(1, '#c22a45', 1);
+        if (front) disc(at(.18, 0, .2), .045, '#ff5a6e');
+        break;
+      case 'emberpriest': // a halo of flame
+        stroke(Array.from({ length: 17 }, (_, i) => at(-.2, Math.cos(i / 16 * 6.283) * .36, .14 + Math.sin(i / 16 * 6.283) * .36)), .05, '#ffb445');
+        for (let i = 0; i < 7; i++) {
+          const a = i / 6 * Math.PI;
+          const rim = (da, reach) => at(-.2, Math.cos(a + da) * reach, .14 + Math.sin(a + da) * reach);
+          poly([rim(-.14, .38), rim(0, .54), rim(.14, .38)], '#ffd268', false);
+        }
+        shine(at(-.2, 0, .2), .55, 'rgba(255,170,60,.45)');
+        break;
     }
   }
 
@@ -493,7 +568,10 @@
       }, .12);
     }
 
-    part(j.head, () => head(r, spec, look, facing), .16);
+    part(j.head, () => {
+      head(r, spec, look, facing);
+      headgear(r, spec, look, facing);
+    }, .16);
     part(lerp(j.handR, add(j.handR, j.aim), .45), () => weapon(spec.weapon, j.handR, j.aim, j.side, look, p.charge), .13);
     if (spec.shield) part(j.handL, () => shield(r, spec, look, facing), .18);
 
@@ -515,7 +593,7 @@
       const x = v[0], y = v[1] * K - v[2] * Z;
       left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
     }
-    const pad = .52;
+    const pad = .72;
     return { left: left - pad, right: right + pad, top: top - pad, bottom: bottom + pad };
   }
 
@@ -594,7 +672,7 @@
     return { image, x: box.left, y: box.top, w: w / res, h: h / res };
   }
 
-  // spec: { team, armor, weapon, spare, shield, cracks, frozen }
+  // spec: { team, kit, armor, weapon, spare, shield, cracks, frozen }
   function get(spec, facing, anim, shape, progress) {
     const direction = ((Math.round(facing / (Math.PI * 2) * DIRECTIONS) % DIRECTIONS) + DIRECTIONS) % DIRECTIONS;
     const count = frames[anim];
@@ -602,7 +680,7 @@
     const frame = looping ? Math.floor(((progress % 1) + 1) % 1 * count) % count
       : Math.min(count - 1, Math.max(0, Math.round(progress * (count - 1))));
     const t = looping ? frame / count : count > 1 ? frame / (count - 1) : 0;
-    const key = [spec.team, spec.armor, spec.weapon, spec.spare, spec.shield || '-', spec.cracks, spec.frozen ? 1 : 0,
+    const key = [spec.team, spec.kit, spec.armor, spec.weapon, spec.spare, spec.shield || '-', spec.cracks, spec.frozen ? 1 : 0,
       direction, anim, shape || '-', frame].join('|');
     let sprite = cache.get(key);
     if (sprite) {
