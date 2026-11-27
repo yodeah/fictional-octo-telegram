@@ -949,8 +949,12 @@
     ctx.restore();
   }
 
+  let sized = false;
   function resize() {
     dpr = Math.min(root.devicePixelRatio || 1, 2);
+    // A hidden tab or pane can load with no layout; wait until the canvas has a size.
+    sized = canvas.clientWidth > 0 && canvas.clientHeight > 0;
+    if (!sized) return;
     width = canvas.clientWidth;
     height = canvas.clientHeight;
     canvas.width = Math.round(width * dpr);
@@ -1546,6 +1550,8 @@
   }
 
   function draw(duel, dt, { debug = false } = {}) {
+    if (!sized || canvas.clientWidth !== width || canvas.clientHeight !== height) resize();
+    if (!sized) return;
     updateEffects(dt, duel);
     aimCamera(duel, dt);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
