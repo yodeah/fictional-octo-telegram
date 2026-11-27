@@ -18,7 +18,7 @@
       <div><p class="eyebrow">FIELD MANUAL</p><h1>Mechanics</h1></div>
     </section>
     <nav class="toc" aria-label="Sections">
-      <a href="#bout">The bout</a><a href="#stats">Stats and resources</a><a href="#choice">Decisions</a><a href="#hits">Hits and damage</a><a href="#stance">Stance</a><a href="#tactics">Tactics and wounds</a><a href="#gear">Gear</a><a href="#spells">Spells</a><a href="#strangers">Strangers</a><a href="#stands">The stands</a><a href="#ideas">Improvements</a>
+      <a href="#bout">The bout</a><a href="#stats">Stats and resources</a><a href="#choice">Decisions</a><a href="#hits">Hits and damage</a><a href="#stance">Stance</a><a href="#tactics">Tactics and wounds</a><a href="#gear">Gear</a><a href="#spells">Spells</a><a href="#strangers">Strangers</a><a href="#stands">The stands</a><a href="#crowd">Crowd and Charm</a><a href="#ideas">Improvements</a>
     </nav>
 
     <section class="record" id="bout">
@@ -209,6 +209,26 @@
         <li><b>Stake:</b> half or all of a day’s wage, never more than you hold. The result is fixed and saved before the bout is shown.</li>
         <li><b>Scouting:</b> the champion wall always shows every champion’s gear and stats. Watching the champion adds their habits and weak points. On their bout screen it also names a stance or target, if trial fights show one doing clearly better.</li>
         <li><b>The Peddler’s eye</b> shows all four champions’ weak points at once, but not their habits.</li>
+      </ul>
+    </section>
+
+    <section class="record" id="crowd">
+      <h2>Crowd and Charm</h2>
+      <p>Crowd favour runs from 0 to 100 and starts at 50. It never changes how a fight goes, only what comes after.</p>
+      <table>
+        <tr><th>After a bout</th><th>Favour</th></tr>
+        <tr><td>Win</td><td>+6. A fight to the death adds +4, finishing under a quarter health +8, finishing inside 10 seconds +4</td></tr>
+        <tr><td>Loss</td><td>−10, or −8 in sparring</td></tr>
+        <tr><td>Stance</td><td>Aggressive +5, defensive −6</td></tr>
+        <tr><td>Longer than 40 seconds</td><td>−5</td></tr>
+        <tr><td>A day without a bout</td><td>3 points back toward 50</td></tr>
+      </table>
+      <p>A watched bout counts as a day without one.</p>
+      <ul>
+        <li><b>Pay:</b> 0.5% more or less per point from 50, so 75% to 125% of the purse.</li>
+        <li><b>Mercy:</b> the first fall before each champion is spared for certain at 35 favour or more. Below that the odds fall with favour. A second fall can be spared only above 65 favour, at no better than even odds, and leaves the crowd at 25. The odds are shown before the bout.</li>
+        <li><b>Charm above 10</b> lowers shop, surgeon and spell page prices by 2.5% a point (20% at most), makes favour rise 6% faster and fall 4% slower, and adds 3% to a first mercy (2% to a second).</li>
+        <li><b>Charm below 10</b> does the reverse (prices 15% dearer at most), but purses in fights to the death grow 4% a point, 24% at most.</li>
       </ul>
     </section>
 

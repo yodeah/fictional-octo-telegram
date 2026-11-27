@@ -32,7 +32,7 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 - [x] **4. Spellbook rework** (13). Market pages, three slots, a trigger per spell chosen on the bout screen (2026-11-26). `tests/spells.test.mjs` shows triggers changing win rates.
 - [x] **5. Strangers and bargains** (14). Five visitors between days, each with a shown price (2026-11-26). `tests/bargains.test.mjs` shows each one right in one situation and wrong in another, for the test bot and in measured odds.
 - [x] **6. Spectate and bet** (15). Watch the champion or an undercard for a day and bet up to a day’s wage; watching the champion reveals habits (2026-11-27). `tests/stands.test.mjs` shows simple betting strategies losing gold.
-- [ ] **7. Crowd and Charm** (16). Crowd favour changes pay and mercy; Charm changes prices.
+- [ ] **7. Crowd and Charm** (16). Crowd favour changes pay and mercy; Charm changes prices, favour and mercy. Written on branch `salt-sand-stage-7-wip` (2026-11-27), not yet verified: see the notes below.
 - [ ] **8. Shop and inventory depth** (17). Limited bag, repairs, trophies, champion specials with descriptions.
 - [ ] **9. Quests** (18). Eight to ten short goals.
 - [ ] **10. Art and sound** (20). Richer first-person scenes, an arena backdrop per act, synthesized sound with mute.
@@ -96,6 +96,14 @@ One stage per session keeps the context small. Use a single read-only reviewer o
 **Repeatable fights (fixed 2026-11-27)**
 - Until now `fighterPose` took its breathing from the page clock, so in a browser the same seed could fight differently after a reload. Headless tests never saw it, because that clock stays at 0 there. Anything `checkContact` reads must come from fight state alone; `tests/game.test.mjs` checks the page clock.
 - A browser replay now matches Node exactly. Idle breathing still shows before a bout, not during one.
+
+**Crowd and Charm (stage 7, work in progress on `salt-sand-stage-7-wip`)**
+- Left to do: run the whole suite (`node --test tests/*.test.mjs`), run `node tests/report.mjs`, then tick the stage and push to `swords-and-sandals`.
+- Passed: `crowd`, `stands` and `spells` tests, and one bout in the browser at phone width. Not run since the stage 7 changes: `game`, `tactics`, `bargains` and `install` tests, and the report.
+- The sensible bot won 10 of 30 before stages 6 and 7, and still 10 after stage 6.
+- `winnings`, `mercyChance`, `cheer` and `favourOf` in `rules.js`. No combat changes. `run.favour`, `run.crowd` (the mercy dice) and `pending.spare` may be missing in old saves.
+- Charm 5 against 16 over seeds 1-30: low won 18 runs and high 11; low got further on 12 seeds, high on 6. That gap may be chance. A second sample (seeds 31-60) was stopped unfinished. If it holds, lower `brutePurse`.
+- The bot Charm test in `tests/crowd.test.mjs` relies on seeds 1 and 4, so a rule change can flip it.
 
 **2D art (merged 2026-11-26)**
 - 2D is the default; the **Art** button on the fight screen (or `?style=3d`) brings back the 3D meshes. The choice is kept in `localStorage` under `arena-art`.

@@ -49,6 +49,7 @@ const Game = (() => {
     tactics: ['Tactics', 'Pick a stance and a target before the bell. The trainer judges the fight with your choice.'],
     strangers: ['Strangers', 'Some days a stranger finds you. You see the price before you agree, and you may always say no.'],
     stands: ['The stands', 'Watching takes the day and pays no wage. Watch the champion to learn their habits and weak points. Bets are capped at a day’s wage, and the bookmaker keeps a cut.'],
+    crowd: ['The crowd', 'A pleased crowd pays more and may spare you. Win boldly or narrowly and it warms to you. Caution and defeat cool it, and quiet days let it forget.'],
     spells: ['Spells', 'Your first spell wakes your mana. You can ready up to three. Before each bout you choose when each one is cast.'],
     triggers: ['Triggers', '“Their call” leaves the moment to your gladiator. Any other trigger holds the spell until it comes true, then casts it at once. If two come true together, the lower-numbered slot goes first.']
   };
@@ -176,7 +177,7 @@ const Game = (() => {
         + '</div><dl class="dice">' + Object.entries(Rules.statNames).map(([key, label]) => {
           const bonus = race.stats[key] || 0;
           return '<div><dt>' + label + '</dt><dd>' + (draft.stats[key] + bonus) + (bonus ? '<small>' + signed(bonus) + '</small>' : '') + '</dd></div>';
-        }).join('') + '</dl><p class="small">Strength hits harder. Agility aims and dodges. Endurance is health. Mind powers spells. Charm earns coin.</p>'
+        }).join('') + '</dl><p class="small">Strength hits harder. Agility aims and dodges. Endurance is health. Mind powers spells. Charm cuts prices and wins the crowd; a face they fear draws bigger purses to the death.</p>'
         + button('reroll', 'Roll again (' + draft.rerolls + ' left)', draft.rerolls ? '' : 'disabled')
         + (save.legacy ? '<label class="field">Begin at<select id="start">' + Array.from({ length: save.legacy + 1 }, (_, i) => '<option value="' + i + '"' + (draft.startAct === i ? ' selected' : '') + '>'
           + (i ? 'Champion ' + (i + 1) + ' — a Legacy start' : 'The beach — the full story') + '</option>').join('') + '</select></label>' : '')
@@ -198,7 +199,8 @@ const Game = (() => {
       const header = '<header class="status"><div><b>' + escape(run.name) + '</b><span>' + Rules.races[run.race].name + ' · day ' + run.day + '</span></div>'
         + '<dl><div><dt>Gold</dt><dd>' + run.gold + '</dd></div><div><dt>Health</dt><dd class="' + (run.health < .6 ? 'warn' : '') + '">' + Math.round(run.health * 100) + '%</dd></div>'
         + '<div><dt>Debt</dt><dd class="' + (due <= 2 && run.gold < Rules.debtDue(run) ? 'warn' : '') + '">' + Rules.debtDue(run) + '<small>' + (due === 1 ? 'tonight' : 'in ' + due + ' days') + '</small></dd></div>'
-        + '<div><dt>Renown</dt><dd>' + Math.min(run.renown, Rules.renownNeeded[run.act]) + '/' + Rules.renownNeeded[run.act] + '</dd></div></dl></header>';
+        + '<div><dt>Renown</dt><dd>' + Math.min(run.renown, Rules.renownNeeded[run.act]) + '/' + Rules.renownNeeded[run.act] + '</dd></div>'
+        + '<div><dt>Crowd</dt><dd>' + Rules.favourOf(run) + '<small>' + Rules.moodOf(Rules.favourOf(run)).toLowerCase() + '</small></dd></div></dl></header>';
       const journal = notes.length ? '<ul class="notes">' + notes.map(note => '<li>' + escape(note) + '</li>').join('') + '</ul>' : '';
       const panels = { arena: arenaPanel, train: trainPanel, market: marketPanel, gear: gearPanel, wall: wallPanel };
       const nav = '<nav class="tabs">' + [['arena', 'Arena'], ['train', 'Yard'], ['market', 'Market'], ['gear', 'Gear'], ['wall', 'Champions']]
@@ -209,9 +211,13 @@ const Game = (() => {
     confirm: () => {
       const run = save.run;
       const { kind, foe, read } = preview;
+      const chance = Rules.mercyChance(run);
       const risk = kind === 'spar' ? 'First blood. Losing costs the purse and leaves you hurt and wounded.'
-        : run.mercy ? 'To the death. If you fall, the crowd may spare you this once, for half your gold.' : 'To the death. There is no mercy left. If you fall, ' + escape(run.name) + ' is gone.';
-      return scene('arena') + '<h2>' + { spar: 'Sparring', blood: 'Blood bout', champion: 'Champion', duel: 'The Duel' }[kind] + ' · purse about ' + Rules.purse(run, kind) + ' gold</h2>'
+        : 'To the death. ' + (chance >= 1 ? 'If you fall, the crowd will spare you, for half your gold.'
+          : chance > 0 ? 'If you fall, the crowd spares you about ' + Math.max(1, Math.round(chance * 10)) + ' times in 10, for half your gold. Otherwise ' + escape(run.name) + ' is gone.'
+            : 'There is no mercy. If you fall, ' + escape(run.name) + ' is gone.');
+      const crowd = 'Crowd ' + Rules.moodOf(Rules.favourOf(run)).toLowerCase() + ' (' + Rules.favourOf(run) + '). An aggressive stance pleases it; a defensive one bores it.';
+      return scene('arena') + '<h2>' + { spar: 'Sparring', blood: 'Blood bout', champion: 'Champion', duel: 'The Duel' }[kind] + ' · purse ' + Rules.winnings(run, kind) + ' gold</h2><p class="small">' + crowd + '</p>'
         + card({ ...Rules.heroConfig(run) }, '<p class="small">You, at ' + Math.round(run.health * 100) + '% health</p>') + woundList(run)
         + card(foe, '<p class="weak">' + weakness(foe) + '</p>' + (kind === 'champion' ? '<p class="small">' + Rules.champions[run.act].hint + (Rules.scoutedOf(run) ? ' ' + Rules.champions[run.act].habits : '') + '</p>' : ''))
         + (preview.advice ? '<p class="read">' + preview.advice + '</p>' : '')
@@ -229,7 +235,7 @@ const Game = (() => {
       const journal = notes.length ? '<ul class="notes">' + notes.map(note => '<li>' + escape(note) + '</li>').join('') + '</ul>' : '';
       return '<div class="scene">' + Art.stranger(visitor.color, offer.key) + '</div>' + journal + tip('strangers') + '<h2>' + visitor.name + '</h2><p class="story">' + visitor.story + '</p>'
         + '<div class="card"><p class="eyebrow">YOU GAIN</p><p>' + terms.gain + '</p></div><div class="card wound"><p class="eyebrow">THE PRICE</p><p>' + terms.price + '</p></div>' + now
-        + '<p class="small">Gold ' + run.gold + ' · health ' + Math.round(run.health * 100) + '% · ' + (run.mercy ? 'mercy unspent' : 'no mercy left') + '</p>'
+        + '<p class="small">Gold ' + run.gold + ' · health ' + Math.round(run.health * 100) + '% · ' + (run.mercy ? 'mercy unspent' : 'mercy spent') + '</p>'
         + button('accept', 'Strike the bargain', 'class="primary"') + button('decline', 'Send them away');
     },
 
@@ -283,9 +289,9 @@ const Game = (() => {
 
   function arenaPanel(run) {
     const offer = (kind, title, foe) => '<div class="card offer ' + kind + '"><p class="eyebrow">' + title + '</p><h3>' + escape(foe.name) + '</h3><p>' + itemName(foe.gear.special !== 'none' ? foe.gear.special : foe.gear.weapon) + ' · ' + itemName(foe.gear.armor)
-      + ' · ' + foe.maxHP + ' health</p><p class="small">About ' + Rules.purse(run, kind) + ' gold</p>' + button('size', 'Size up', 'data-key="' + kind + '"') + '</div>';
+      + ' · ' + foe.maxHP + ' health</p><p class="small">Purse ' + Rules.winnings(run, kind) + ' gold</p>' + button('size', 'Size up', 'data-key="' + kind + '"') + '</div>';
     const champion = Rules.champions[run.act];
-    return scene('arena') + tip('arena') + (run.health < 1 ? tip('wounds') : '') + (run.day > 2 ? tip('debt') : '')
+    return scene('arena') + tip('arena') + (run.fights ? tip('crowd') : '') + (run.health < 1 ? tip('wounds') : '') + (run.day > 2 ? tip('debt') : '')
       + (Rules.woundsOf(run).length ? tip('injury') + woundList(run, true) : '')
       + offer('spar', 'SPARRING · +1 renown', run.offers.spar) + offer('blood', 'BLOOD BOUT · +2 renown · to the death', run.offers.blood)
       + (Rules.championReady(run) ? offer('champion', champion.title + ' · to the death', Rules.championConfig(run.act))

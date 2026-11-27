@@ -11,7 +11,7 @@ export function wouldAccept(game, run, trials = 25) {
   };
   // A blind draw is only worth it when losing the duel is unlikely and would not be the end.
   if (run.visitor.key === 'dealer') {
-    if (!run.mercy || run.health <= .9) return false;
+    if (Rules.mercyChance(run) < 1 || run.health <= .9) return false;
     // Nobody knows the stranger yet, so picture a few.
     let total = 0;
     for (let seed = 1; seed <= 5; seed++) {
@@ -30,7 +30,7 @@ export function wouldAccept(game, run, trials = 25) {
 }
 
 // Two players for whole-run tests: one makes sensible choices, one picks at random.
-export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
+export function playRun(game, { seed, smart, race = 'human', startAct = 0, charm = null }) {
   const { Rules, ArenaDuel, weapons, armors } = game;
   let state = seed * 7919 + 13;
   const random = () => ((state = (Math.imul(state, 1664525) + 1013904223) >>> 0) / 4294967296);
@@ -42,6 +42,8 @@ export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
     const next = Rules.rollStats(random);
     if (total(next) > total(stats)) stats = next;
   }
+  // A build with its Charm chosen, to compare high against low.
+  if (charm !== null) stats = { ...stats, cha: charm };
   const run = Rules.newRun({ name: 'Bot', race, stats, seed, startAct });
   const kinds = { spar: 0, blood: 0, champion: 0, duel: 0 };
   const losses = { spar: 0, blood: 0, champion: 0, duel: 0 };
@@ -128,16 +130,16 @@ export function playRun(game, { seed, smart, race = 'human', startAct = 0 }) {
     }
     const reserve = Rules.daysToDebt(run) <= 4 ? Rules.debtDue(run) : 0;
     if (run.health < .75) { Rules.rest(run); continue; }
-    if (Rules.championReady(run) && run.health > .9 && odds(Rules.championConfig(run.act), 25) >= (run.mercy ? .6 : .84)) { fight('champion'); continue; }
+    if (Rules.championReady(run) && run.health > .9 && odds(Rules.championConfig(run.act), 25) >= (Rules.mercyChance(run) >= 1 ? .6 : .84)) { fight('champion'); continue; }
     const canTrain = run.gold >= Rules.trainingCost(run) + reserve;
     if (canTrain && (run.day % 2 === 0 || Rules.championReady(run))) {
       const drill = ['skill', 'power', 'toughness', 'guard'].sort((a, b) => run.train[a] - run.train[b])[0];
       Rules.train(run, drill);
       continue;
     }
-    if (run.mercy && odds(run.offers.blood) >= .7) fight('blood');
+    if (Rules.mercyChance(run) >= 1 && odds(run.offers.blood) >= .7) fight('blood');
     else if (odds(run.offers.spar) >= .5) fight('spar');
     else Rules.work(run);
   }
-  return { over: run.over || 'stalled', act: run.act, day: run.day, fights: run.fights, kinds, losses, seconds, bargains };
+  return { over: run.over || 'stalled', act: run.act, day: run.day, fights: run.fights, kinds, losses, seconds, bargains, favour: Rules.favourOf(run) };
 }

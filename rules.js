@@ -100,6 +100,17 @@ const Rules = (() => {
   const maxPays = 4;
   const minPays = 1.1;
   const studyTrials = 20;
+  // The crowd. Favour runs from 0 to 100, scales the purse and decides whether a fallen gladiator is spared.
+  const favourStart = 50;
+  const favourPay = .005;
+  const favourFade = 3;
+  const favourAfterSparing = 25;
+  // What Charm does either side of 10.
+  const charmPrice = .025;
+  const charmCheer = .06;
+  const charmSpite = .04;
+  const charmMercy = .03;
+  const brutePurse = .04;
 
   const clone = value => JSON.parse(JSON.stringify(value));
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -126,6 +137,9 @@ const Rules = (() => {
   const stat = (run, key) => run.stats[key] + (races[run.race].stats[key] || 0);
   // Saves from before strangers existed have met none.
   const metOf = run => run.met || {};
+  const charmOf = run => stat(run, 'cha') - 10;
+  // Well-liked faces are charged less.
+  const charmRate = run => 1 - clamp(charmOf(run) * charmPrice, -.15, .2);
 
   function trained(run, key) {
     let total = 0;
@@ -142,7 +156,7 @@ const Rules = (() => {
 
   // From the second act the market sells one torn page per act.
   // Only spells that come from pages raise the price; the Red Envoy's does not.
-  const pageCost = run => 50 + 30 * run.learned.filter(key => spellPool.includes(key)).length;
+  const pageCost = run => Math.round((50 + 30 * run.learned.filter(key => spellPool.includes(key)).length) * charmRate(run));
   const pageOnSale = run => run.act >= 1 && run.pageAct !== run.act && spellPool.some(key => !run.learned.includes(key));
 
   function buyPage(run) {
@@ -229,7 +243,7 @@ const Rules = (() => {
       train: { power: startAct * 2, skill: startAct * 2, guard: startAct * 2, toughness: startAct * 2 },
       gold: 40 + startAct * 120, day: 1, act: startAct, renown: 0, health: 1, mercy: true, debtMisses: 0,
       inventory: ['club'], equipped: { weapon: 'club', reserve: 'none', shield: 'none', armor: 'rags' },
-      tactic: 'balanced', aimAt: 'any', wounds: [], met: {}, visitor: null, duel: null,
+      tactic: 'balanced', aimAt: 'any', wounds: [], met: {}, visitor: null, duel: null, favour: favourStart,
       spells: [], triggers: {}, learned: [], spellChoices: null, spellsOwed: startAct, wins: 0, fights: 0, pending: null, over: null
     };
     if (startAct > 0) {
@@ -240,7 +254,7 @@ const Rules = (() => {
     return run;
   }
 
-  const price = (run, key) => Math.round(catalog[key].price * races[run.race].price * (1 - clamp((stat(run, 'cha') - 10) * .02, -.1, .16)));
+  const price = (run, key) => Math.round(catalog[key].price * races[run.race].price * charmRate(run));
   const sellPrice = key => Math.round((catalog[key]?.price || 0) * .4);
   const shopStock = run => Object.keys(catalog).filter(key => catalog[key].act <= run.act);
   const slotOf = key => trophies[key] ? 'weapon' : catalog[key].slot;
@@ -250,6 +264,51 @@ const Rules = (() => {
   const debtDue = run => 25 + 20 * run.act;
   const daysToDebt = run => debtEvery - ((run.day - 1) % debtEvery);
   const championReady = run => run.renown >= renownNeeded[run.act];
+
+  // Saves from before the crowd had a mind of its own start in the middle.
+  const favourOf = run => run.favour ?? favourStart;
+  const moodOf = favour => favour >= 70 ? 'Roaring' : favour >= 58 ? 'Warm' : favour >= 35 ? 'Watching' : 'Jeering';
+  const setFavour = (run, value) => { run.favour = clamp(Math.round(value), 0, 100); };
+  // Quiet days and the stands let the crowd's feeling fade back toward the middle.
+  function fade(run) {
+    const gap = favourStart - favourOf(run);
+    setFavour(run, favourOf(run) + Math.sign(gap) * Math.min(favourFade, Math.abs(gap)));
+  }
+
+  // What the crowd pays: more when it is pleased, and more to watch a face it fears in a fight to the death.
+  const winnings = (run, kind) => Math.round(purse(run, kind) * (1 + (favourOf(run) - favourStart) * favourPay)
+    * (kind === 'spar' ? 1 : 1 + clamp(-charmOf(run) * brutePurse, 0, .24)));
+
+  // The chance of being spared after losing a fight to the death.
+  function mercyChance(run) {
+    const favour = favourOf(run);
+    if (run.mercy) return clamp(favour / 35 + charmOf(run) * charmMercy, 0, 1);
+    return favour > 65 ? clamp((favour - 65) / 70 + charmOf(run) * .02, 0, .5) : 0;
+  }
+
+  // How much a bout moves the crowd. It likes boldness, blood and a close call, and is bored by caution.
+  function cheer(run, kind, tactic, result) {
+    let change = result.won ? 6 : kind === 'spar' ? -8 : -10;
+    if (result.won && kind !== 'spar') change += 4;
+    if (result.won && result.health < .25) change += 8;
+    if (result.won && result.time < 10) change += 4;
+    if (result.time > 40) change -= 5;
+    change += tactic === 'aggressive' ? 5 : tactic === 'defensive' ? -6 : 0;
+    return Math.round(change * (change > 0 ? 1 + charmOf(run) * charmCheer : 1 - charmOf(run) * charmSpite));
+  }
+
+  function sway(run, change, events) {
+    const before = moodOf(favourOf(run));
+    setFavour(run, favourOf(run) + change);
+    const after = moodOf(favourOf(run));
+    if (after !== before) events.push('The crowd is now ' + after.toLowerCase() + '.');
+  }
+
+  // Mercy has its own dice, so asking the crowd never changes a run's foes or fight seeds.
+  function crowdRoll(run) {
+    run.crowd = run.crowd || { rng: (run.rng ^ 0xC40DC40D) >>> 0 };
+    return roll(run.crowd);
+  }
 
   function buy(run, key) {
     if (!shopStock(run).includes(key) || run.inventory.includes(key) || run.gold < price(run, key)) return false;
@@ -283,7 +342,7 @@ const Rules = (() => {
 
   // Saves from before wounds existed have none.
   const woundsOf = run => run.wounds || [];
-  const surgeonCost = run => 15 + 15 * run.act;
+  const surgeonCost = run => Math.round((15 + 15 * run.act) * charmRate(run));
 
   function wound(run, part, events) {
     run.wounds = woundsOf(run).filter(item => item.part !== part).concat({ part, days: woundDays });
@@ -430,11 +489,13 @@ const Rules = (() => {
     if (busy(run) || run.gold < cost) return null;
     run.gold -= cost;
     run.train[key]++;
+    fade(run);
     return endDay(run, ['You spend the day on drills: ' + drills[key].name.toLowerCase() + '.']);
   }
 
   function rest(run) {
     if (busy(run)) return null;
+    fade(run);
     return endDay(run, ['You sleep, eat and let your wounds close.'], true);
   }
 
@@ -442,6 +503,7 @@ const Rules = (() => {
     if (busy(run)) return null;
     const pay = wage(run);
     run.gold += pay;
+    fade(run);
     return endDay(run, ['You haul cargo on the docks for ' + pay + ' gold.']);
   }
 
@@ -452,7 +514,7 @@ const Rules = (() => {
     // Walking onto the sand sends away a stranger still waiting.
     run.visitor = null;
     const foe = kind === 'champion' ? championConfig(run.act) : kind === 'duel' ? run.duel : run.offers[kind];
-    run.pending = { kind, seed: Math.floor(roll(run) * 4294967296), hero: heroConfig(run), foe: clone(foe) };
+    run.pending = { kind, seed: Math.floor(roll(run) * 4294967296), spare: crowdRoll(run), hero: heroConfig(run), foe: clone(foe) };
     return run.pending;
   }
 
@@ -530,6 +592,7 @@ const Rules = (() => {
       run.scouted = { ...run.scouted, [run.act]: true };
       events.push('You have studied ' + champions[run.act].name + '. The champion wall shows their habits.');
     }
+    fade(run);
     return endDay(run, events);
   }
 
@@ -555,17 +618,20 @@ const Rules = (() => {
 
   function finishFight(run, result) {
     if (run.pending.kind === 'watch') return finishWatch(run);
-    const { kind, foe } = run.pending;
+    // A fight saved before the crowd rolled dice counts as the kindest roll.
+    const { kind, foe, hero, spare = 0 } = run.pending;
     run.pending = null;
     if (kind === 'duel') run.duel = null;
     run.fights++;
     const events = [];
+    const change = cheer(run, kind, hero.tactic, result);
     if (result.won) {
       run.wins++;
-      const gold = Math.round(purse(run, kind) * (1 + clamp((stat(run, 'cha') - 10) * .025, -.1, .2)));
+      const gold = winnings(run, kind);
       run.gold += gold;
       run.health = clamp(result.health, .15, 1);
       events.push('You defeat ' + foe.name + ' and earn ' + gold + ' gold.');
+      sway(run, change, events);
       if (kind === 'champion') {
         const champion = champions[run.act];
         run.inventory.push(champion.trophy);
@@ -586,14 +652,22 @@ const Rules = (() => {
     } else if (kind === 'spar') {
       run.health = .3;
       events.push(foe.name + ' beats you to the sand. Sparring ends at first blood: you keep your life, not the purse.');
-    } else if (run.mercy) {
+      sway(run, change, events);
+    } else if (spare < mercyChance(run)) {
+      const first = run.mercy;
       run.mercy = false;
       run.gold = Math.floor(run.gold / 2);
       run.health = .25;
-      events.push('You yield. The crowd grants mercy, once. Half your gold is gone, and they will not spare you again before the next champion.');
+      if (first) {
+        events.push('You yield. The crowd grants mercy. Half your gold is gone, and only a crowd that loves you will spare you again before the next champion.');
+        sway(run, change, events);
+      } else {
+        events.push('You yield again, and the crowd that loves you spares you again. Half your gold is gone.');
+        sway(run, favourAfterSparing - favourOf(run), events);
+      }
     } else {
       run.over = 'dead';
-      events.push(foe.name + ' kills you. The sand drinks and the crowd moves on.');
+      events.push((run.mercy ? 'The crowd turns its thumbs down. ' : '') + foe.name + ' kills you. The sand drinks and the crowd moves on.');
       return events;
     }
     endDay(run, events);
@@ -625,6 +699,6 @@ const Rules = (() => {
   return {
     races, statNames, visitors, metOf, visitorOffer, visitorTerms, acceptBargain, declineBargain, triggerKeys, spellPool, triggerFor, setTrigger, pageCost, pageOnSale, buyPage, wounds, woundDays, woundBelow, tacticKeys, aimKeys, woundsOf, surgeonCost, treat, setTactic, setAim, drills, catalog, trophies, champions, renownNeeded,
     rollStats, stat, newRun, heroConfig, championConfig, price, sellPrice, shopStock, slotOf, trainingCost, purse, wage,
-    debtDue, daysToDebt, championReady, scoutedOf, billFor, bookOdds, maxStake, startWatch, study, buy, sell, equip, equipped, train, rest, work, startFight, finishFight, learnSpell, toggleSpell
+    debtDue, daysToDebt, championReady, favourOf, moodOf, winnings, mercyChance, cheer, scoutedOf, billFor, bookOdds, maxStake, startWatch, study, buy, sell, equip, equipped, train, rest, work, startFight, finishFight, learnSpell, toggleSpell
   };
 })();

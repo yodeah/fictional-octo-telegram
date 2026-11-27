@@ -7,12 +7,13 @@ A gory gladiator autobattler with permanent death, for phone and laptop. Static 
 - Dice-rolled stats and a race (human, elf or demon, each with a drawback).
 - Each day: fight, train, rest, work or watch. The debt falls due every fifth day.
 - The champion wall shows each champion in their gear, with their stats beside yours. In the stands, watch the champion’s exhibition to learn their habits, or bet up to a day’s wage. The bookmaker keeps a cut.
-- Sparring is safe from death; blood bouts and champions are not, apart from one mercy per champion.
+- Sparring is safe from death; blood bouts and champions are not, where the crowd decides whether you are spared (usually once per champion).
 - Before each bout pick a stance (aggressive, balanced, defensive) and where to aim.
 - Ending a bout under a fifth of your health leaves a wound on the part that took the most damage: −10% to one thing for four days, unless you pay the surgeon.
 - Champions give a trophy weapon and a spell page, and from the second act the market sells one page per act. Mana appears with your first spell.
 - Strangers sometimes turn up between days with a bargain: the price is shown before you accept, and you may always refuse.
 - Three spell slots. Before each bout give every spell a trigger (such as below 40% health) or leave it to your gladiator.
+- A pleased crowd pays more and may spare you. Charm lowers prices and wins the crowd; a face they fear draws bigger purses in fights to the death.
 - The game saves itself. A saved fight replays identically after a reload. A save code backs it up.
 - A new gladiator may start at the furthest champion reached (a Legacy).
 
