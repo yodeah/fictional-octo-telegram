@@ -19,7 +19,8 @@
   let shake = 0, clock = 0;
   const fallen = new Map();
   const shown = [];
-  let vignette, foreground, fallArt, mistArt, shaftArt;
+  let vignette, foreground, fallArt, mistArt, shaftArt, shadeArt;
+  let excitement = 0;
   const bursts = new Map();
   let impacts = [];
 
@@ -867,6 +868,64 @@
     ctx.restore();
   }
 
+  // The audience: shades of the dead, painted calm and cheering.
+  function paintShades(res) {
+    shadeArt = [false, true].map(cheer => {
+      const c = makeCanvas(1.5 * res, 1.9 * res), g = c.getContext('2d');
+      g.setTransform(res, 0, 0, res, .75 * res, 1.7 * res);
+      const body = g.createLinearGradient(0, -1.35, 0, .1);
+      body.addColorStop(0, '#9ef5e0');
+      body.addColorStop(.6, '#3f9fb0');
+      body.addColorStop(1, 'rgba(40,80,140,0)');
+      if (cheer) for (const side of [-1, 1]) {
+        shapeAt(g, [[side * .2, -.68], [side * .62, -1.24], [side * .7, -1.1], [side * .32, -.5]], '#6ccfcb', .05);
+        blob(g, side * .68, -1.22, .09, '#aef8e6');
+      }
+      g.beginPath();
+      g.moveTo(-.4, .05);
+      g.bezierCurveTo(-.42, -.6, -.36, -1.35, 0, -1.4);
+      g.bezierCurveTo(.36, -1.35, .42, -.6, .4, .05);
+      // A ragged, trailing hem instead of feet.
+      for (const [x, y] of [[.24, -.14], [.12, .12], [0, -.1], [-.14, .14], [-.26, -.12]]) g.lineTo(x, y);
+      g.closePath();
+      g.fillStyle = body;
+      g.fill();
+      g.strokeStyle = 'rgba(10,20,40,.8)';
+      g.lineWidth = .055;
+      g.stroke();
+      shapeAt(g, [[-.2, -.92], [-.18, -1.16], [0, -1.24], [.18, -1.16], [.2, -.92], [0, -.82]], '#0a1c2c', .035);
+      for (const dx of [-.08, .08]) {
+        blob(g, dx, -1.02, .075, 'rgba(190,255,235,.35)');
+        blob(g, dx, -1.02, cheer ? .04 : .03, '#f2fffa');
+      }
+      if (cheer) blob(g, 0, -.9, .045, '#bfffee');
+      return c;
+    });
+  }
+
+  const shadeSpots = [[-10.1, -4.7], [-9.2, -5.25], [-6.9, -5.7], [-3.75, -5.55], [-2.9, -5.75], [-1.45, -5.6],
+    [1.45, -5.6], [2.95, -5.75], [3.7, -5.5], [6.85, -5.7], [9.25, -5.2], [10.15, -4.65],
+    // Along the flanks, where they stay in sight when the camera closes in.
+    [-10.9, -2.9], [-11.6, -1.1], [-11.35, .9], [10.9, -2.9], [11.6, -1.1], [11.35, .9]];
+
+  function drawCrowd() {
+    ctx.save();
+    shadeSpots.forEach(([x, y], i) => {
+      const bob = Math.sin(clock * 1.6 + i * 2.3) * .07;
+      // Each one takes a different amount of excitement to get going, and hops on its own beat.
+      const keen = clamp(excitement * 1.6 - (i * 7 % 12) / 14, 0, 1);
+      const hop = keen * Math.abs(Math.sin(clock * 9 + i * 1.7)) * .32;
+      const size = .72 + (i * 5 % 4) * .05;
+      const art = shadeArt[keen > .35 ? 1 : 0];
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = .62 + keen * .3;
+      ctx.drawImage(art, sx(x - .75 * size), (y + bob - hop - 1.7 * size) * unit, 1.5 * size * unit, 1.9 * size * unit);
+      ctx.globalCompositeOperation = 'lighter';
+      glow(sx(x), (y + bob - hop - .7 * size) * unit, unit * .65, '90,230,220', .12 + keen * .2);
+    });
+    ctx.restore();
+  }
+
   function drawShafts() {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -922,6 +981,7 @@
     Sprites.setResolution(unit * dpr * 1.25);
     paintFrame();
     paintWeather();
+    paintShades(unit * dpr * 1.25);
   }
 
   // ---- Projection and primitives ----
@@ -1196,8 +1256,13 @@
 
   const jolt = amount => { if (!reducedMotion) shake = Math.max(shake, amount); };
 
+  const thrills = { hit: .12, block: .08, stagger: .3, wallslam: .4, shieldbreak: .35, freeze: .25, death: 1.6 };
+
   function onEvent(e, duel) {
     const who = duel.fighters[e.who];
+    const thrill = (thrills[e.type] || 0) + (e.type === 'hit' && (e.heavy || e.critical) || e.perfect ? .3 : 0);
+    // Small blows alone never stack into a full cheer; only a death holds it.
+    excitement = e.type === 'death' ? thrill : Math.min(.9, excitement + thrill);
     if (e.type === 'hit') {
       const rgb = e.color || (e.critical ? '#ffd23f' : '#fff4e6');
       if (e.damage) {
@@ -1282,6 +1347,8 @@
   function updateEffects(dt, duel) {
     clock += dt;
     shake = Math.max(0, shake - dt * 1.4);
+    // After a kill the crowd keeps cheering for a while.
+    excitement = Math.max(0, excitement - dt * (fallen.size ? .22 : .8));
     for (const p of particles) {
       p.age += dt;
       p.vz -= p.gravity * dt;
@@ -1498,6 +1565,7 @@
     drawFalls();
     drawMist(-5.5, .35, .55, 1.7);
     drawMist(-6.6, -.2, .3, 2.2);
+    drawCrowd();
     duel.fighters.forEach(telegraph);
     duel.fighters.forEach(footing);
 
@@ -1610,6 +1678,7 @@
     particles = []; floaters = []; trails = []; ghosts = []; rings = []; pools = []; impacts = [];
     fallen.clear();
     shake = 0;
+    excitement = 0;
     Object.assign(camera, { x: 0, y: 0, zoom: 1 });
     if (decalCtx) decalCtx.clearRect(bounds.x, bounds.y, bounds.w, bounds.h);
   }
