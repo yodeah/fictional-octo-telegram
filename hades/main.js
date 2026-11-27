@@ -11,22 +11,13 @@
 
   let duel, state = 'ready', speed = 0, bout = 1, accumulator = 0, pause = 0, slow = 0, rematch = 0;
   let matchup;
-  const keys = Object.keys(kits);
+  // Only the two detailed champions can be picked. The older classes stay in data.js but their
+  // sprites are not up to the same standard, so they are left out of the menus.
+  const keys = Object.keys(kits).filter(key => kits[key].champion);
   const pickers = [0, 1].map(i => $('kit' + i));
 
-  function rollKit(index, otherKey) {
-    const pinned = pickers[index].value;
-    if (pinned !== 'random') return pinned;
-    // Random matchups favor a clash of styles.
-    const style = key => weapons[kits[key].weapon].style;
-    let pool = keys.filter(key => key !== otherKey);
-    if (otherKey && Math.random() < .75) pool = pool.filter(key => style(key) !== style(otherKey));
-    return pool[Math.floor(Math.random() * pool.length)];
-  }
-
   function newMatchup() {
-    const first = rollKit(0, pickers[1].value === 'random' ? null : pickers[1].value);
-    matchup = [first, rollKit(1, first)];
+    matchup = pickers.map(picker => picker.value);
     wins[0] = wins[1] = 0;
   }
 
@@ -172,8 +163,10 @@
     else if (state === 'finished') { bout++; setup(); begin(); }
     else { state = state === 'running' ? 'paused' : 'running'; updateControls(); }
   });
+  // Swaps which champion stands on which side.
   $('generate').addEventListener('click', () => {
     if (state === 'finished') bout++;
+    [pickers[0].value, pickers[1].value] = [pickers[1].value, pickers[0].value];
     newMatchup();
     setup();
   });
@@ -182,7 +175,6 @@
     $('speed').textContent = speeds[speed] + '×';
   });
   pickers.forEach(picker => {
-    picker.add(new Option('Random', 'random'));
     for (const key of keys) picker.add(new Option(`${kits[key].name} — ${weapons[kits[key].weapon].name} + ${weapons[kits[key].reserve].name}`, key));
     picker.addEventListener('change', () => {
       if (state === 'finished') bout++;
@@ -191,11 +183,11 @@
     });
   });
 
-  // ?a=marksman&b=raider pins the kits, ?seed=7 repeats a bout, ?debug draws collision shapes.
+  // ?a=murmillo&b=murmillo pins the champions (a mirror match), ?seed=7 repeats a bout, ?debug draws collision shapes.
   // Without them the two champions meet: Varro the murmillo against Cassian the archer.
   pickers.forEach((picker, i) => {
     const key = params.get(i ? 'b' : 'a');
-    picker.value = kits[key] ? key : i ? 'sagittarius' : 'murmillo';
+    picker.value = keys.includes(key) ? key : i ? 'sagittarius' : 'murmillo';
   });
 
   Render.init($('arena'));
