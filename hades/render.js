@@ -79,66 +79,14 @@
     g.save();
     ellipsePath(g, 0, 0, rx - .12, ry - .08);
     g.clip();
-    // Flagstones laid on the diagonal, as seen from the high camera.
-    g.save();
-    g.scale(1, K);
-    g.rotate(Math.PI / 4);
-    const size = 1.45;
-    for (let i = -11; i < 11; i++) for (let j = -11; j < 11; j++) {
-      const shade = r();
-      g.fillStyle = `hsl(${168 + r() * 22}, ${30 + r() * 14}%, ${23 + shade * 12}%)`;
-      g.fillRect(i * size + .04, j * size + .04, size - .08, size - .08);
-      g.fillStyle = 'rgba(200,255,230,.09)';
-      g.fillRect(i * size + .05, j * size + .05, size - .1, .07);
-      g.fillStyle = 'rgba(0,20,25,.35)';
-      g.fillRect(i * size + .05, (j + 1) * size - .12, size - .1, .08);
-      if (r() < .16) {
-        g.strokeStyle = 'rgba(5,28,30,.6)';
-        g.lineWidth = .035;
-        let x = i * size + r() * size, y = j * size + .1;
-        g.beginPath();
-        g.moveTo(x, y);
-        for (let k = 0; k < 4; k++) g.lineTo(x += r() * .5 - .25, y += .3);
-        g.stroke();
-      }
+    paving(g, r);
+    // Tufts of dark grass and pale flowers creeping in from the edge.
+    for (let i = 0; i < 90; i++) {
+      const angle = r() * Math.PI * 2, d = .84 + r() * .17;
+      tuft(g, Math.cos(angle) * d * rx, Math.sin(angle) * d * ry, .22 + r() * .26, r);
     }
-    g.restore();
-    // Moss, grass tufts and small pale flowers, thicker toward the edge.
-    for (let i = 0; i < 1500; i++) {
-      const angle = r() * Math.PI * 2, d = Math.sqrt(r()) * (r() < .65 ? 1 : .8);
-      const edge = d > .78;
-      if (!edge && r() < .65) continue;
-      const x = Math.cos(angle) * d * rx, y = Math.sin(angle) * d * ry;
-      blob(g, x, y, .04 + r() * (edge ? .2 : .1), `rgba(${40 + r() * 30},${130 + r() * 80},${100 + r() * 40},${.18 + r() * .3})`);
-      if (r() < .08) blob(g, x, y - .06, .035, 'rgba(214,245,255,.85)');
-    }
-    // The central seal.
-    g.save();
-    g.scale(1, K);
-    g.shadowColor = 'rgba(120,255,220,.5)';
-    for (const [radius, w, color] of [[2.75, .24, '#7b8a58'], [2.75, .09, gold], [2.35, .05, '#e8d08a'], [1.15, .08, gold]]) {
-      g.strokeStyle = color;
-      g.lineWidth = w;
-      ellipsePath(g, 0, 0, radius, radius);
-      g.stroke();
-    }
-    g.strokeStyle = 'rgba(235,210,140,.75)';
-    g.lineWidth = .07;
-    for (let i = 0; i < 12; i++) {
-      g.save();
-      g.rotate(i / 12 * Math.PI * 2);
-      g.beginPath();
-      g.moveTo(1.15, 0);
-      g.bezierCurveTo(1.5, -.55, 2.1, -.5, 2.35, 0);
-      g.bezierCurveTo(2.1, .5, 1.5, .55, 1.15, 0);
-      g.stroke();
-      blob(g, 2.55, 0, .09, '#e8d08a');
-      g.restore();
-    }
-    g.fillStyle = 'rgba(160,255,230,.14)';
-    ellipsePath(g, 0, 0, 1.1, 1.1);
-    g.fill();
-    g.restore();
+    fissures(g, r);
+    seal(g, r);
     const light = g.createRadialGradient(-2, -1.5, 1, 0, 0, rx);
     light.addColorStop(0, 'rgba(150,255,225,.14)');
     light.addColorStop(.65, 'rgba(10,50,60,0)');
@@ -170,6 +118,174 @@
           `hsl(${160 + r() * 50}, 45%, ${14 + r() * 18}%)`);
       }
     }
+  }
+
+  function tuft(g, x, y, size, r) {
+    const hue = 158 + r() * 40;
+    for (let k = 0; k < 11; k++) {
+      const lean = (r() - .5) * 2.4, tall = size * (.5 + r() * .8);
+      const baseX = x + (r() - .5) * size * 1.5, baseY = y + (r() - .5) * size * .5;
+      g.beginPath();
+      g.moveTo(baseX - size * .09, baseY);
+      g.quadraticCurveTo(baseX + lean * tall * .2, baseY - tall * .8, baseX + lean * tall * .6, baseY - tall);
+      g.quadraticCurveTo(baseX + lean * tall * .25, baseY - tall * .5, baseX + size * .09, baseY);
+      g.fillStyle = `hsl(${hue + r() * 14}, ${38 + r() * 20}%, ${14 + k * 1.8}%)`;
+      g.fill();
+    }
+    if (r() < .35) for (let k = 0; k < 3; k++) {
+      const fx = x + (r() - .5) * size * 1.4, fy = y - size * (.3 + r() * .6);
+      for (let p = 0; p < 5; p++) blob(g, fx + Math.cos(p * 1.256) * .045, fy + Math.sin(p * 1.256) * .035, .033, '#cfeeff');
+      blob(g, fx, fy, .025, '#ffd76a');
+    }
+  }
+
+  // One cut stone: face, lit upper edge, shaded lower edge and a few chips.
+  function stone(g, points, color, r) {
+    const cx = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+    const cy = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+    const inset = points.map(([x, y]) => {
+      const d = Math.hypot(cx - x, cy - y) || 1;
+      return [x + (cx - x) / d * .07, y + (cy - y) / d * .07];
+    });
+    const path = () => {
+      g.beginPath();
+      inset.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](x, y));
+      g.closePath();
+    };
+    path();
+    g.fillStyle = color;
+    g.fill();
+    g.save();
+    path();
+    g.clip();
+    for (const [dx, dy, tone] of [[.07, .09, 'rgba(190,255,235,.22)'], [-.08, -.1, 'rgba(0,8,24,.5)']]) {
+      g.save();
+      g.translate(dx, dy);
+      path();
+      g.strokeStyle = tone;
+      g.lineWidth = .1;
+      g.stroke();
+      g.restore();
+    }
+    for (let i = 0; i < 7; i++) {
+      blob(g, cx + (r() - .5) * 1.1, cy + (r() - .5) * 1.1, .02 + r() * .06, r() < .5 ? 'rgba(0,20,30,.24)' : 'rgba(180,240,220,.12)');
+    }
+    if (r() < .3) {
+      g.strokeStyle = 'rgba(4,20,28,.65)';
+      g.lineWidth = .028;
+      let x = cx + (r() - .5) * .6, y = cy - .6;
+      g.beginPath();
+      g.moveTo(x, y);
+      for (let k = 0; k < 5; k++) g.lineTo(x += r() * .46 - .23, y += .24);
+      g.stroke();
+    }
+    g.restore();
+  }
+
+  const stoneColor = (r, lift = 0) => `hsl(${172 + r() * 34}, ${26 + r() * 18}%, ${16 + r() * 10 + lift * .7}%)`;
+
+  // Uneven flagstones on the diagonal, ringed by a course of curved stones around the seal.
+  function paving(g, r) {
+    g.save();
+    g.scale(1, K);
+    g.fillStyle = '#0d2a30';
+    g.fillRect(-14, -12, 28, 24);
+    g.save();
+    g.rotate(Math.PI / 4);
+    const size = 1.5, n = 11;
+    const corner = [];
+    for (let i = 0; i <= n * 2; i++) {
+      corner[i] = [];
+      for (let j = 0; j <= n * 2; j++) corner[i][j] = [(i - n) * size + (r() - .5) * .48, (j - n) * size + (r() - .5) * .48];
+    }
+    for (let i = 0; i < n * 2; i++) for (let j = 0; j < n * 2; j++) {
+      const a = corner[i][j], b = corner[i + 1][j], c = corner[i + 1][j + 1], d = corner[i][j + 1];
+      const half = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      // Some slabs are split in two so the courses never line up too neatly.
+      if (r() < .28) {
+        stone(g, [a, half(a, b), half(d, c), d], stoneColor(r), r);
+        stone(g, [half(a, b), b, c, half(d, c)], stoneColor(r), r);
+      } else stone(g, [a, b, c, d], stoneColor(r), r);
+    }
+    g.restore();
+    for (const [inner, outer, count] of [[2.9, 3.75, 20]]) {
+      blob(g, 0, 0, outer + .06, '#0b252c');
+      for (let i = 0; i < count; i++) {
+        const from = i / count * Math.PI * 2, to = (i + 1) / count * Math.PI * 2;
+        const at = (a, radius) => [Math.cos(a) * radius, Math.sin(a) * radius];
+        stone(g, [at(from, inner), at(from, outer), at((from + to) / 2, outer), at(to, outer), at(to, inner), at((from + to) / 2, inner)],
+          stoneColor(r, i % 2 ? 4 : 10), r);
+      }
+    }
+    g.restore();
+  }
+
+  // Cracks where the light of the underworld shows through.
+  function fissures(g, r) {
+    g.save();
+    g.scale(1, K);
+    g.lineCap = g.lineJoin = 'round';
+    for (const [startX, startY, heading] of [[-9.5, 3.2, -.35], [8.8, -5.2, 2.2], [3.6, 7.6, -1.9], [-6.2, -7.4, 1.2], [9.9, 4.4, 3.5]]) {
+      const points = [[startX, startY]];
+      let x = startX, y = startY;
+      for (let i = 0; i < 8; i++) {
+        const a = heading + (r() - .5) * 1.5;
+        points.push([x += Math.cos(a) * .52, y += Math.sin(a) * .52]);
+      }
+      for (const [w, color] of [[.46, 'rgba(60,255,200,.09)'], [.2, 'rgba(80,255,210,.22)'], [.1, '#04141a'], [.035, '#8dffe0']]) {
+        for (let i = 1; i < points.length; i++) {
+          g.strokeStyle = color;
+          g.lineWidth = w * (1 - i / points.length * .75);
+          g.beginPath();
+          g.moveTo(...points[i - 1]);
+          g.lineTo(...points[i]);
+          g.stroke();
+        }
+      }
+    }
+    g.restore();
+  }
+
+  // The central seal: an inlaid sunburst in gold on dark stone.
+  function seal(g, r) {
+    g.save();
+    g.scale(1, K);
+    blob(g, 0, 0, 2.86, ink);
+    blob(g, 0, 0, 2.78, '#8d6a2e');
+    blob(g, 0, 0, 2.62, '#123a42');
+    const point = (a, radius) => [Math.cos(a) * radius, Math.sin(a) * radius];
+    const shard = (a, inner, outer, wide, light, dark) => {
+      for (const [side, color] of [[-1, light], [1, dark]]) {
+        g.beginPath();
+        g.moveTo(...point(a, outer));
+        g.lineTo(...point(a + side * wide, inner));
+        g.lineTo(...point(a, inner * .82));
+        g.closePath();
+        g.fillStyle = color;
+        g.fill();
+        g.strokeStyle = ink;
+        g.lineWidth = .028;
+        g.stroke();
+      }
+    };
+    for (let i = 0; i < 8; i++) shard(i / 8 * Math.PI * 2 + Math.PI / 8, .8, 1.9, .3, '#2f8f82', '#1c5f63');
+    for (let i = 0; i < 8; i++) shard(i / 8 * Math.PI * 2, .85, 2.5, .2, '#f2cf73', '#9c7430');
+    for (let i = 0; i < 32; i++) blob(g, ...point(i / 32 * Math.PI * 2, 2.7), .045, '#ffe7a0');
+    for (const [radius, w, color] of [[2.52, .045, '#e8d08a'], [2.02, .025, 'rgba(232,208,138,.6)'], [.95, .1, gold]]) {
+      g.strokeStyle = color;
+      g.lineWidth = w;
+      ellipsePath(g, 0, 0, radius, radius);
+      g.stroke();
+    }
+    blob(g, 0, 0, .86, '#0e2f38');
+    for (let i = 0; i < 3; i++) shard(i / 3 * Math.PI * 2 - Math.PI / 2, .28, .8, .55, '#b6ffe6', '#4fc7ac');
+    blob(g, 0, 0, .2, ink);
+    blob(g, 0, 0, .14, '#d8fff2');
+    // Wear, so the inlay sits in the floor.
+    for (let i = 0; i < 240; i++) {
+      blob(g, ...point(r() * Math.PI * 2, Math.sqrt(r()) * 2.75), .015 + r() * .05, 'rgba(8,30,36,.35)');
+    }
+    g.restore();
   }
 
   function column(g, x, y, tall) {
