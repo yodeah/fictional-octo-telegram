@@ -66,6 +66,7 @@
       g.quadraticCurveTo(x + .5, y - .12, x + 1 + r(), y);
       g.stroke();
     }
+    cavern(g);
     const rx = arena.a + .75, ry = (arena.b + .75) * K;
     // Platform side, then top.
     for (let i = 10; i >= 1; i--) {
@@ -110,11 +111,106 @@
     surroundings(g, r, rx, ry);
   }
 
+  // The far side of the cavern, painted back to front: each layer nearer, darker and sharper.
+  function cavern(g) {
+    const r = noise(307);
+    const left = bounds.x, right = bounds.x + bounds.w, top = bounds.y;
+    const sky = g.createLinearGradient(0, top, 0, -3.8);
+    sky.addColorStop(0, '#12061f');
+    sky.addColorStop(.4, '#3a1648');
+    sky.addColorStop(.62, '#8a2f5c');
+    sky.addColorStop(.74, 'rgba(48,50,92,.95)');
+    sky.addColorStop(1, 'rgba(20,60,90,0)');
+    g.fillStyle = sky;
+    g.fillRect(left, top, bounds.w, -3.8 - top);
+    // A pale sun of the underworld behind the ruins.
+    const sun = g.createRadialGradient(0, -6.6, .1, 0, -6.6, 4.5);
+    sun.addColorStop(0, 'rgba(255,205,150,.75)');
+    sun.addColorStop(.25, 'rgba(255,120,110,.3)');
+    sun.addColorStop(1, 'rgba(255,90,120,0)');
+    g.fillStyle = sun;
+    g.fillRect(-5, -10, 10, 5);
+    const ridge = (base, low, high, color, edge) => {
+      const points = [[left, base + 1]];
+      for (let x = left; x <= right; x += .5 + r() * .8) points.push([x, base - low - r() ** 2 * (high - low)]);
+      points.push([right, base - low], [right, base + 1]);
+      shapeAt(g, points, color, 0);
+      g.strokeStyle = edge;
+      g.lineWidth = .05;
+      g.beginPath();
+      points.slice(1, -1).forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](x, y));
+      g.stroke();
+    };
+    ridge(-6.1, .35, 1.9, '#4a2058', 'rgba(255,140,150,.45)');
+    ruins(g, r);
+    const shore = g.createLinearGradient(0, -6.4, 0, -4.5);
+    shore.addColorStop(0, '#1d1638');
+    shore.addColorStop(.45, 'rgba(28,30,66,.85)');
+    shore.addColorStop(1, 'rgba(20,48,80,0)');
+    ridge(-5.5, .2, .9, shore, 'rgba(120,200,220,.35)');
+    // Stone teeth hanging from the roof.
+    for (let x = left; x < right; x += .55 + r() * .9) {
+      const long = .5 + r() ** 2 * 2.6 + (Math.abs(x) > 8 ? 1 : 0), wide = .18 + r() * .34;
+      const y = -9.3;
+      shapeAt(g, [[x - wide, top], [x + wide, top], [x + wide * .6, y + long * .35], [x + r() * .1, y + long], [x - wide * .55, y + long * .3]], '#10061b', .04);
+      g.strokeStyle = 'rgba(200,110,170,.35)';
+      g.lineWidth = .04;
+      g.beginPath();
+      g.moveTo(x - wide * .55, y + long * .3);
+      g.lineTo(x + r() * .1, y + long);
+      g.stroke();
+    }
+    // Haze where the cavern meets the water.
+    const haze = g.createLinearGradient(0, -6.4, 0, -4.4);
+    haze.addColorStop(0, 'rgba(60,220,200,0)');
+    haze.addColorStop(.5, 'rgba(70,230,205,.22)');
+    haze.addColorStop(1, 'rgba(40,160,170,0)');
+    g.fillStyle = haze;
+    g.fillRect(left, -6.4, bounds.w, 2);
+    // Broken reflections of the sunset on the water.
+    for (let i = 0; i < 130; i++) {
+      const y = -5.4 + r() * 1.5, x = (r() - .5) * (2 + (y + 5.4) * 5);
+      g.fillStyle = `rgba(255,${140 + r() * 90},150,${.08 + r() * .2})`;
+      g.fillRect(x, y, .1 + r() * .55, .035);
+    }
+  }
+
+  // A drowned temple on the horizon: colonnades, broken pediments and lit doorways.
+  function ruins(g, r) {
+    const stoneDark = '#2b1440', stoneLit = '#6b2e63';
+    for (const [cx, columns, tall, broken] of [[-10.6, 4, 2.1, true], [-5.4, 5, 1.7, false], [5.6, 5, 1.7, false], [10.8, 4, 2.2, true], [0, 3, 1.15, true]]) {
+      const base = -5.75, wide = columns * .52;
+      shapeAt(g, [[cx - wide / 2 - .3, base + .5], [cx - wide / 2 - .15, base], [cx + wide / 2 + .15, base], [cx + wide / 2 + .3, base + .5]], stoneDark, .05);
+      for (let i = 0; i < columns; i++) {
+        const x = cx - wide / 2 + i * .52 + .26;
+        const high = broken && r() < .45 ? tall * (.35 + r() * .4) : tall;
+        shapeAt(g, [[x - .13, base], [x - .11, base - high], [x + .11, base - high], [x + .13, base]], stoneDark, .04);
+        g.fillStyle = stoneLit;
+        g.fillRect(x - .08, base - high + .04, .05, high - .08);
+        if (high === tall) g.fillRect(x - .17, base - high - .07, .34, .07);
+        // A doorway glows between some of the columns.
+        if (i < columns - 1 && r() < .5) {
+          blob(g, x + .26, base - .28, .34, 'rgba(255,190,110,.16)');
+          shapeAt(g, [[x + .18, base], [x + .18, base - .34], [x + .26, base - .46], [x + .34, base - .34], [x + .34, base]], '#ffc176', .03);
+        }
+      }
+      const y = base - tall - .07;
+      if (!broken) {
+        shapeAt(g, [[cx - wide / 2 - .1, y], [cx - wide / 2 - .1, y - .2], [cx + wide / 2 + .1, y - .2], [cx + wide / 2 + .1, y]], stoneLit, .05);
+        shapeAt(g, [[cx - wide / 2 - .2, y - .2], [cx, y - .85], [cx + wide / 2 + .2, y - .2]], stoneDark, .05);
+        blob(g, cx, y - .43, .12, '#ffc176');
+      } else {
+        shapeAt(g, [[cx - wide / 2 - .1, y], [cx - wide / 2 - .1, y - .2], [cx - .1, y - .2], [cx + .12, y]], stoneLit, .05);
+      }
+    }
+  }
+
   // Islands of rock in the dark water, then the colonnade and guardians along the far side.
   function surroundings(g, r, rx, ry) {
     for (let i = 0; i < 46; i++) {
       const a = r() * Math.PI * 2, far = 1.12 + r() * .5;
       const x = Math.cos(a) * rx * far, y = Math.sin(a) * ry * far;
+      if (y < -5.2) continue;
       rock(g, x, y, .25 + r() * .6, r);
     }
     const around = (a, out = 1.05) => [Math.cos(a) * (rx + out), Math.sin(a) * (ry + out * .9)];
@@ -600,7 +696,7 @@
     height = canvas.clientHeight;
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
-    unit = Math.min(width / 23.6, height / 12.2);
+    unit = Math.min(width / 23.6, height / 13);
     // Painted once a little above screen resolution so zooming stays sharp.
     const res = unit * dpr * 1.25;
     const old = decals;
@@ -1172,7 +1268,7 @@
     const top = Math.min(a.y, b.y) * K - 4.2, bottom = Math.max(a.y, b.y) * K + 1.4 + sprawl;
     const zoom = clamp(Math.min(width / unit / (right - left), height / unit / (bottom - top)), 1, duel.winner === null ? 1.42 : 1.3);
     // Never pan far enough to show past the painted scenery.
-    const roomX = Math.max(0, 12.4 - width / unit / zoom / 2), roomY = Math.max(0, 7.4 - height / unit / zoom / 2);
+    const roomX = Math.max(0, 12.4 - width / unit / zoom / 2), roomY = Math.max(0, 7.6 - height / unit / zoom / 2);
     const tx = clamp((left + right) / 2, -roomX, roomX);
     const ty = clamp((top + bottom) / 2, -roomY, roomY);
     const follow = 1 - Math.exp(-dt * 3);
@@ -1190,7 +1286,7 @@
     const z = camera.zoom;
     const jx = rand(-shake, shake) * unit * .5, jy = rand(-shake, shake) * unit * .5;
     ctx.setTransform(dpr * z, 0, 0, dpr * z,
-      dpr * (width / 2 - camera.x * unit * z + jx), dpr * (height / 2 + unit * .25 - camera.y * unit * z + jy));
+      dpr * (width / 2 - camera.x * unit * z + jx), dpr * (height / 2 + unit * .55 * z - camera.y * unit * z + jy));
     ctx.drawImage(floor, bounds.x * unit, bounds.y * unit, bounds.w * unit, bounds.h * unit);
     ctx.drawImage(decals, bounds.x * unit, bounds.y * unit, bounds.w * unit, bounds.h * unit);
     ctx.save();
