@@ -1,6 +1,6 @@
 # Arena Ledger
 
-A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters use low-poly 3D geometry rendered on Canvas 2D with a perspective camera.
+A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters, gear and venues are hand-drawn 2D art on a Canvas 2D skeleton with a perspective camera; the earlier low-poly 3D look is still available.
 
 ## Design decision: fights are fully idle
 
@@ -45,7 +45,7 @@ The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three com
 
 Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
 
-The **Quality** menu saves your choice for the next visit. Low is the default. Medium and High refine the fighters, equipment, bolts, finisher props and the three venues. High draws about twice as much geometry as Low in the reference bout.
+With **Art 3D**, the **Quality** menu appears and saves your choice for the next visit. Low is the default. Medium and High refine the fighters, equipment, bolts, finisher props and the three venues. High draws about twice as much geometry as Low in the reference bout.
 
 **Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
 
@@ -75,9 +75,9 @@ The second row of buttons finds what limits the frame rate on a device. **Res fu
 
 Measured at phone size on a Mac (60 Hz), both renderers held 60 FPS with no drops at 1× and 3×. WebGL cut main-thread draw time from 3.2 to 2.3 ms at 1× and from 9.2 to 5.0 ms at 3×, and painting alone from 1.8 to 0.4 ms. The first test on a phone reported about 24 FPS on Canvas and 22 FPS on WebGL. The follow-up phone profiling steps and full measurements are in [docs/rendering-performance.md](docs/rendering-performance.md). The plan for doubling geometric detail with a Quality setting is in [docs/detail-rework-plan.md](docs/detail-rework-plan.md).
 
-## 2D art proof of concept
+## 2D art
 
-**Art 3D / Art 2D** switches the fighters between the 3D meshes (the default) and detailed 2D cut-out art (`fighter2d.js`). `?style=2d` or `?style=3d` sets it from the address bar, and `?cast=1` or `?cast=2` starts from a set matchup. Every weapon, special, shield, armor kit and venue has 2D art (`weapons2d.js`, `armor2d.js`, `venues2d.js`); a new item needs it too, or it keeps its 3D mesh there. It changes only the picture. Findings, measurements and the plan are in [docs/2d-art-poc.md](docs/2d-art-poc.md).
+**Art 2D / Art 3D** switches between the detailed 2D cut-out art (`fighter2d.js`, the default) and the older 3D meshes. `?style=2d` or `?style=3d` sets it from the address bar, and `?cast=1` or `?cast=2` starts from a set matchup. Every weapon, special, shield, armor kit and venue has 2D art (`weapons2d.js`, `armor2d.js`, `venues2d.js`); a new item needs it too, or it keeps its 3D mesh there. It changes only the picture. Findings, measurements and the plan are in [docs/2d-art-poc.md](docs/2d-art-poc.md).
 
 ## Armor geometry
 

@@ -1499,11 +1499,11 @@ function drawShieldModel(fighter, pose, world) {
   return transform;
 }
 
-// Which fighter painter is on: the 3D meshes, or the 2D art proof of concept (fighter2d.js).
+// Which art is on: the 2D cut-out art (fighter2d.js), the default, or the older 3D meshes.
 const artStyle = (() => {
   const query = new URLSearchParams(location.search).get('style');
   if (query === '2d' || query === '3d') return { flat: query === '2d' };
-  try { return { flat: localStorage.getItem('arena-art') === '2d' }; } catch { return { flat: false }; }
+  try { return { flat: localStorage.getItem('arena-art') !== '3d' }; } catch { return { flat: true }; }
 })();
 
 // Gear without 2D art yet keeps its 3D mesh, painted in place between the sprites.
@@ -3411,6 +3411,8 @@ const artButton = document.getElementById('art');
 function showArtStyle() {
   artButton.textContent = artStyle.flat ? 'Art 2D' : 'Art 3D';
   artButton.setAttribute('aria-pressed', String(artStyle.flat));
+  // Quality only refines the 3D meshes and venues.
+  qualitySelect.closest('label').hidden = artStyle.flat;
 }
 artButton.addEventListener('click', () => {
   artStyle.flat = !artStyle.flat;

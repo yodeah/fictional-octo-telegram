@@ -4,7 +4,7 @@ Branch: `claude/detailed-2d-assets-poc-63e424`, cut from `main` at `aa10e25`. Me
 
 ## Answer
 
-Detailed 2D fighters look far better than the current meshes and draw faster, as long as each part is painted once into a sprite and only moved afterwards. The 2D art is playable behind the **Art 3D / Art 2D** button.
+Detailed 2D fighters look far better than the current meshes and draw faster, as long as each part is painted once into a sprite and only moved afterwards. The 2D art is now the default, after it was checked on a phone on 2026-11-27; **Art 2D / Art 3D** still switches.
 
 **3D (today)**
 
@@ -18,7 +18,7 @@ Detailed 2D fighters look far better than the current meshes and draw faster, as
 
 ## Try it
 
-`open index.html`, then press **Art 3D** so it reads **Art 2D**. The button switches painters at any time, also mid-bout, and remembers the choice. 3D stays the default. Pick any gear under **Show gear, stats & spells**.
+`open index.html`. The **Art** button switches painters at any time, also mid-bout, and remembers the choice. Pick any gear under **Show gear, stats & spells**.
 
 To start from a set matchup, run `python3 -m http.server 8000` in the project folder and open one of these (`open` cannot pass address options to a local file):
 
@@ -87,7 +87,7 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 - Sprite memory for the first matchup: about 2.8 MB on desktop and 0.5 MB at phone size. Baking took 7–60 ms, once, and repeats after a resize or a new look.
 - Looks pile up over many matchups, so sprites are released between bouts once they pass 12 MB. Peak in the 66-bout sweep was about 15 MB on desktop.
 - A forced-readback timing in the app's hidden browser pane showed 2D as slower. Neither real frame measurement above reproduced that, so it is not counted.
-- **Not measured on a real phone.** Add `?style=2d&cast=1&bench` to the served address and compare with `?style=3d&cast=1&bench`. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
+- **Phone:** reported to work fine on 2026-11-27, without frame-rate numbers. To get them, add `?style=2d&cast=1&bench` to the served address and compare with `?style=3d&cast=1&bench`. The first phone test of the 3D game reported about 24 FPS, and its cause was never confirmed.
 
 ## Options considered
 
@@ -105,17 +105,18 @@ Headless Chrome on an Apple M1. Plate against leather, ready pose.
 - One side-on drawing per part, so there is no true twist or turn of the torso or shield.
 - Specials do not change their art with their state (Last Oath's blade does not brighten when sworn; the aura still shows it).
 - Sprites do not interleave by depth between the two fighters. The attacker is drawn on top.
-- The Quality setting changes nothing in 2D mode.
+- The Quality setting only affects 3D, so it is hidden in 2D mode.
 - The Polys and WebGL benchmark toggles do nothing to the sprites.
 
 ## Plan to finish
 
 | # | Step | Est. tokens | State |
 | --- | --- | ---: | --- |
-| 1 | Look at the 2D art, test on the phone, and decide | — | **Open** |
+| 1 | Look at the 2D art, test on the phone, and decide | — | Done: 2D is the default |
 | 2 | Joint polish and cloth swing | 40k | Done |
 | 3 | All weapons, shields, specials and armor kits, with a first polish pass | 370k | Done |
 | 4 | Matching backdrop and crowd art for the three venues | 80k | Done |
-| 5 | Make 2D the default, remove the 3D painter, WebGL path and Quality setting, update docs | 40k | Waiting for the decision in step 1 |
+| 5 | Make 2D the default | 10k | Done |
+| 6 | Remove the 3D painter, WebGL path and Quality setting, update docs | 40k | **Open** |
 
-If 2D is chosen, stop adding 3D mesh detail, because step 5 deletes it. A new weapon or armor kit now needs 2D art too.
+Stop adding 3D mesh detail, because step 6 deletes it. A new weapon or armor kit now needs 2D art too.
