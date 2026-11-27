@@ -8,7 +8,9 @@
   const Z = .80;          // apparent height of one unit
   const SIZE = 1.38;      // fighters are painted a little larger than their collision circle
   const DIRECTIONS = 16;
-  const LIMIT = 900;      // cached frames
+  const LIMIT = 1400;     // cached frames
+  // Champions get extra in-between frames for smoother motion.
+  const extraFrames = { idle: 2, run: 2, windup: 2, active: 2, recover: 2, stun: 2, dead: 2, dash: 1 };
   const frames = { idle: 4, run: 8, dash: 2, windup: 4, active: 3, recover: 3, hurt: 1, stun: 6, dead: 6 };
   const ink = '#0a0710';
   const looks = [
@@ -37,17 +39,22 @@
 
   // Weapon and body parameters for one frame. yaw turns around the body (positive to the right),
   // pitch lifts the weapon, out is the hand's distance in front.
-  function posture(weapon, anim, shape, t) {
-    const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0 };
+  function posture(weapon, anim, shape, t, fine = false) {
+    const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0, breath: 0, swing: 0 };
     if (weapon === 'spear') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
     if (['maul', 'greatsword', 'mace', 'axe'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
     if (weapon === 'staff') { p.yaw = .75; p.pitch = 1.38; }
     if (weapon === 'crossbow' || weapon === 'bow' || weapon === 'recurve') { p.yaw = .16; p.pitch = 0; p.out = .32; p.high = 1.14; }
     const wave = Math.sin(t * Math.PI * 2);
-    if (anim === 'idle') { p.bob = wave * .025; p.sway = .06 + wave * .04; p.crouch = .04; }
+    if (anim === 'idle') {
+      p.bob = wave * .025; p.sway = .06 + wave * .04; p.crouch = .04;
+      // Breathing: the chest and shoulders rise, the guard drifts a little.
+      if (fine) { p.breath = wave; p.pitch += wave * .05; p.yaw += Math.cos(t * Math.PI * 2) * .04; p.crouch = .06 - wave * .015; }
+    }
     else if (anim === 'run') {
       p.stride = wave; p.bob = Math.abs(Math.cos(t * Math.PI * 2)) * .09; p.lean = .24; p.sway = .42 + Math.sin(t * Math.PI * 4) * .1;
+      if (fine) p.swing = wave;
       p.pitch = Math.min(p.pitch, .5); p.yaw += wave * .12;
     } else if (anim === 'dash') { p.lean = .55; p.crouch = .22; p.stride = 1 - t * .5; p.sway = .9; p.yaw = 1.3; p.pitch = .1; }
     else if (anim === 'hurt') { p.lean = -.28; p.crouch = .08; p.yaw += .5; p.sway = .3; }
@@ -60,9 +67,11 @@
     }
     else if (anim === 'dead') { p.fall = ease(t); p.pitch = mix(p.pitch, -.2, t); p.yaw += t; p.sway = .2; }
     else {
+      // Champions coil deeper, snap through faster and settle back with a small overshoot.
+      const settle = fine ? u => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2 : ease;
       const key = (rest, coil, follow) => anim === 'windup' ? mix(rest, coil, ease(t))
-        : anim === 'active' ? mix(coil, follow, ease(Math.min(1, t * 1.3))) : mix(follow, rest, ease(t));
-      p.crouch = key(.04, .12, .16);
+        : anim === 'active' ? mix(coil, follow, ease(Math.min(1, t * (fine ? 1.6 : 1.3)))) : mix(follow, rest, settle(t));
+      p.crouch = key(.04, fine ? .17 : .12, .16);
       if (shape === 'arc') {
         p.yaw = key(p.yaw, 2.3, -1.95); p.pitch = key(p.pitch, .45, -.18); p.out = key(p.out, .3, .5);
         p.lunge = key(0, -.14, .3); p.lean = key(.06, -.12, .36); p.sway = key(.06, .1, .55);
@@ -100,7 +109,7 @@
 
   // Builds the joints for one frame in world space around the fighter's feet.
   function rig(spec, facing, anim, shape, t) {
-    const p = posture(spec.weapon, anim, shape, t);
+    const p = posture(spec.weapon, anim, shape, t, isChampion(spec.kit));
     const c = Math.cos(facing), sn = Math.sin(facing);
     const P = (forward, right, up) => {
       let x = (forward * c - right * sn) * SIZE, y = (forward * sn + right * c) * SIZE, z = up * SIZE;
@@ -115,7 +124,7 @@
       return [x, y, z];
     };
     const vector = (forward, right, up) => sub(P(forward, right, up), P(0, 0, 0));
-    const hipZ = .78 - p.crouch + p.bob * .6, chestZ = 1.36 - p.crouch * 1.2 + p.bob;
+    const hipZ = .78 - p.crouch + p.bob * .6, chestZ = 1.36 - p.crouch * 1.2 + p.bob + p.breath * .018;
     const lean = p.lean + p.lunge * .4;
     const shift = p.lunge * .22;
     const st = p.stride;
@@ -129,17 +138,18 @@
       chest: P(shift + lean * .72, 0, chestZ),
       neck: P(shift + lean * .9, 0, chestZ + .2),
       head: P(shift + lean * 1.02 + .06 + p.kneel * .05, p.loll * .09, chestZ + .42 - p.kneel * .05 - Math.abs(p.loll) * .03),
-      shoulderL: P(shift + lean * .76, -.36, chestZ + .1), shoulderR: P(shift + lean * .76, .36, chestZ + .1)
+      // Shoulders counter-rotate against the stride.
+      shoulderL: P(shift + lean * .76 - p.swing * .06, -.36, chestZ + .1 + p.breath * .012), shoulderR: P(shift + lean * .76 + p.swing * .06, .36, chestZ + .1 + p.breath * .012)
     };
     const reach = .22 + p.out + p.lunge * .4;
     const handZ = p.high - p.crouch + p.bob;
-    j.handR = P(shift + Math.cos(p.yaw) * reach, Math.sin(p.yaw) * reach + .08, handZ);
+    j.handR = P(shift + Math.cos(p.yaw) * reach - p.swing * .14, Math.sin(p.yaw) * reach + .08, handZ + Math.abs(p.swing) * .03);
     j.aim = vector(Math.cos(p.yaw) * Math.cos(p.pitch), Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch));
     j.side = vector(-Math.sin(p.yaw), Math.cos(p.yaw), 0);
     const twoHanded = ['maul', 'greatsword', 'spear', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
     j.handL = spec.shield ? P(shift + .4 - p.droop * .14 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3 - p.droop * .08, 1.04 - p.crouch + p.bob - p.droop * .3)
       : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (['crossbow', 'bow', 'recurve'].includes(spec.weapon) ? .42 : .26)))
-        : P(shift + .12 - st * .3, -.52, .9 + p.bob + (anim === 'run' ? .1 : 0));
+        : P(shift + .12 - st * .3 + p.swing * .1, -.52, .9 + p.bob + (anim === 'run' ? .1 : 0));
     j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(-.14, -.2, -.1));
     j.elbowR = add(lerp(j.shoulderR, j.handR, .5), vector(-.14, .2, -.1));
     return { j, p, P, vector, lean: shift + lean, chestZ, hipZ };
@@ -1214,7 +1224,7 @@
   // spec: { team, kit, armor, weapon, spare, shield, cracks, frozen }
   function get(spec, facing, anim, shape, progress) {
     const direction = ((Math.round(facing / (Math.PI * 2) * DIRECTIONS) % DIRECTIONS) + DIRECTIONS) % DIRECTIONS;
-    const count = frames[anim];
+    const count = frames[anim] + (isChampion(spec.kit) ? extraFrames[anim] || 0 : 0);
     const looping = anim === 'idle' || anim === 'run' || anim === 'stun';
     const frame = looping ? Math.floor(((progress % 1) + 1) % 1 * count) % count
       : Math.min(count - 1, Math.max(0, Math.round(progress * (count - 1))));
