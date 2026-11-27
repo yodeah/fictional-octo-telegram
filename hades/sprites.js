@@ -176,11 +176,13 @@
     if (fine && spec.weapon === 'recurve' && !['dead', 'stun', 'dash', 'hurt'].includes(anim)) {
       // An archer's stance: shoulders turned side-on, the bow arm pushed out at the target and the
       // string hand drawn back toward the cheek as the shot charges.
-      const twist = .95, sideways = Math.sin(twist) * .34, across = Math.cos(twist) * .34;
+      const running = anim === 'run';
+      const twist = running ? .55 : .95, sideways = Math.sin(twist) * .34, across = Math.cos(twist) * .34;
       const shoulderZ = chestZ + .1;
       j.shoulderL = P(shift + lean * .76 + sideways, -across, shoulderZ);
       j.shoulderR = P(shift + lean * .76 - sideways, across, shoulderZ);
-      const pitch = p.pitch * .3;
+      // On the run the bow is carried low and forward, ready to come up.
+      const pitch = running ? -.62 + p.swing * .05 : p.pitch * .3;
       j.aim = vector(Math.cos(pitch), 0, Math.sin(pitch));
       j.side = vector(0, 1, 0);
       const draw = .12 + p.charge * .42;
@@ -188,6 +190,26 @@
       j.handR = add(j.handL, j.aim.map(v => -v * draw));
       j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(0, -.1, -.08));
       drawHint = add(lerp(j.shoulderR, j.handR, .5), vector(-.25, .3, .06));
+    }
+    if (fine && spec.weapon === 'pilum' && ['idle', 'run', 'windup', 'active', 'recover'].includes(anim)) {
+      // An overhand javelin throw. Carried level at the shoulder, cocked high behind the head with
+      // the shoulders turned back, then whipped forward over the shoulder. The javelin leaves the
+      // hand on the throw and the next one is drawn during the recovery.
+      const throwing = shape === 'bolt';
+      const cock = throwing && anim === 'windup' ? ease(t) : throwing && anim === 'active' ? 1 - ease(Math.min(1, t * 1.4)) : 0;
+      const whip = throwing && anim === 'active' ? ease(Math.min(1, t * 1.4)) : throwing && anim === 'recover' ? 1 - ease(t) : 0;
+      const twist = -.55 * cock + .5 * whip;
+      const shoulderZ = chestZ + .1;
+      j.shoulderR = P(shift + lean * .76 + Math.sin(twist) * .34, Math.cos(twist) * .34, shoulderZ);
+      j.shoulderL = P(shift + lean * .76 - Math.sin(twist) * .34, -Math.cos(twist) * .34, shoulderZ);
+      const carry = [.1, .34, chestZ + .16], cocked = [-.36, .32, chestZ + .48], thrown = [.62, .16, chestZ + .02];
+      const at = carry.map((v, i) => mix(mix(v, cocked[i], cock), thrown[i], whip));
+      j.handR = P(shift + lean * .6 + at[0], at[1], at[2] + p.bob * .5 + (anim === 'run' ? Math.abs(p.swing) * .03 : 0));
+      const pitch = .06 + cock * .24 - whip * .2;
+      j.aim = vector(Math.cos(pitch), 0, Math.sin(pitch));
+      j.side = vector(0, 1, 0);
+      j.elbowR = add(lerp(j.shoulderR, j.handR, .5), vector(-.12, .28, cock * .12 - .06));
+      p.thrown = throwing && (anim === 'active' || anim === 'recover' && t < .55);
     }
     if (fine) {
       if (drawHint) j.elbowR = drawHint;
@@ -285,7 +307,7 @@
     }
   }
 
-  const weaponLength = { gladius: .95, pilum: 1.5, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
+  const weaponLength = { gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
 
   // along(d, w): d from the hand toward the point, w across.
   function weapon(kind, hand, aim, side, look, charge) {
@@ -731,14 +753,17 @@
       fine(back.slice(0, 7).map(v => add(v, side.map(x => x * -.025))), metal.dark, .012);
     },
     pilum(al, aim, side, look) {
-      // Wooden shaft, a lead weight, a long iron shank and a small pyramid point.
-      taper(al(-.62), al(.86), .06, .055, '#7a432c');
-      fine([al(-.6, .012), al(.84, .012)], '#a8693f', .012);
-      taper(al(.5), al(.66), .12, .1, metal.dark);
-      fine([al(.52), al(.64)], metal.iron, .03);
-      taper(al(.84), al(1.32), .035, .03, metal.iron);
-      poly([al(1.3, -.05), al(1.5, 0), al(1.3, .05), al(1.27, 0)], metal.steel);
-      taper(al(-.36), al(-.24), .085, .085, look.main);
+      // Wooden shaft, a lead weight, a long iron shank and a small pyramid point, a little taller
+      // than the man who throws it.
+      taper(al(-.5), al(.7), .058, .052, '#7a432c');
+      fine([al(-.48, .012), al(.68, .012)], '#a8693f', .012);
+      taper(al(.4), al(.53), .115, .095, metal.dark);
+      fine([al(.42), al(.51)], metal.iron, .03);
+      taper(al(.68), al(1.08), .034, .028, metal.iron);
+      fine([al(.7, .008), al(1.04, .006)], metal.edge, .008);
+      poly([al(1.06, -.05), al(1.24, 0), al(1.06, .05), al(1.03, 0)], metal.steel);
+      taper(al(-.1), al(.06), .075, .075, look.main);
+      fine([al(-.08), al(.04)], look.light, .02);
     },
     recurve(al, aim, side, look, charge) {
       // A horn-and-sinew composite bow: dark sinew backs, pale horn bellies, bone ears that kick
@@ -778,16 +803,20 @@
     const { j, vector } = r;
     const W = .42, T = .64;
     // Curved like a half cylinder: the middle bulges toward the enemy.
-    const pt = (u, v, scale = 1) => add(add(j.handL, vector(.05 + (1 - u * u) * .08, u * W * scale, 0)), [0, 0, v * T * scale]);
-    const edge = scale => {
+    // Held angled around the front of the body, inner edge forward, so it never shows edge-on.
+    const pt = (u, v, scale = 1, depth = 0) => add(add(j.handL, vector(.05 + (1 - u * u) * .08 + u * W * scale * .38 + depth, u * W * scale * .92, 0)), [0, 0, v * T * scale]);
+    const edge = (scale, depth = 0) => {
       const points = [];
-      for (let i = 0; i <= 8; i++) points.push(pt(-1 + i / 4 * .5 * 1, .97, scale));
-      for (let i = 1; i <= 6; i++) points.push(pt(1, .97 - i / 6 * 1.94, scale));
-      for (let i = 1; i <= 8; i++) points.push(pt(1 - i / 4 * .5 * 1, -.97, scale));
-      for (let i = 1; i < 6; i++) points.push(pt(-1, -.97 + i / 6 * 1.94, scale));
+      for (let i = 0; i <= 8; i++) points.push(pt(-1 + i / 4 * .5 * 1, .97, scale, depth));
+      for (let i = 1; i <= 6; i++) points.push(pt(1, .97 - i / 6 * 1.94, scale, depth));
+      for (let i = 1; i <= 8; i++) points.push(pt(1 - i / 4 * .5 * 1, -.97, scale, depth));
+      for (let i = 1; i < 6; i++) points.push(pt(-1, -.97 + i / 6 * 1.94, scale, depth));
       return points;
     };
-    const front = Math.sin(facing) > -.25;
+    // Which face the camera sees depends on the shield's own turn, not just the body's.
+    const front = Math.sin(facing + .36) > -.2;
+    // The board's thickness: a darker copy set back behind the face.
+    poly(edge(1.04, front ? -.06 : .06), '#3a2414');
     poly(edge(1.04), c.bronze);
     poly(edge(.93), front ? look.main : '#4c2f2a');
     if (!front) {
@@ -881,13 +910,16 @@
     // Cassian's long hooded cloak, streaming behind.
     const sway = p.sway;
     if (!varro) {
-      const drop = .2 + sway * .55;
+      // Pinned at the real shoulders (so it turns with the archer's stance), falling to the backs of
+      // the knees with a ragged hem, narrow enough that the legs and quiver still read from behind.
+      const drop = .46 + sway * .45 + (hipZ - .78) * .5;
       const cl = (forward, right, up) => P(forward, right, Math.max(.04, up));
+      const pin = (shoulder, s) => add(shoulder, add(vector(-.12, s * -.04, 0), [0, 0, .06]));
       const cloak = [
-        cl(lean * .8 - .1, -.36, chestZ + .14), cl(lean * .8 - .1, .36, chestZ + .14),
-        cl(-.3 - sway * .45, .54, .72 + sway * .25), cl(-.48 - sway * .9, .5, drop - .06), cl(-.42 - sway * .7, .3, drop + .14),
-        cl(-.56 - sway * 1.1, .14, drop - .1), cl(-.46 - sway * .8, -.02, drop + .12), cl(-.6 - sway * 1.15, -.18, drop - .12),
-        cl(-.42 - sway * .7, -.32, drop + .14), cl(-.5 - sway * .92, -.5, drop - .04), cl(-.3 - sway * .45, -.54, .72 + sway * .25)
+        pin(j.shoulderL, -1), pin(j.shoulderR, 1),
+        cl(-.3 - sway * .45, .44, .9 + sway * .25), cl(-.44 - sway * .85, .4, drop - .04), cl(-.38 - sway * .65, .24, drop + .14),
+        cl(-.5 - sway * 1.05, .1, drop - .08), cl(-.42 - sway * .75, -.03, drop + .12), cl(-.54 - sway * 1.1, -.15, drop - .1),
+        cl(-.38 - sway * .65, -.26, drop + .14), cl(-.46 - sway * .88, -.4, drop - .03), cl(-.3 - sway * .45, -.44, .9 + sway * .25)
       ];
       part(P(-.36, 0, .95), () => {
         poly(cloak, look.main);
@@ -918,8 +950,8 @@
       if (spec.spare === 'pilum') {
         // Two javelins crossed low on the back, points over the shoulders.
         for (const s of [-1, 1]) {
-          const grip = P(lean * .5 - .3, -s * .16, hipZ + .1);
-          weapon('pilum', grip, vector(-.06, s * .42, .9).map(v => v * .6), vector(0, .9, -.4), look, 0);
+          const grip = P(lean * .5 - .3 - s * .04, -s * .17, hipZ + .12);
+          weapon('pilum', grip, vector(-.22 - s * .12, s * .45, .86).map(v => v * .68), vector(0, .9, -.4), look, 0);
         }
       } else if (spec.spare === 'recurve') {
         weapon('recurve', P(lean * .6 - .68, .02, chestZ - .1), vector(.15, -.2, -.3).map(v => v * 1.3), vector(0, .1, 1), look, 0);
@@ -1120,7 +1152,7 @@
     }
 
     part(j.head, () => (varro ? murmilloHead : archerHead)(r, look, c, facing), .16);
-    part(lerp(j.handR, add(j.handR, j.aim), .45), () => weapon(spec.weapon, j.handR, j.aim, j.side, look, p.charge), .13);
+    if (!p.thrown) part(lerp(j.handR, add(j.handR, j.aim), .45), () => weapon(spec.weapon, j.handR, j.aim, j.side, look, p.charge), .13);
     if (spec.shield) part(j.handL, () => scutum(r, spec, look, facing, c), .18);
 
     parts.sort((a, b) => a.depth - b.depth);
@@ -1134,15 +1166,15 @@
     // A broad brim that dips at the back into a neck guard.
     poly(Array.from({ length: 20 }, (_, i) => {
       const a = i / 20 * Math.PI * 2;
-      return at(Math.cos(a) * .31 - .03, Math.sin(a) * .31, -.05 - Math.max(0, -Math.cos(a)) * .08);
+      return at(Math.cos(a) * .28 - .03, Math.sin(a) * .28, -.05 - Math.max(0, -Math.cos(a)) * .08);
     }), c.bronze);
     fine(Array.from({ length: 11 }, (_, i) => {
       const a = Math.PI / 2 + i / 10 * Math.PI;
-      return at(Math.cos(a) * .28 - .03, Math.sin(a) * .28, -.06 - Math.max(0, -Math.cos(a)) * .07);
+      return at(Math.cos(a) * .25 - .03, Math.sin(a) * .25, -.06 - Math.max(0, -Math.cos(a)) * .07);
     }), c.bronzeDeep, .014);
     for (let i = 0; i < 9; i++) {
       const a = -Math.PI / 2 + i / 8 * Math.PI;
-      disc(at(Math.cos(a) * .28 - .03, Math.sin(a) * .28, -.04), .015, c.bronzeLight, false);
+      disc(at(Math.cos(a) * .25 - .03, Math.sin(a) * .25, -.04), .014, c.bronzeLight, false);
     }
     disc(at(-.03, 0, .07), .215, metal.iron);
     disc(at(-.07, -.06, .14), .13, '#a9bccb', false);
