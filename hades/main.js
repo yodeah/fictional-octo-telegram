@@ -188,9 +188,10 @@
   });
 
   // ?a=marksman&b=raider pins the kits, ?seed=7 repeats a bout, ?debug draws collision shapes.
+  // Without them the two champions meet: Varro the murmillo against Cassian the archer.
   pickers.forEach((picker, i) => {
     const key = params.get(i ? 'b' : 'a');
-    if (kits[key]) picker.value = key;
+    picker.value = kits[key] ? key : i ? 'sagittarius' : 'murmillo';
   });
 
   Render.init($('arena'));

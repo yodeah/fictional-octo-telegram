@@ -12,6 +12,11 @@
     mace: { name: 'Mace', style: 'melee', shape: 'arc', reach: 1.8, spread: 1.1, damage: 15, energy: 17, windup: .35, recover: .40, stance: 40, block: .25, breaks: true },
     crossbow: { name: 'Crossbow', style: 'ranged', shape: 'bolt', reach: 9.5, speed: 17, damage: 23, energy: 11, windup: .54, recover: .48, stance: 22, push: .8, hinder: .8, block: .30 },
     bow: { name: 'Repeating bow', style: 'ranged', shape: 'bolt', reach: 8.5, speed: 15, damage: 12, energy: 8, windup: .32, recover: .32, stance: 12, hinder: .35, block: .30 },
+    // The two champions' own gear.
+    gladius: { name: 'Gladius', style: 'melee', shape: 'arc', reach: 1.9, spread: 1.1, damage: 13, energy: 14, windup: .29, recover: .32, stance: 30, block: .25 },
+    pilum: { name: 'Pilum', style: 'ranged', shape: 'bolt', reach: 8, speed: 16, damage: 21, energy: 13, windup: .5, recover: .5, stance: 26, push: 1, hinder: .6, block: .30 },
+    recurve: { name: 'Composite bow', style: 'ranged', shape: 'bolt', reach: 9, speed: 18, damage: 16, energy: 9, windup: .38, recover: .34, stance: 14, hinder: .4, block: .30 },
+    sica: { name: 'Sica', style: 'melee', shape: 'arc', reach: 1.8, spread: 1.25, damage: 12, energy: 11, windup: .23, recover: .29, stance: 24, block: .22 },
     staff: { name: 'Staff', style: 'magic', shape: 'bolt', reach: 8, speed: 11, damage: 8, energy: 6, windup: .42, recover: .42, stance: 10, block: .10, spellPower: 1.3 }
   };
 
@@ -19,6 +24,7 @@
     none: { name: 'No shield', defense: 0, mobility: 1, energy: 0, durability: 0, block: 0 },
     buckler: { name: 'Buckler', defense: 11, mobility: 1.05, energy: 9, durability: 2, block: .02, radius: .27 },
     round: { name: 'Round shield', defense: 20, mobility: .97, energy: 13, durability: 3, block: .10, radius: .38 },
+    scutum: { name: 'Scutum', defense: 21, mobility: .93, energy: 15, durability: 3, block: .08, radius: .42 },
     tower: { name: 'Tower shield', defense: 34, mobility: .86, energy: 19, durability: 4, block: .20, radius: .46 }
   };
 
@@ -56,7 +62,11 @@
   // Every fighter carries a main weapon and a backup, and switches as the distance changes.
   const switchCost = 7;
 
+  // The two champions are fixed characters with their own painted sprites (champion: true) and are
+  // the default matchup: Varro the murmillo against Cassian the archer.
   const kits = {
+    murmillo: { name: 'Murmillo', weapon: 'gladius', reserve: 'pilum', shield: 'scutum', armor: 'leather', move: 'dash', speed: 3.9, hp: 245, champion: true },
+    sagittarius: { name: 'Sagittarius', weapon: 'recurve', reserve: 'sica', shield: 'none', armor: 'leather', move: 'roll', speed: 3.75, hp: 248, champion: true },
     duelist: { name: 'Duelist', weapon: 'sword', reserve: 'crossbow', shield: 'round', armor: 'leather', move: 'dash', speed: 4.0, hp: 245 },
     hoplite: { name: 'Hoplite', weapon: 'spear', reserve: 'sword', shield: 'tower', armor: 'plate', move: 'dash', speed: 3.85, hp: 245 },
     raider: { name: 'Raider', weapon: 'axe', reserve: 'bow', shield: 'buckler', armor: 'leather', move: 'dash', speed: 4.15, hp: 245 },
