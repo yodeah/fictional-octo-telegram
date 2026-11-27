@@ -15,6 +15,10 @@ Every commit that changes the game must be a meaningful improvement in a working
 - After committing, give me the commit hash, the command that starts the game (`open index.html` from the project folder), and what to try.
 - If you couldn't run the game, say so and don't call the commit tested.
 
+## Deploy
+
+After each commit, push it with `git push origin HEAD`. A push to this branch publishes the game to https://yodeah.github.io/fictional-octo-telegram/arena-2d/ through `.github/workflows/pages.yml`, beside Salt & Sand from the `swords-and-sandals` branch at the site's root. Check that the **Deploy games to Pages** run for your commit succeeded (`gh run list --workflow pages.yml`) before reporting, and give the user that address.
+
 ## Ideas backlog
 
 `ideas.md` lists improvement ideas with an impact (1–5), an estimated token cost and a score (impact per 10k tokens), sorted best first.

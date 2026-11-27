@@ -12,6 +12,10 @@ A browser prototype for an idle gladiator manager. The first milestone is an aut
 
 This replaces the earlier idea of a "corner coach" with timed calls.
 
+## Play on a phone
+
+https://yodeah.github.io/fictional-octo-telegram/arena-2d/ always shows the latest push of this branch.
+
 ## Run locally
 
 Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
