@@ -12,7 +12,7 @@
   const reducedMotion = root.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   let canvas, ctx, width = 0, height = 0, unit = 40, dpr = 1;
-  let floor, decals, decalCtx, pillarSprite;
+  let floor, decals, decalCtx, pillarSprite, brazierSprite;
   const bounds = { x: -15, y: -10, w: 30, h: 20 }; // painted area, in screen units
   const camera = { x: 0, y: 0, zoom: 1 };
   let particles = [], floaters = [], trails = [], ghosts = [], rings = [], pools = [];
@@ -425,21 +425,71 @@
       face(west, south, from, to, '#c0964a');
       face(south, east, from, to, '#83652f');
     }
-    for (const side of [[west, south], [south, east]]) {
+    // A carved medallion with a gem on each face, and vines spilling over the rim.
+    for (const [side, lit] of [[[west, south], true], [[south, east], false]]) {
       const x = (side[0][0] + side[1][0]) / 2, y = (side[0][1] + side[1][1]) / 2 - tall / 2;
-      blob(g, x, y, .17, ink);
-      blob(g, x, y, .12, '#8fe4cf');
+      const slope = (side[1][1] - side[0][1]) / (side[1][0] - side[0][0]);
+      g.save();
+      g.translate(x, y);
+      g.transform(1, slope, 0, 1, 0, 0);
+      shapeAt(g, [[0, -.27], [.24, 0], [0, .27], [-.24, 0]], lit ? '#b8903f' : '#7d5f2a', .04);
+      shapeAt(g, [[0, -.15], [.13, 0], [0, .15], [-.13, 0]], lit ? '#7ff5d2' : '#43b8a0', .03);
+      shapeAt(g, [[0, -.15], [0, 0], [-.13, 0]], 'rgba(255,255,255,.55)', 0);
+      for (const dx of [-.34, .34]) blob(g, dx, 0, .035, '#d9b866');
+      g.restore();
     }
     g.beginPath();
     corners.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](x, y - tall));
     g.closePath();
-    g.fillStyle = '#17333a';
+    g.fillStyle = '#10272e';
     g.fill();
+    g.strokeStyle = ink;
+    g.lineWidth = .055;
     g.stroke();
-    for (let i = 0; i < 70; i++) {
-      const x = (n() - .5) * r * 1.5, y = (n() - .5) * r * K * 1.1 - tall - .12 - n() * .22;
-      blob(g, x, y, .13 + n() * .12, `hsl(${158 + n() * 36}, 42%, ${19 + n() * 20}%)`);
-      if (i % 6 === 0) blob(g, x, y - .08, .05, '#dff6ff');
+    const leaf = (x, y, angle, long, color) => {
+      g.save();
+      g.translate(x, y);
+      g.rotate(angle);
+      g.beginPath();
+      g.moveTo(0, 0);
+      g.quadraticCurveTo(long * .5, -long * .36, long, 0);
+      g.quadraticCurveTo(long * .5, long * .36, 0, 0);
+      g.fillStyle = color;
+      g.fill();
+      g.strokeStyle = ink;
+      g.lineWidth = .022;
+      g.stroke();
+      g.strokeStyle = 'rgba(210,255,225,.35)';
+      g.beginPath();
+      g.moveTo(long * .1, 0);
+      g.lineTo(long * .8, 0);
+      g.stroke();
+      g.restore();
+    };
+    // Three tiers of pointed leaves, darkest at the bottom.
+    for (const [count, spread, lift, light] of [[34, 1, .1, 17], [24, .75, .3, 25], [12, .45, .48, 34]]) {
+      for (let i = 0; i < count; i++) {
+        const a = i / count * Math.PI * 2 + n();
+        const d = (.35 + n() * .5) * r * spread;
+        leaf(Math.cos(a) * d * .6, Math.sin(a) * d * K * .5 - tall - lift, a + (n() - .5) * .9, .34 + n() * .22,
+          `hsl(${150 + n() * 40}, 42%, ${light + n() * 8}%)`);
+      }
+    }
+    for (const [dx, dy] of [[-.34, -.34], [.3, -.5], [.04, -.74], [.46, -.18], [-.1, -.2]]) {
+      for (let i = 0; i < 5; i++) leaf(dx, dy - tall, i * 1.256, .13, '#e6f6ff');
+      blob(g, dx, dy - tall, .04, '#ffcf55');
+    }
+    // Vines hanging down the two front faces.
+    for (const [x, y, long] of [[-.62, .1, .5], [-.22, .34, .34], [.4, .24, .62]]) {
+      g.strokeStyle = '#173f2e';
+      g.lineWidth = .045;
+      g.beginPath();
+      g.moveTo(x, y - tall);
+      g.quadraticCurveTo(x - .1, y - tall + long * .6, x + .04, y - tall + long);
+      g.stroke();
+      for (let i = 1; i < 5; i++) {
+        leaf(x - .04, y - tall + long * i / 5, i % 2 ? .5 : 2.6, .16, `hsl(${150 + i * 8}, 45%, ${26 + i * 3}%)`);
+      }
     }
   }
 
@@ -566,6 +616,10 @@
       decalCtx.drawImage(old, bounds.x, bounds.y, bounds.w, bounds.h);
     }
     pillarSprite = makeCanvas(3 * res, 3.4 * res);
+    brazierSprite = makeCanvas(2 * res, 2 * res);
+    const bg = brazierSprite.getContext('2d');
+    bg.setTransform(res, 0, 0, res, res, 1.6 * res);
+    paintBrazier(bg);
     const g = pillarSprite.getContext('2d');
     g.setTransform(res, 0, 0, res, 1.5 * res, 2.5 * res);
     paintPillar(g, arena.pillars[0].r);
@@ -1040,16 +1094,54 @@
     if (Math.random() < .5) spray(p.x, p.y, 1.1, 1, [spell.color], { speed: .6, up: .5, gravity: 2, glowing: true, size: .05, life: .35 });
   }
 
+  function paintBrazier(g) {
+    ellipsePath(g, 0, 0, .55, .2);
+    g.fillStyle = 'rgba(0,10,18,.5)';
+    g.fill();
+    // Three clawed legs, a stem and a wide bowl.
+    for (const [foot, color] of [[-.42, '#a47d36'], [.42, '#6f5224'], [0, '#c79c48']]) {
+      shapeAt(g, [[-.07, -.5], [.07, -.5], [foot + .09, .04], [foot - .09, .04]], color, .05);
+    }
+    shapeAt(g, [[-.09, -.8], [.09, -.8], [.07, -.46], [-.07, -.46]], '#8d6a2e', .05);
+    shapeAt(g, [[-.52, -1.04], [.52, -1.04], [.36, -.8], [.14, -.72], [-.14, -.72], [-.36, -.8]], '#b88f40', .06);
+    shapeAt(g, [[.06, -1.02], [.5, -1.02], [.34, -.82], [.1, -.75]], '#7a5a27', 0);
+    shapeAt(g, [[-.6, -1.12], [.6, -1.12], [.55, -1.0], [-.55, -1.0]], '#e8c46a', .05);
+    for (const dx of [-.3, 0, .3]) blob(g, dx, -.9, .045, '#8ff7da');
+  }
+
+  // A pointed tongue of flame that sways and stretches.
+  function tongue(x, y, wide, tall, lean, color) {
+    ctx.beginPath();
+    ctx.moveTo(x - wide, y);
+    ctx.bezierCurveTo(x - wide * 1.1, y - tall * .5, x + lean - wide * .1, y - tall * .6, x + lean * 1.6, y - tall);
+    ctx.bezierCurveTo(x + lean + wide * .5, y - tall * .55, x + wide * 1.2, y - tall * .4, x + wide, y);
+    ctx.quadraticCurveTo(x, y + wide * .5, x - wide, y);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
   function brazier(x, y, hue) {
-    const [px, py] = [sx(x), sy(y)];
-    limb([[x, y, 0], [x, y, .85]], .16, '#8a6a33');
-    limb([[x - .3, y, .9], [x + .3, y, .9]], .2, gold);
+    const px = sx(x), py = sy(y);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    glow(px, py - unit * 1.1, unit * 2.2, hue, .2 + Math.sin(clock * 7 + x) * .035);
-    for (let i = 0; i < 4; i++) {
-      const lick = Math.sin(clock * (6 + i) + i * 2 + x) * .12;
-      glow(px + sx(lick * (i / 3)), py - unit * (.95 + i * .22), unit * (.34 - i * .055), hue, .85);
+    // Light spilling on the floor around the stand.
+    ctx.translate(px, py);
+    ctx.scale(1, K);
+    glow(0, 0, unit * 2.7, hue, .2 + Math.sin(clock * 7 + x) * .03);
+    ctx.restore();
+    ctx.drawImage(brazierSprite, px - unit, py - unit * 1.6, unit * 2, unit * 2);
+    const top = py - unit * 1.08;
+    const wave = k => Math.sin(clock * (7 + k * 2) + x * 3 + k * 2);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    glow(px, top - unit * .4, unit * 1.2, hue, .5);
+    tongue(px, top, unit * .36, unit * (.95 + wave(0) * .12), unit * wave(1) * .1, `rgba(${hue},.8)`);
+    tongue(px - unit * .18, top, unit * .16, unit * (.62 + wave(2) * .14), -unit * (.08 + wave(0) * .05), `rgba(${hue},.65)`);
+    tongue(px + unit * .2, top, unit * .15, unit * (.55 + wave(3) * .14), unit * (.07 + wave(2) * .05), `rgba(${hue},.65)`);
+    tongue(px, top, unit * .19, unit * (.55 + wave(3) * .08), unit * wave(2) * .06, 'rgba(235,255,250,.9)');
+    for (let i = 0; i < 3; i++) {
+      const rise = (clock * .7 + i / 3 + x) % 1;
+      glow(px + unit * Math.sin(rise * 7 + i) * .25, top - unit * (.6 + rise * 1.1), unit * .1, hue, 1 - rise);
     }
     ctx.restore();
   }
