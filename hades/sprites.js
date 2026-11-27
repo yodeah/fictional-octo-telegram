@@ -192,9 +192,10 @@
     const twoHanded = ['maul', 'greatsword', 'spear', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
     j.handL = spec.shield ? P(shift + .4 - p.droop * .14 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3 - p.droop * .08, 1.04 + chestUp - p.crouch + p.bob - p.droop * .3)
       : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (spec.weapon === 'recurve' ? BRACE : ['crossbow', 'bow'].includes(spec.weapon) ? .42 : .26)))
-        : P(shift + .12 - st * .3 + p.swing * .1, -.48, .9 + tall * .6 + p.bob + (anim === 'run' ? .1 : 0));
-    j.elbowL = add(lerp(j.shoulderL, j.handL, .5), vector(-.14, -.2, -.1));
-    j.elbowR = add(lerp(j.shoulderR, j.handR, .5), vector(-.14, .2, -.1));
+        : P(shift + .12 - st * .3 + p.swing * .1, fine ? -.42 : -.48, .9 + tall * .6 + p.bob + (anim === 'run' ? .1 : 0));
+    // Champions keep their elbows in and down, close to the ribs, instead of flaring them out.
+    j.elbowL = add(lerp(j.shoulderL, j.handL, .5), fine ? vector(-.12, -.09, -.22) : vector(-.14, -.2, -.1));
+    j.elbowR = add(lerp(j.shoulderR, j.handR, .5), fine ? vector(-.12, .09, -.22) : vector(-.14, .2, -.1));
     let drawHint = null;
     if (fine && spec.weapon === 'recurve' && !['dead', 'stun', 'dash', 'hurt'].includes(anim)) {
       // At rest the archer holds the bow low in front, arrow nocked and string hand on it. A shot
@@ -1087,12 +1088,12 @@
 
   // Width (world units) along an arm, from the shoulder to the wrist: deltoid, biceps peak, a narrow
   // elbow, the forearm swelling below it and narrowing to the wrist.
-  function armProfile(shoulder, elbow, wrist) {
+  function armProfile(shoulder, elbow, wrist, build = 1) {
     const l1 = Math.hypot(...sub(elbow, shoulder)), l2 = Math.hypot(...sub(wrist, elbow));
     const tE = l1 / (l1 + l2 || 1);
-    const upper = [[0, .27], [.16, .245], [.38, .2], [.58, .205], [.84, .155], [1, .132]];
-    const lower = [[0, .132], [.16, .172], [.42, .158], [.78, .118], [1, .102]];
-    const f = t => t < tE ? curve(upper, t / tE) : curve(lower, (t - tE) / (1 - tE));
+    const upper = [[0, .29], [.14, .27], [.36, .222], [.6, .228], [.86, .172], [1, .152]];
+    const lower = [[0, .152], [.14, .196], [.4, .178], [.76, .134], [1, .114]];
+    const f = t => build * (t < tE ? curve(upper, t / tE) : curve(lower, (t - tE) / (1 - tE)));
     f.elbow = tE;
     return f;
   }
@@ -1520,14 +1521,15 @@
     for (const [shoulder, elbow, hand, left] of [[j.shoulderL, j.elbowL, j.handL, true], [j.shoulderR, j.elbowR, j.handR, false]]) {
       part(lerp(shoulder, hand, .55), () => {
         const wrist = add(hand, sub(elbow, hand).map(v => v * .12 / (Math.hypot(...sub(elbow, hand)) || 1)));
-        const S = drawLimb([shoulder, elbow, wrist], armProfile(shoulder, elbow, wrist), c.skin);
+        const S = drawLimb([shoulder, elbow, wrist], armProfile(shoulder, elbow, wrist, varro ? 1.08 : .98), c.skin);
         const tE = S.elbow;
         limbShade(S, 'rgba(90,30,24,.3)', c.glint);
-        // Muscle lines: the biceps-triceps split, the elbow crease, the forearm's long muscle.
-        limbLine(S, tE * .3, tE * .9, .38, c.shade, .016);
-        limbLine(S, tE * .55, tE * .95, -.45, c.shade, .012);
-        limbLine(S, tE + (1 - tE) * .08, tE + (1 - tE) * .6, .3, c.shade, .012);
-        limbLine(S, tE - .02, tE + .03, -.1, c.deep, .012);
+        // Muscle forms, kept soft so they read as shape and not as dirt: the biceps-triceps split,
+        // the elbow crease and the forearm's long muscle.
+        const crease = 'rgba(110,45,30,.42)';
+        limbLine(S, tE * .38, tE * .86, .36, crease, .014);
+        limbLine(S, tE + (1 - tE) * .1, tE + (1 - tE) * .5, .28, crease, .012);
+        limbLine(S, tE - .015, tE + .02, -.15, crease, .012);
         if (varro && !left) {
           // Manica: overlapping steel lames that follow the arm, upper ones over lower ones.
           for (let i = 7; i >= 0; i--) {
@@ -1586,8 +1588,7 @@
           disc(add(top, vector(.03, .01, .04)), .1, c.bronze, false);
           fine([at(.1, .0, .1), at(.02, .1, .16), at(-.08, .14, .1)], c.bronzeLight, .016);
           for (const a2 of [0, 2.1, 4.2]) disc(add(top, vector(Math.cos(a2) * .12, Math.sin(a2) * .12, 0)), .014, c.bronzeLight, false);
-        } else if (varro) fine([add(shoulder, vector(.06, -.08, .03)), add(shoulder, vector(-.02, -.12, -.04))], c.shade, .014);
-        else {
+        } else {
           // Cassian's shoulder plates are drawn with the arm, following its contour.
         }
       }, .12);
