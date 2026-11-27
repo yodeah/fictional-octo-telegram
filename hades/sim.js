@@ -3,7 +3,7 @@
 // react to is pushed to duel.events. A seed makes a bout repeatable.
 (function (root) {
   const D = typeof module !== 'undefined' ? require('./data.js') : root.HadesData;
-  const { weapons, shields, armors, spells, moves, kits, arena } = D;
+  const { weapons, shields, armors, spells, moves, kits, arena, switchCost } = D;
 
   const radius = .46;
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -21,14 +21,14 @@
     };
   }
 
-  const kitStyle = kit => weapons[kits[kit].weapon].style;
+  const styleOf = f => weapons[f.weapon].style;
 
   function createFighter(index, kitKey, name) {
     const kit = kits[kitKey];
     const move = moves[kit.move];
     const x = index ? 6 : -6;
     return {
-      index, name, kitKey, kit, x, y: 0, vx: 0, vy: 0, facing: index ? Math.PI : 0,
+      index, name, kitKey, kit, weapon: kit.weapon, swapReady: 1.2, shots: 0, x, y: 0, vx: 0, vy: 0, facing: index ? Math.PI : 0,
       hp: kit.hp, maxHP: kit.hp, mana: 70, energy: 100, stance: 0, ward: 0, wardUntil: 0,
       shieldHits: shields[kit.shield].durability, move: kit.move, charges: move.charges, rechargeAt: 0,
       action: null, dash: null, readyAt: .5 + index * .12, stunnedUntil: 0, frozenUntil: 0, chilledUntil: 0,
@@ -48,7 +48,7 @@
   const emit = (duel, type, data) => duel.events.push({ type, time: duel.time, ...data });
   const other = (duel, f) => duel.fighters[1 - f.index];
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  const shieldUp = f => f.shieldHits > 0;
+  const shieldUp = f => f.shieldHits > 0 && !weapons[f.weapon].twoHanded;
   const defense = f => 30 + armors[f.kit.armor].defense + (shieldUp(f) ? shields[f.kit.shield].defense : 0);
   const stanceLimit = f => 59 + defense(f) * .23;
   const mobility = (duel, f) => armors[f.kit.armor].mobility * (shieldUp(f) ? shields[f.kit.shield].mobility : 1)
@@ -156,8 +156,44 @@
     return best;
   }
 
+  // Which of the two weapons suits this moment. Called between attacks.
+  function pickWeapon(duel, f, rival) {
+    const main = weapons[f.kit.weapon], spare = weapons[f.kit.reserve];
+    const holdingSpare = f.weapon === f.kit.reserve;
+    const d = dist(f, rival);
+    if (main.style === 'melee' && spare.style !== 'melee') {
+      // A couple of shots from range, then back to the blade.
+      if (holdingSpare) return d < 3.2 || f.shots >= 2 ? f.kit.weapon : f.kit.reserve;
+      const stuck = styleOf(rival) === 'melee' ? d > 5 && duel.random() < .4 : d > 4.5 && f.charges < 1;
+      return stuck && lineOfSight(f, rival, .5) ? f.kit.reserve : f.kit.weapon;
+    }
+    if (main.style !== 'melee') {
+      // Shooters and mages draw steel only when caught with no escape left.
+      if (holdingSpare) return d > 3.3 || f.charges > 0 ? f.kit.weapon : f.kit.reserve;
+      const novaFirst = main.style === 'magic' && duel.time >= f.novaReady;
+      return d < 2.2 && f.charges < 1 && !novaFirst && styleOf(rival) === 'melee' ? f.kit.reserve : f.kit.weapon;
+    }
+    // Two melee weapons: a spear gives way to a sword up close, a maul when the arms are tired.
+    if (main.shape === 'thrust') return d < (holdingSpare ? 2.1 : 1.45) ? f.kit.reserve : f.kit.weapon;
+    if (rival.stunnedUntil > duel.time || rival.frozenUntil > duel.time) return f.kit.weapon;
+    return f.energy < (holdingSpare ? 55 : 30) ? f.kit.reserve : f.kit.weapon;
+  }
+
+  function swapWeapon(duel, f, rival) {
+    if (duel.time < f.swapReady || f.energy < switchCost) return false;
+    const next = pickWeapon(duel, f, rival);
+    if (next === f.weapon) return false;
+    f.weapon = next;
+    f.energy -= switchCost;
+    f.shots = 0;
+    f.swapReady = duel.time + 1.8;
+    f.readyAt = duel.time + .22;
+    emit(duel, 'swap', { who: f.index, weapon: next });
+    return true;
+  }
+
   function startAttack(duel, f, rival, kind = 'attack') {
-    const weapon = weapons[f.kit.weapon];
+    const weapon = weapons[f.weapon];
     const spellKey = kind === 'attack' && weapon.style === 'magic' ? pickSpell(duel, f, rival) : null;
     const spell = spells[spellKey];
     const bash = kind === 'bash', nova = kind === 'nova';
@@ -169,7 +205,7 @@
     if (!spell) f.energy = Math.max(0, f.energy - cost);
     f.facing = Math.atan2(rival.y - f.y, rival.x - f.x);
     f.action = {
-      id: duel.nextId++, kind, spellKey, shape: bash ? 'arc' : nova ? 'nova' : spell && !spell.damage ? 'self' : weapon.shape,
+      id: duel.nextId++, kind, spellKey, weapon: f.weapon, shape: bash ? 'arc' : nova ? 'nova' : spell && !spell.damage ? 'self' : weapon.shape,
       reach: bash ? 1.6 : nova ? 2.4 : weapon.reach, spread: bash ? 1.2 : weapon.spread, radius: weapon.radius,
       t: 0, windup, active: .1, recover, hit: false, angle: f.facing, aimed: false, fatigue,
       riposte: bash && f.riposte && f.counterUntil > duel.time,
@@ -181,7 +217,8 @@
 
   // A melee dash that ends beside the rival flows into a quicker, harder blow.
   function dashStrike(duel, f, rival) {
-    const weapon = weapons[f.kit.weapon];
+    const weapon = weapons[f.weapon];
+    if (weapon.style !== 'melee') return;
     if (helpless(duel, f) || rival.dead || f.energy < weapon.energy * .45
       || dist(f, rival) > weapon.reach + (weapon.shape === 'slam' ? .6 : .9)) return;
     startAttack(duel, f, rival);
@@ -205,7 +242,7 @@
 
   function release(duel, f, action) {
     const rival = other(duel, f);
-    const weapon = weapons[f.kit.weapon];
+    const weapon = weapons[action.weapon];
     const spell = spells[action.spellKey];
     if (spell) {
       f.mana -= spell.cost;
@@ -219,9 +256,10 @@
       duel.projectiles.push({
         id: duel.nextId++, owner: f.index, x: f.x + Math.cos(angle) * .7, y: f.y + Math.sin(angle) * .7,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: weapon.reach / speed + .25,
-        spellKey: action.spellKey, weapon: f.kit.weapon, fatigue: action.fatigue,
+        spellKey: action.spellKey, weapon: action.weapon, fatigue: action.fatigue,
         homing: spell ? .9 : 0, crowded: !spell && dist(f, rival) < 2.6
       });
+      if (!spell) f.shots++;
       emit(duel, 'shoot', { who: f.index, spell: action.spellKey });
       return;
     }
@@ -349,7 +387,7 @@
     if (action.hit || rival.dead || rival.safeUntil > duel.time || !covers(f, action, rival)) return;
     if (!lineOfSight(f, rival, 0)) return;
     action.hit = true;
-    const weapon = weapons[f.kit.weapon];
+    const weapon = weapons[action.weapon];
     const bash = action.kind === 'bash', nova = action.kind === 'nova';
     const [dirX, dirY] = unit(rival.x - f.x, rival.y - f.y);
     strike(duel, f, rival, {
@@ -399,7 +437,7 @@
   function threatTo(duel, f, rival) {
     const a = rival.action;
     if (a && !a.hit && a.t < a.windup && a.windup - a.t < .24 && a.shape !== 'bolt' && a.shape !== 'self' && covers(rival, a, f, radius + .15)) {
-      return { id: a.id, angle: Math.atan2(f.y - rival.y, f.x - rival.x), weight: weapons[rival.kit.weapon].heavy ? 1.5 : 1 };
+      return { id: a.id, angle: Math.atan2(f.y - rival.y, f.x - rival.x), weight: weapons[a.weapon].heavy ? 1.5 : 1 };
     }
     for (const p of duel.projectiles) {
       if (p.owner === f.index) continue;
@@ -448,7 +486,7 @@
   function steer(duel, f, rival) {
     const d = dist(f, rival);
     const [tx, ty] = unit(rival.x - f.x, rival.y - f.y);
-    const weapon = weapons[f.kit.weapon];
+    const weapon = weapons[f.weapon];
     let x = 0, y = 0;
     if (duel.time > f.strafeUntil) {
       f.strafeUntil = duel.time + .8 + duel.random() * 1.4;
@@ -462,7 +500,7 @@
       if (d > want) { x = tx; y = ty; }
       else if (d < want * .6) { x = -tx * .5; y = -ty * .5; }
       // Circle in close, and come at shooters on a slight curve.
-      const side = d < weapon.reach + 1.2 ? .45 : kitStyle(rival.kitKey) !== 'melee' ? .3 : .1;
+      const side = d < weapon.reach + 1.2 ? .45 : styleOf(rival) !== 'melee' ? .3 : .1;
       x += -ty * f.strafe * side; y += tx * f.strafe * side;
     } else {
       const near = 4.4, far = 6.6;
@@ -481,9 +519,10 @@
   function decide(duel, f, rival) {
     if (rival.dead) return;
     const d = dist(f, rival);
-    const weapon = weapons[f.kit.weapon];
     if (tryEvade(duel, f, rival)) return;
     if (f.dash) return;
+    if (!f.action && f.readyAt <= duel.time && swapWeapon(duel, f, rival)) return;
+    const weapon = weapons[f.weapon];
     const free = !f.action && f.readyAt <= duel.time;
     // A block opens a quick bash, even while recovering.
     const canBash = shieldUp(f) && f.energy >= 14 && f.counterUntil > duel.time && d < 1.8
@@ -491,7 +530,7 @@
     if (canBash && (f.riposte || duel.random() < .08)) return startAttack(duel, f, rival, 'bash');
 
     if (weapon.style !== 'melee') {
-      const meleeRival = kitStyle(rival.kitKey) === 'melee';
+      const meleeRival = styleOf(rival) === 'melee';
       // Get out when crowded: roll or blink to the most open spot.
       if (meleeRival && d < 2.7 && f.charges > 0 && (!f.action || f.action.t > f.action.windup * .4 || d < 1.9)) {
         if (startDash(duel, f, bestHeading(duel, f, rival, moves[f.move].distance), 'escape')) return;
@@ -509,8 +548,8 @@
       return;
     }
     // Melee: burst across the gap at a shooter, otherwise walk in.
-    if (free && f.charges > (kitStyle(rival.kitKey) === 'melee' ? 1 : 0) && duel.time >= f.nextClose && d > 3.4 && d < 8 && lineOfSight(f, rival, .5)
-      && duel.random() < (kitStyle(rival.kitKey) === 'melee' ? .008 : .035)) {
+    if (free && f.charges > (styleOf(rival) === 'melee' ? 1 : 0) && duel.time >= f.nextClose && d > 3.4 && d < 8 && lineOfSight(f, rival, .5)
+      && duel.random() < (styleOf(rival) === 'melee' ? .008 : .035)) {
       f.nextClose = duel.time + 3.2;
       return void startDash(duel, f, Math.atan2(rival.y - f.y, rival.x - f.x), 'close');
     }
@@ -542,7 +581,7 @@
       if (a.t < a.windup * (a.shape === 'bolt' ? .85 : .55)) {
         let aim = Math.atan2(rival.y - f.y, rival.x - f.x);
         if (a.shape === 'bolt') {
-          const lead = dist(f, rival) / (spells[a.spellKey]?.speed || weapons[kit.weapon].speed) * .6;
+          const lead = dist(f, rival) / (spells[a.spellKey]?.speed || weapons[a.weapon].speed) * .6;
           aim = Math.atan2(rival.y + rival.vy * lead - f.y, rival.x + rival.vx * lead - f.x);
         }
         f.facing += clamp(angleDiff(aim, f.facing), -9 * dt, 9 * dt);

@@ -7,8 +7,9 @@
     sword: { name: 'Sword', style: 'melee', shape: 'arc', reach: 2.0, spread: 1.15, damage: 13, energy: 14, windup: .30, recover: .34, stance: 29, block: .25 },
     spear: { name: 'Spear', style: 'melee', shape: 'thrust', reach: 2.8, spread: .42, damage: 14, energy: 14, windup: .31, recover: .38, stance: 27, block: .30 },
     axe: { name: 'Axe', style: 'melee', shape: 'arc', reach: 1.85, spread: 1.05, damage: 19, energy: 18, windup: .40, recover: .44, stance: 36, block: .31, breaks: true },
-    maul: { name: 'War maul', style: 'melee', shape: 'slam', reach: 1.8, radius: 1.55, damage: 31, energy: 26, windup: .66, recover: .62, stance: 52, block: .30, breaks: true, heavy: true },
-    greatsword: { name: 'Greatsword', style: 'melee', shape: 'arc', reach: 2.45, spread: 1.55, damage: 26, energy: 23, windup: .54, recover: .54, stance: 46, block: .25, heavy: true },
+    maul: { name: 'War maul', style: 'melee', shape: 'slam', reach: 1.8, radius: 1.55, damage: 31, energy: 26, windup: .66, recover: .62, stance: 52, block: .30, breaks: true, heavy: true, twoHanded: true },
+    greatsword: { name: 'Greatsword', style: 'melee', shape: 'arc', reach: 2.45, spread: 1.55, damage: 26, energy: 23, windup: .54, recover: .54, stance: 46, block: .25, heavy: true, twoHanded: true },
+    mace: { name: 'Mace', style: 'melee', shape: 'arc', reach: 1.8, spread: 1.1, damage: 15, energy: 17, windup: .35, recover: .40, stance: 40, block: .25, breaks: true },
     crossbow: { name: 'Crossbow', style: 'ranged', shape: 'bolt', reach: 9.5, speed: 17, damage: 23, energy: 11, windup: .54, recover: .48, stance: 22, push: .8, hinder: .8, block: .30 },
     bow: { name: 'Repeating bow', style: 'ranged', shape: 'bolt', reach: 8.5, speed: 15, damage: 12, energy: 8, windup: .32, recover: .32, stance: 12, hinder: .35, block: .30 },
     staff: { name: 'Staff', style: 'magic', shape: 'bolt', reach: 8, speed: 11, damage: 8, energy: 6, windup: .42, recover: .42, stance: 10, block: .10, spellPower: 1.3 }
@@ -52,18 +53,21 @@
     blink: { name: 'Blink', charges: 2, recharge: 5.6, distance: 4.2, time: .16, energy: 10, safe: .16 }
   };
 
+  // Every fighter carries a main weapon and a backup, and switches as the distance changes.
+  const switchCost = 7;
+
   const kits = {
-    duelist: { name: 'Duelist', weapon: 'sword', shield: 'round', armor: 'leather', move: 'dash', speed: 4.0, hp: 245 },
-    hoplite: { name: 'Hoplite', weapon: 'spear', shield: 'tower', armor: 'plate', move: 'dash', speed: 3.85, hp: 245 },
-    raider: { name: 'Raider', weapon: 'axe', shield: 'buckler', armor: 'leather', move: 'dash', speed: 4.15, hp: 245 },
-    breaker: { name: 'Breaker', weapon: 'maul', shield: 'none', armor: 'plate', move: 'dash', speed: 3.9, hp: 285 },
-    executioner: { name: 'Executioner', weapon: 'greatsword', shield: 'none', armor: 'plate', move: 'dash', speed: 3.9, hp: 275 },
-    marksman: { name: 'Marksman', weapon: 'crossbow', shield: 'none', armor: 'leather', move: 'roll', speed: 3.5, hp: 235 },
-    huntress: { name: 'Skirmisher', weapon: 'bow', shield: 'buckler', armor: 'leather', move: 'roll', speed: 3.65, hp: 230 },
-    frostmage: { name: 'Cryomancer', weapon: 'staff', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['frost', 'barrage', 'shell'] },
-    stormmage: { name: 'Stormcaller', weapon: 'staff', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['arc', 'thunder', 'tailwind'] },
-    bloodmage: { name: 'Sanguinist', weapon: 'staff', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['drain', 'surge', 'pact'] },
-    emberpriest: { name: 'Ember Priest', weapon: 'staff', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['ember', 'ward', 'heal'] }
+    duelist: { name: 'Duelist', weapon: 'sword', reserve: 'crossbow', shield: 'round', armor: 'leather', move: 'dash', speed: 4.0, hp: 245 },
+    hoplite: { name: 'Hoplite', weapon: 'spear', reserve: 'sword', shield: 'tower', armor: 'plate', move: 'dash', speed: 3.85, hp: 245 },
+    raider: { name: 'Raider', weapon: 'axe', reserve: 'bow', shield: 'buckler', armor: 'leather', move: 'dash', speed: 4.15, hp: 245 },
+    breaker: { name: 'Breaker', weapon: 'maul', reserve: 'sword', shield: 'none', armor: 'plate', move: 'dash', speed: 3.9, hp: 285 },
+    executioner: { name: 'Executioner', weapon: 'greatsword', reserve: 'crossbow', shield: 'none', armor: 'plate', move: 'dash', speed: 3.9, hp: 275 },
+    marksman: { name: 'Marksman', weapon: 'crossbow', reserve: 'sword', shield: 'none', armor: 'leather', move: 'roll', speed: 3.5, hp: 235 },
+    huntress: { name: 'Skirmisher', weapon: 'bow', reserve: 'spear', shield: 'buckler', armor: 'leather', move: 'roll', speed: 3.65, hp: 230 },
+    frostmage: { name: 'Cryomancer', weapon: 'staff', reserve: 'sword', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['frost', 'barrage', 'shell'] },
+    stormmage: { name: 'Stormcaller', weapon: 'staff', reserve: 'spear', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['arc', 'thunder', 'tailwind'] },
+    bloodmage: { name: 'Sanguinist', weapon: 'staff', reserve: 'axe', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['drain', 'surge', 'pact'] },
+    emberpriest: { name: 'Ember Priest', weapon: 'staff', reserve: 'mace', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['ember', 'ward', 'heal'] }
   };
 
   const arena = {
@@ -74,7 +78,7 @@
     ]
   };
 
-  const data = { weapons, shields, armors, spells, moves, kits, arena };
+  const data = { switchCost, weapons, shields, armors, spells, moves, kits, arena };
   if (typeof module !== 'undefined') module.exports = data;
   else root.HadesData = data;
 })(this);

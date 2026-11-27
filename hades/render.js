@@ -340,11 +340,11 @@
   // Where the weapon is, in the fighter's own frame: yaw is around the body (0 is forward,
   // positive to the fighter's right), pitch is above the horizon.
   function weaponPose(f, now) {
-    const kind = f.kit.weapon;
+    const kind = f.weapon;
     const a = f.action;
     let yaw = .55, pitch = .5, out = .28, high = 1.0, lunge = 0, charge = 0;
     if (kind === 'spear') { yaw = .22; pitch = .1; }
-    if (kind === 'maul' || kind === 'greatsword') { yaw = .35; pitch = .75; out = .3; high = 1.05; }
+    if (kind === 'maul' || kind === 'greatsword' || kind === 'mace' || kind === 'axe') { yaw = .35; pitch = .75; out = .3; high = 1.05; }
     if (kind === 'staff') { yaw = .7; pitch = 1.38; high = 1.0; }
     if (kind === 'crossbow' || kind === 'bow') { yaw = .12; pitch = 0; out = .32; high = 1.12; }
     if (!a) return { yaw, pitch, out, high, lunge, charge };
@@ -391,6 +391,10 @@
       limb([along(-.15), along(.92)], .08, wood);
       shape([along(.62, .02), along(.5, .36), along(.82, .46), along(1.06, .32), along(.9, .02)], steel);
       shape([along(.66, -.02), along(.76, -.2), along(.9, -.02)], darkSteel);
+    } else if (kind === 'mace') {
+      limb([along(-.15), along(.72)], .08, wood);
+      orb(along(.82), .17, darkSteel);
+      for (const [d, w] of [[1.03, 0], [.82, .22], [.82, -.22]]) limb([along(.82), along(d, w)], .045, steel, false);
     } else if (kind === 'maul') {
       limb([along(-.25), along(1.05)], .1, wood);
       limb([along(1.08, -.27), along(1.08, .27)], .34, darkSteel);
@@ -447,12 +451,13 @@
       Math.max(.05, pose.high - crouch + bob + Math.sin(pose.pitch)));
     const origin = P(0, 0, 0);
     const side = P(-Math.sin(pose.yaw), Math.cos(pose.yaw), 0).map((v, i) => v - origin[i]);
-    const hasShield = kit.shield !== 'none' && f.shieldHits > 0;
+    const ownsShield = kit.shield !== 'none' && f.shieldHits > 0;
+    const hasShield = ownsShield && !weapons[f.weapon].twoHanded;
     const twoHands = !hasShield;
     const bash = a?.kind === 'bash' ? pose.lunge : 0;
     const shieldHand = hasShield ? P(.36 + bash + lean * .5, -.3, 1.04 + bob - crouch + (a ? 0 : .02))
-      : twoHands && ['maul', 'greatsword', 'spear', 'crossbow', 'bow'].includes(kit.weapon)
-        ? handR.map((v, i) => mix(v, tipR[i], kit.weapon === 'crossbow' || kit.weapon === 'bow' ? .32 : .18))
+      : twoHands && ['maul', 'greatsword', 'spear', 'crossbow', 'bow'].includes(f.weapon)
+        ? handR.map((v, i) => mix(v, tipR[i], f.weapon === 'crossbow' || f.weapon === 'bow' ? .32 : .18))
         : P(.14 - stride * .2, -.44, .92 + bob);
     const elbow = (shoulder, hand, out) => {
       const mid = shoulder.map((v, i) => (v + hand[i]) / 2);
@@ -484,6 +489,11 @@
       shape(cape, dark);
       limb([cape[2], cape[3], cape[4]], .045, look.trim, false);
     });
+    // The spare weapon rides across the back, grip over one shoulder.
+    const spare = f.weapon === kit.weapon ? kit.reserve : kit.weapon;
+    const grip = P(-.36, .2, chestZ - .08), end = P(-.4, -.34, .55);
+    const across = P(0, 1, 0).map((v, i) => v - origin[i]);
+    add(P(-.42, 0, 1.05), () => drawWeapon(spare, grip, end, across, look, 0, f.index ? '#9fd8ff' : '#ffb27a'));
     if (robes) {
       add(waist, () => {
         shape([P(.2, -.22, hipZ + .16), P(.2, .22, hipZ + .16), P(.34 + stride * .1, .34, .14), P(-.02, .42, .12),
@@ -531,7 +541,7 @@
         for (const r of [-.085, .085]) orb(P(lean + .3, r, chestZ + .44), .033, f.index ? '#a8f4ff' : '#ffe27a', false);
       }
     }, .14);
-    add(mid(handR, tipR), () => drawWeapon(kit.weapon, handR, tipR, side, look, pose.charge,
+    add(mid(handR, tipR), () => drawWeapon(f.weapon, handR, tipR, side, look, pose.charge,
       spells[a?.spellKey]?.color || (f.index ? '#9fd8ff' : '#ffb27a')), .12);
     if (hasShield) {
       add(shieldHand, () => {
@@ -749,6 +759,8 @@
         jolt(.25);
       }
       if (e.shape === 'nova') rings.push({ x: who.x, y: who.y, z: .5, r: .4, to: e.reach, age: 0, life: .35, color: '#d7c2ff' });
+    } else if (e.type === 'swap') {
+      floater(who, weapons[e.weapon].name.toUpperCase(), '#d9f4e8', .62);
     } else if (e.type === 'dashstrike') {
       floater(who, 'DASH-STRIKE', looks[e.who].trim, .75);
       rings.push({ x: who.x, y: who.y, z: .05, r: .3, to: 1.5, age: 0, life: .28, color: looks[e.who].trim });

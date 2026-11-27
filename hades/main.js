@@ -42,8 +42,6 @@
       const kit = f.kit;
       $('name' + f.index).textContent = f.name;
       $('class' + f.index).textContent = kit.name;
-      $('gear' + f.index).textContent = [weapons[kit.weapon].name, kit.shield !== 'none' && shields[kit.shield].name,
-        armors[kit.armor].name, moves[kit.move].name].filter(Boolean).join(' · ');
     }
     updateControls();
     updateHud();
@@ -71,6 +69,11 @@
       set($('mana' + i), f.mana);
       set($('energy' + i), f.energy);
       set($('stance' + i), 100 * (1 - f.stance / Sim.stanceLimit(f)));
+      const { kit } = f;
+      const stowed = f.weapon === kit.weapon ? kit.reserve : kit.weapon;
+      text($('gear' + i), [`${weapons[f.weapon].name} (spare: ${weapons[stowed].name})`,
+        kit.shield !== 'none' && (f.shieldHits ? shields[kit.shield].name : 'Shield broken'),
+        armors[kit.armor].name, moves[kit.move].name].filter(Boolean).join(' · '));
       const status = f.dead ? 'Fallen' : f.frozenUntil > duel.time ? 'Frozen' : f.stunnedUntil > duel.time ? 'Staggered'
         : f.chilledUntil > duel.time ? 'Chilled' : f.hinderedUntil > duel.time ? 'Slowed' : f.hastedUntil > duel.time ? 'Hasted' : '';
       text($('status' + i), status);
@@ -93,6 +96,7 @@
     const by = duel.fighters[e.by]?.name;
     if (e.type === 'hit' && e.damage) log(`${by} hits ${who} for ${e.damage}${e.rear ? ' from behind' : e.critical ? ', a critical blow' : ''}.`);
     else if (e.type === 'block') log(`${who} ${e.perfect ? 'times a perfect block' : 'blocks'}.`);
+    else if (e.type === 'swap') log(`${who} switches to the ${weapons[e.weapon].name.toLowerCase()}.`);
     else if (e.type === 'dashstrike') log(`${who} dash-strikes.`);
     else if (e.type === 'blink' || e.type === 'roll') log(`${who} ${e.type}s away.`);
     else if (e.type === 'stagger') log(`${who} staggers.`);
@@ -175,7 +179,7 @@
   });
   pickers.forEach(picker => {
     picker.add(new Option('Random', 'random'));
-    for (const key of keys) picker.add(new Option(`${kits[key].name} — ${weapons[kits[key].weapon].name}`, key));
+    for (const key of keys) picker.add(new Option(`${kits[key].name} — ${weapons[kits[key].weapon].name} + ${weapons[kits[key].reserve].name}`, key));
     picker.addEventListener('change', () => {
       if (state === 'finished') bout++;
       newMatchup();
