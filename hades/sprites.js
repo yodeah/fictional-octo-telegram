@@ -1170,14 +1170,20 @@
     g.beginPath();
     for (let i = 1; i < S.n; i++) g[i > 1 ? 'lineTo' : 'moveTo'](S[i].x - S[i].nx * S[i].w * away * .55, S[i].y - S[i].ny * S[i].w * away * .55);
     g.stroke();
+    return away;
   }
 
-  // A strip of the limb between t0 and t1, a little wider than the skin, for armor and cloth.
-  function limbBand(S, t0, t1, scale, color, line) {
+  // A strip of the limb between t0 and t1, a little wider than the skin, for armor and cloth. With
+  // bow, both ends curve toward the hand like rings seen on a round arm.
+  function limbBand(S, t0, t1, scale, color, line, bow = 0) {
     const i0 = Math.max(0, Math.round(t0 * S.n)), i1 = Math.min(S.n, Math.max(i0 + 1, Math.round(t1 * S.n)));
+    const edge = (s, side) => [s.x + s.nx * s.w * scale * side, s.y + s.ny * s.w * scale * side];
+    const bulge = s => [s.x + s.ny * s.w * bow * 2, s.y - s.nx * s.w * bow * 2];
     g.beginPath();
-    for (let i = i0; i <= i1; i++) g[i === i0 ? 'moveTo' : 'lineTo'](S[i].x + S[i].nx * S[i].w * scale, S[i].y + S[i].ny * S[i].w * scale);
-    for (let i = i1; i >= i0; i--) g.lineTo(S[i].x - S[i].nx * S[i].w * scale, S[i].y - S[i].ny * S[i].w * scale);
+    for (let i = i0; i <= i1; i++) g[i === i0 ? 'moveTo' : 'lineTo'](...edge(S[i], 1));
+    if (bow) g.quadraticCurveTo(...bulge(S[i1]), ...edge(S[i1], -1));
+    for (let i = i1; i >= i0; i--) g.lineTo(...edge(S[i], -1));
+    if (bow) g.quadraticCurveTo(...bulge(S[i0]), ...edge(S[i0], 1));
     g.closePath();
     g.fillStyle = color;
     g.fill();
@@ -1189,7 +1195,7 @@
 
   // A line along the limb at a fraction of its half-width (side), or, when t0 = t1, straight across
   // it at that station (span is how far across, as a fraction of the half-width).
-  function limbLine(S, t0, t1, side, color, width, span = 1, crossWidth = .014) {
+  function limbLine(S, t0, t1, side, color, width, span = 1, crossWidth = .014, bow = 0) {
     g.strokeStyle = color;
     g.lineCap = 'round';
     g.beginPath();
@@ -1197,12 +1203,35 @@
       const s = sampleAt(S, t0);
       g.lineWidth = res * crossWidth;
       g.moveTo(s.x + s.nx * s.w * span, s.y + s.ny * s.w * span);
-      g.lineTo(s.x - s.nx * s.w * span, s.y - s.ny * s.w * span);
+      g.quadraticCurveTo(s.x + s.ny * s.w * bow * 2, s.y - s.nx * s.w * bow * 2, s.x - s.nx * s.w * span, s.y - s.ny * s.w * span);
     } else {
       g.lineWidth = res * width;
       const i0 = Math.round(t0 * S.n), i1 = Math.round(t1 * S.n);
       for (let i = i0; i <= i1; i++) g[i === i0 ? 'moveTo' : 'lineTo'](S[i].x + S[i].nx * S[i].w * side, S[i].y + S[i].ny * S[i].w * side);
     }
+    g.stroke();
+  }
+
+  // A shell over the top of the arm: rounded over the deltoid, following the arm down to t1 and
+  // ending in an edge that bows toward the hand. For pauldrons and shoulder plates.
+  function limbShell(S, t1, top, bottom, color, line = .014) {
+    const i1 = Math.max(1, Math.min(S.n, Math.round(t1 * S.n)));
+    const s0 = S[0], e = S[i1];
+    const at = (i, side) => { const k = mix(top, bottom, i / i1); return [S[i].x + S[i].nx * S[i].w * k * side, S[i].y + S[i].ny * S[i].w * k * side]; };
+    g.beginPath();
+    g.moveTo(...at(i1, 1));
+    for (let i = i1 - 1; i >= 0; i--) g.lineTo(...at(i, 1));
+    const a0 = Math.atan2(s0.ny, s0.nx);
+    g.arc(s0.x, s0.y, s0.w * top, a0, a0 + Math.PI);
+    for (let i = 1; i <= i1; i++) g.lineTo(...at(i, -1));
+    g.quadraticCurveTo(e.x + e.ny * e.w * bottom * .7, e.y - e.nx * e.w * bottom * .7, ...at(i1, 1));
+    g.closePath();
+    g.fillStyle = color;
+    g.fill();
+    if (!line) return;
+    g.strokeStyle = ink;
+    g.lineWidth = res * line;
+    g.lineJoin = 'round';
     g.stroke();
   }
 
@@ -1523,7 +1552,7 @@
         const wrist = add(hand, sub(elbow, hand).map(v => v * .12 / (Math.hypot(...sub(elbow, hand)) || 1)));
         const S = drawLimb([shoulder, elbow, wrist], armProfile(shoulder, elbow, wrist, varro ? 1.08 : .98), c.skin);
         const tE = S.elbow;
-        limbShade(S, 'rgba(90,30,24,.3)', c.glint);
+        const away = limbShade(S, 'rgba(90,30,24,.3)', c.glint);
         // Muscle forms, kept soft so they read as shape and not as dirt: the biceps-triceps split,
         // the elbow crease and the forearm's long muscle.
         const crease = 'rgba(110,45,30,.42)';
@@ -1534,64 +1563,40 @@
           // Manica: overlapping steel lames that follow the arm, upper ones over lower ones.
           for (let i = 7; i >= 0; i--) {
             const t0 = .04 + i * .112;
-            limbBand(S, t0, t0 + .13, 1.1, i % 2 ? metal.iron : metal.steel, .012);
-            limbLine(S, t0 + .02, t0 + .1, .55, i % 2 ? metal.steel : metal.edge, .01);
-            limbLine(S, t0 + .125, t0 + .125, 0, metal.dark, 0, 1.1);
+            limbBand(S, t0, t0 + .13, 1.1, i % 2 ? metal.iron : metal.steel, .012, .32);
+            limbLine(S, t0 + .03, t0 + .1, -away * .5, i % 2 ? metal.steel : metal.edge, .012);
           }
-          for (const t of [tE - .03, tE + .04]) limbLine(S, t, t, 0, c.leather, 0, 1.15, .02);
-          limbBand(S, .9, 1, 1.12, c.leather, .012);
+          for (const t of [tE - .03, tE + .04]) limbLine(S, t, t, 0, c.leather, 0, 1.15, .02, .32);
+          limbBand(S, .9, 1, 1.12, c.leather, .012, .3);
+          // A bronze shoulder guard that rounds over the deltoid and follows the arm down.
+          limbShell(S, tE * .38, 1.32, 1.18, c.bronzeDeep, .016);
+          limbShell(S, tE * .3, 1.16, 1.06, c.bronze, false);
+          limbLine(S, tE * .04, tE * .26, -away * .55, c.bronzeLight, .018);
+          for (const f of [.08, .2]) limbDot(S, tE * f, .016, c.bronzeLight);
         } else if (varro) {
-          limbBand(S, tE + (1 - tE) * .35, tE + (1 - tE) * .72, 1.06, c.linen, .012);
-          for (const f of [.43, .53, .63]) limbLine(S, tE + (1 - tE) * f, tE + (1 - tE) * f, 0, c.linenShade, 0, 1.06, .01);
-          limbBand(S, tE + (1 - tE) * .76, 1, 1.1, c.leather, .012);
+          limbBand(S, tE + (1 - tE) * .35, tE + (1 - tE) * .72, 1.06, c.linen, .012, .3);
+          for (const f of [.43, .53, .63]) limbLine(S, tE + (1 - tE) * f, tE + (1 - tE) * f, 0, c.linenShade, 0, 1.06, .01, .3);
+          limbBand(S, tE + (1 - tE) * .76, 1, 1.1, c.leather, .012, .3);
           limbLine(S, tE + (1 - tE) * .8, .97, 0, c.bronze, .02);
         } else {
-          // A short sleeve that rounds over the deltoid, gathered at a gilded hem, under two layered
-          // leather shoulder plates that follow the arm's curve. Then a laced bracer on the bow arm.
-          const cap = (scale, color) => {
-            const s0 = S[0];
-            g.beginPath();
-            g.arc(s0.x, s0.y, s0.w * scale, 0, Math.PI * 2);
-            g.fillStyle = color;
-            g.fill();
-            g.strokeStyle = ink;
-            g.lineWidth = res * .014;
-            g.stroke();
-          };
-          cap(1.1, look.main);
-          limbBand(S, 0, tE * .5, 1.1, look.main, .014);
-          for (const f of [.2, .34]) limbLine(S, tE * f, tE * (f + .1), f > .3 ? -.5 : .45, look.deep, .012);
-          limbLine(S, tE * .5, tE * .5, 0, metal.gold, 0, 1.1, .022);
-          cap(1.24, c.leatherDeep);
-          limbBand(S, 0, tE * .3, 1.24, c.leatherDeep, .014);
-          cap(1.12, c.leather);
-          limbBand(S, 0, tE * .2, 1.14, c.leather, .014);
-          limbLine(S, tE * .2, tE * .2, 0, c.leatherLight, 0, 1.1, .012);
-          limbLine(S, tE * .3, tE * .3, 0, c.leather, 0, 1.2, .012);
-          limbDot(S, tE * .1, .018, c.bronze);
-          limbDot(S, tE * .25, .016, c.bronze);
+          // A sleeve in the team color down to a gilded hem above the elbow, under two layered
+          // leather shoulder plates that round over the deltoid and follow the arm. Then a laced
+          // bracer on the bow arm.
+          limbBand(S, 0, tE * .66, 1.1, look.main, .014, .3);
+          limbLine(S, tE * .42, tE * .6, away * .5, look.deep, .014);
+          limbLine(S, tE * .66, tE * .66, 0, metal.gold, 0, 1.12, .024, .3);
+          limbShell(S, tE * .4, 1.3, 1.2, c.leatherDeep, .014);
+          limbShell(S, tE * .27, 1.16, 1.1, c.leather, .014);
+          limbLine(S, tE * .04, tE * .22, -away * .5, c.leatherLight, .014);
+          for (const f of [.12, .32]) limbDot(S, tE * f, .016, c.bronze);
           if (left) {
-            limbBand(S, tE + (1 - tE) * .3, 1, 1.1, c.leatherDeep, .012);
+            limbBand(S, tE + (1 - tE) * .3, 1, 1.1, c.leatherDeep, .012, .3);
             for (let k = 0; k < 4; k++) limbLine(S, tE + (1 - tE) * (.38 + k * .15), tE + (1 - tE) * (.45 + k * .15), k % 2 ? .4 : -.4, c.leatherLight, .01);
             for (const f of [.4, .62, .84]) limbDot(S, tE + (1 - tE) * f, .016, c.bronze);
-          } else limbBand(S, tE + (1 - tE) * .78, 1, 1.08, c.leather, .012);
+          } else limbBand(S, tE + (1 - tE) * .78, 1, 1.08, c.leather, .012, .3);
         }
         fist(wrist, hand, left, varro ? c.skin : left ? c.skin : c.leather, c);
       }, .07);
-      part(shoulder, () => {
-        const at = (forward, right, up) => add(shoulder, vector(forward, right * (left ? -1 : 1), up));
-        if (varro && !left) {
-          // A domed bronze cap over the deltoid, banded like the manica below it.
-          const top = add(shoulder, vector(0, .05, .04));
-          disc(top, .155, c.bronze, .016);
-          disc(add(top, vector(.02, .02, .02)), .118, c.bronzeDeep, false);
-          disc(add(top, vector(.03, .01, .04)), .1, c.bronze, false);
-          fine([at(.1, .0, .1), at(.02, .1, .16), at(-.08, .14, .1)], c.bronzeLight, .016);
-          for (const a2 of [0, 2.1, 4.2]) disc(add(top, vector(Math.cos(a2) * .12, Math.sin(a2) * .12, 0)), .014, c.bronzeLight, false);
-        } else {
-          // Cassian's shoulder plates are drawn with the arm, following its contour.
-        }
-      }, .12);
     }
 
     part(j.head, () => (varro ? murmilloHead : archerHead)(r, look, c, facing), .16);
