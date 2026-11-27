@@ -5,7 +5,8 @@ A gory gladiator autobattler with permanent death, for phone and laptop. Static 
 **Play:** https://yodeah.github.io/fictional-octo-telegram/ (GitHub Pages, from the `swords-and-sandals` branch), or open `index.html`. You wash ashore, owe the lanista, and must kill four champions. On a phone, use **Add to Home Screen** to open it full screen with its own icon. The old sparring page is `sandbox.html`.
 
 - Dice-rolled stats and a race (human, elf or demon, each with a drawback).
-- Each day: fight, train, rest or work. The debt falls due every fifth day.
+- Each day: fight, train, rest, work or watch. The debt falls due every fifth day.
+- In the stands, watch the champion’s exhibition to learn their gear and habits, or bet up to a day’s wage. The bookmaker keeps a cut.
 - Sparring is safe from death; blood bouts and champions are not, apart from one mercy per champion.
 - Before each bout pick a stance (aggressive, balanced, defensive) and where to aim.
 - Ending a bout under a fifth of your health leaves a wound on the part that took the most damage: −10% to one thing for four days, unless you pay the surgeon.

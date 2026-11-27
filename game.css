@@ -19,6 +19,8 @@ body[data-view="fight"] #app{display:none}
 .stack{display:grid;gap:8px}
 .stack .item{text-align:left}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.row .wide{grid-column:1/-1}
+.fighter-card button{width:100%;margin-top:6px}
 .card{border:1px solid var(--line);background:var(--panel);padding:10px 12px;margin:8px 0;border-radius:4px}
 .card p{margin:3px 0!important;font-size:14px}
 .offer button{width:100%;margin-top:6px}

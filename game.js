@@ -14,6 +14,8 @@ const Game = (() => {
   let storyPage = 0;
   let message = '';
   let watching = false;
+  // The share of the largest stake picked in the stands.
+  let stakeShare = 1;
 
   function load() {
     try {
@@ -46,6 +48,7 @@ const Game = (() => {
     injury: ['Injuries', 'A wound costs you something until it heals. Resting heals it twice as fast, or pay the surgeon.'],
     tactics: ['Tactics', 'Pick a stance and a target before the bell. The trainer judges the fight with your choice.'],
     strangers: ['Strangers', 'Some days a stranger finds you. You see the price before you agree, and you may always say no.'],
+    stands: ['The stands', 'Watching takes the day and pays no wage. Watch the champion to learn their gear and habits. Bets are capped at a day’s wage, and the bookmaker keeps a cut.'],
     spells: ['Spells', 'Your first spell wakes your mana. You can ready up to three. Before each bout you choose when each one is cast.'],
     triggers: ['Triggers', '“Their call” leaves the moment to your gladiator. Any other trigger holds the spell until it comes true, then casts it at once. If two come true together, the lower-numbered slot goes first.']
   };
@@ -127,6 +130,20 @@ const Game = (() => {
       + (treatable ? button('treat', 'Pay the surgeon: ' + cost + ' gold', 'data-key="' + part + '"' + (run.gold < cost ? ' disabled' : '')) : '') + '</div>').join('');
   }
 
+  // Does the first fighter win this seeded bout?
+  function firstWins(seed, first, second) {
+    ArenaDuel.setup(seed, [first, second]);
+    const { won } = ArenaDuel.resolve();
+    ArenaDuel.stop();
+    return won;
+  }
+
+  function counsel(advice) {
+    const words = [advice.tactic !== 'balanced' && 'fight ' + tactics[advice.tactic].name.toLowerCase(),
+      advice.aimAt !== 'any' && 'aim at the ' + aimZones[advice.aimAt].name.toLowerCase()].filter(Boolean);
+    return words.length ? 'Having watched them, you would ' + words.join(' and ') + '.' : 'Having watched them, you see no stance or target that does clearly better.';
+  }
+
   // Asks the trainer again after a short pause, so the screen draws first.
   function judge() {
     const mine = preview;
@@ -134,6 +151,7 @@ const Game = (() => {
     setTimeout(() => {
       if (preview !== mine || view !== 'confirm' || mine.read) return;
       mine.read = trainersRead(Rules.heroConfig(save.run), mine.foe);
+      if (mine.kind === 'champion' && Rules.scoutedOf(save.run) && !mine.advice) mine.advice = counsel(Rules.study(save.run, firstWins));
       render(true);
     }, 60);
   }
@@ -195,7 +213,8 @@ const Game = (() => {
         : run.mercy ? 'To the death. If you fall, the crowd may spare you this once, for half your gold.' : 'To the death. There is no mercy left. If you fall, ' + escape(run.name) + ' is gone.';
       return scene('arena') + '<h2>' + { spar: 'Sparring', blood: 'Blood bout', champion: 'Champion', duel: 'The Duel' }[kind] + ' · purse about ' + Rules.purse(run, kind) + ' gold</h2>'
         + card({ ...Rules.heroConfig(run) }, '<p class="small">You, at ' + Math.round(run.health * 100) + '% health</p>') + woundList(run)
-        + card(foe, '<p class="weak">' + weakness(foe) + '</p>' + (kind === 'champion' ? '<p class="small">' + Rules.champions[run.act].hint + '</p>' : ''))
+        + card(foe, '<p class="weak">' + weakness(foe) + '</p>' + (kind === 'champion' ? '<p class="small">' + Rules.champions[run.act].hint + (Rules.scoutedOf(run) ? ' ' + Rules.champions[run.act].habits : '') + '</p>' : ''))
+        + (preview.advice ? '<p class="read">' + preview.advice + '</p>' : '')
         + tip('tactics') + tacticsPanel() + triggerPanel()
         + '<p class="read ' + (read?.[0] || '') + '">Trainer: ' + (read ? read[1] : 'Let me watch you both…') + '</p><p class="small ' + (kind === 'spar' ? '' : 'warn') + '">' + risk + (kind === 'spar' ? '' : ' Win with under a fifth of your health and you carry a wound.') + '</p>'
         + button('fight', 'Walk onto the sand', 'class="primary"') + (kind === 'duel' ? '' : button('back', 'Not today'));
@@ -212,6 +231,24 @@ const Game = (() => {
         + '<div class="card"><p class="eyebrow">YOU GAIN</p><p>' + terms.gain + '</p></div><div class="card wound"><p class="eyebrow">THE PRICE</p><p>' + terms.price + '</p></div>' + now
         + '<p class="small">Gold ' + run.gold + ' · health ' + Math.round(run.health * 100) + '% · ' + (run.mercy ? 'mercy unspent' : 'no mercy left') + '</p>'
         + button('accept', 'Strike the bargain', 'class="primary"') + button('decline', 'Send them away');
+    },
+
+    stands: () => {
+      const run = save.run;
+      const stake = Math.floor(Rules.maxStake(run) * stakeShare);
+      const bout = ({ key, fighters: pair }) => {
+        const odds = preview.odds?.[key];
+        const side = (config, index) => card(config, !odds ? '<p class="small">The bookmaker is counting…</p>'
+          : !odds[index] ? '<p class="small">Too strong a favourite: no bets.</p>'
+          : button('bet', stake ? 'Bet ' + stake + ' · pays ' + Math.floor(stake * odds[index]) : 'Pays ' + odds[index] + '× · you have no gold to bet',
+            'data-key="' + key + ':' + index + '"' + (stake ? '' : ' disabled')));
+        return '<h2>' + (key === 'champion' ? Rules.champions[run.act].title + ' · exhibition' : 'Undercard') + '</h2>' + side(pair[0], 0) + side(pair[1], 1)
+          + button('watch', 'Just watch this one', 'data-key="' + key + '"');
+      };
+      return scene('arena') + tip('stands') + '<p class="num">Gold ' + run.gold + ' · watching takes the day</p>'
+        + '<div class="row">' + [[.5, 'Half stake'], [1, 'Full stake']].map(([share, label]) => button('stake', label + '<span>' + Math.floor(Rules.maxStake(run) * share) + ' gold</span>',
+          'data-key="' + share + '" aria-pressed="' + (stakeShare === share) + '"')).join('') + '</div>'
+        + Rules.billFor(run).map(bout).join('') + button('back', 'Not today');
     },
 
     outcome: () => {
@@ -253,7 +290,8 @@ const Game = (() => {
       + offer('spar', 'SPARRING · +1 renown', run.offers.spar) + offer('blood', 'BLOOD BOUT · +2 renown · to the death', run.offers.blood)
       + (Rules.championReady(run) ? offer('champion', champion.title + ' · to the death', Rules.championConfig(run.act))
         : '<p class="small locked">' + champion.name + ' will answer your challenge at ' + Rules.renownNeeded[run.act] + ' renown.</p>')
-      + '<div class="row">' + button('rest', 'Rest a day<span>Heal fully</span>') + button('work', 'Work the docks<span>+' + Rules.wage(run) + ' gold, safe</span>') + '</div>';
+      + '<div class="row">' + button('stands', 'Watch the games<span>Takes the day. Study the champion, place a bet.</span>', 'class="wide"')
+      + button('rest', 'Rest a day<span>Heal fully</span>') + button('work', 'Work the docks<span>+' + Rules.wage(run) + ' gold, safe</span>') + '</div>';
   }
 
   function trainPanel(run) {
@@ -294,7 +332,11 @@ const Game = (() => {
       // The glass eye shows every champion's gear; without it only the next one is sized up.
       const config = Rules.championConfig(index);
       const eye = Rules.metOf(run).peddler;
-      const sight = champion.hint + ' ' + weakness(config) + (eye ? ' ' + [config.gear.special, config.gear.armor, config.gear.shield].map(itemName).join(', ') + ', ' + config.maxHP + ' health.' : '');
+      const seen = Rules.scoutedOf(run, index);
+      const kit = [config.gear.special, config.gear.armor, config.gear.shield].map(itemName).join(', ') + ', ' + config.maxHP + ' health.';
+      const sight = champion.hint + ' ' + weakness(config) + (eye || seen ? ' ' + kit : '')
+        + (seen ? '<br>Habits: ' + champion.habits + ' ' + specials[config.gear.special].effect + '.'
+          : index === run.act ? '<br>Watch their exhibition to learn their habits.' : '');
       return '<div class="card champion ' + state + '">' + Art.portrait(champion.color, champion.trim, index) + '<div><p class="eyebrow">' + champion.title + '</p><h3>' + champion.name + '</h3><p class="small">'
         + (state === 'slain' ? 'Slain. Their weapon hangs in your gear.' : state === 'next' || eye ? sight : 'You know only the name. Kill those before them.') + '</p></div></div>';
     }).join('');
@@ -372,6 +414,28 @@ const Game = (() => {
     return { name: '', race: 'human', stats: Rules.rollStats(), rerolls: 3, startAct: 0 };
   }
 
+  // The stands show at once; the odds follow after the screen has drawn.
+  function openStands() {
+    const mine = preview = { odds: null };
+    const bill = Rules.billFor(save.run);
+    store();
+    go('stands');
+    setTimeout(() => {
+      if (preview !== mine || view !== 'stands') return;
+      mine.odds = Object.fromEntries(bill.map(bout => [bout.key, Rules.bookOdds(bout, firstWins)]));
+      render(true);
+    }, 60);
+  }
+
+  function watchBout(key, side, stake) {
+    if (!Rules.startWatch(save.run, key, firstWins, side, stake)) return;
+    preview = null;
+    notes = [];
+    tab = 'arena';
+    store();
+    startWatching();
+  }
+
   function retune(choose, ...picked) {
     choose(save.run, ...picked);
     store();
@@ -436,6 +500,13 @@ const Game = (() => {
     decline: () => { Rules.declineBargain(save.run); notes = []; store(); resume(); },
     treat: part => { Rules.treat(save.run, part); store(); render(true); },
     back: () => go('hub'),
+    stands: openStands,
+    stake: share => { stakeShare = Number(share); render(true); },
+    watch: key => watchBout(key, 0, 0),
+    bet: choice => {
+      const [key, side] = choice.split(':');
+      watchBout(key, Number(side), Math.floor(Rules.maxStake(save.run) * stakeShare));
+    },
     fight: () => {
       if (!Rules.startFight(save.run, preview.kind)) return;
       preview = null;

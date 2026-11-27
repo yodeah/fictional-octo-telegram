@@ -61,12 +61,16 @@ const Rules = (() => {
   const trophies = { earthshaker: 'maul', leechFang: 'rapier', jailersChain: 'flail', headsmansVerdict: 'executioner' };
   const champions = [
     { name: 'Gorrak the Mauler', title: 'Champion of the Docks', trophy: 'earthshaker', color: [92, 112, 66], trim: [168, 190, 110], hint: 'Slow and heavy. He wears only leather.',
+      habits: 'Swings for the arm and head.',
       config: { level: 10, strength: 55, attack: 50, ranged: 30, magic: 30, defense: 11, maxHP: 222, gear: { weapon: 'maul', reserve: 'none', shield: 'none', armor: 'leather', special: 'earthshaker' } } },
     { name: 'Vell the Leech', title: 'Champion of the Salt Market', trophy: 'leechFang', color: [140, 40, 62], trim: [232, 130, 150], hint: 'Fast, and heals with every cut. Missing costs her blood.',
+      habits: 'Quick cuts at the head and body. A long bout favours her.',
       config: { level: 20, strength: 46, attack: 52, ranged: 40, magic: 30, defense: 13, maxHP: 190, gear: { weapon: 'rapier', reserve: 'none', shield: 'buckler', armor: 'scout', special: 'leechFang' } } },
     { name: 'The Iron Widow', title: 'Champion of the Old Ruins', trophy: 'jailersChain', color: [66, 60, 84], trim: [178, 170, 206], hint: 'Walks behind plate and a tower shield. Axes and maces break shields.',
+      habits: 'Hammers the arm, then the ribs and legs.',
       config: { level: 30, strength: 66, attack: 66, ranged: 40, magic: 40, defense: 25, maxHP: 285, gear: { weapon: 'flail', reserve: 'none', shield: 'tower', armor: 'plate', special: 'jailersChain' } } },
     { name: 'Aurek the Undefeated', title: 'Champion of Champions', trophy: 'headsmansVerdict', color: [160, 120, 40], trim: [250, 214, 110], hint: 'Black iron and lightning. His blade executes the badly wounded.',
+      habits: 'Nearly every blow goes for the head. Casts Arc Flash.',
       config: { level: 40, strength: 66, attack: 64, ranged: 50, magic: 60, defense: 22, maxHP: 270, gear: { weapon: 'executioner', reserve: 'none', shield: 'none', armor: 'fortress', special: 'headsmansVerdict' }, spellList: ['arc'] } }
   ];
   const renownNeeded = [4, 6, 6, 8];
@@ -90,6 +94,12 @@ const Rules = (() => {
     flagellant: { name: 'The Flagellant', act: 1, color: [124, 112, 100], story: 'Scars cover his back. “Take the lash with me today, and pain will never slow you again.”' }
   };
   const zealHealth = .94;
+  // The stands. The bookmaker prices a bout from trial runs and keeps a fifth of every fair return.
+  const bookTrials = 40;
+  const houseCut = .2;
+  const maxPays = 4;
+  const minPays = 1.1;
+  const studyTrials = 20;
 
   const clone = value => JSON.parse(JSON.stringify(value));
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -342,7 +352,7 @@ const Rules = (() => {
   function visitorTerms(run) {
     const offer = run.visitor;
     if (offer.key === 'crone') return { gain: '+3 ' + statNames[offer.up] + ', for good.', price: '−3 ' + statNames[offer.down] + ', for good.' };
-    if (offer.key === 'peddler') return { gain: '+16 melee skill, and every champion’s gear and weakness on the wall.', price: '−20 ranged skill, for good.' };
+    if (offer.key === 'peddler') return { gain: '+16 melee skill, and every champion’s gear and weakness on the wall, though not their habits.', price: '−20 ranged skill, for good.' };
     if (offer.key === 'envoy') return { gain: 'Red Verdict, a heavy spell (34 damage, 18 mana). It takes ' + (run.spells.length < 3 ? 'a free slot.' : 'your third slot.'),
       price: 'Every cast costs you 11 health.' };
     if (offer.key === 'dealer') return { gain: 'One card in three is a fortune: ' + fortune(run) + ' gold.',
@@ -446,7 +456,105 @@ const Rules = (() => {
     return run.pending;
   }
 
+  // Saves from before the stands have watched nobody.
+  const scoutedOf = (run, act = run.act) => Boolean(run.scouted?.[act]);
+
+  // The day's bill comes from its own dice and the day alone, so it never shifts a run and reloading shows the same bouts.
+  function billFor(run) {
+    run.sands = run.sands || { rng: (run.rng ^ 0x0DD50DD5) >>> 0 };
+    const holder = { act: run.act, rng: (run.sands.rng + Math.imul(run.day, 0x9E3779B1)) >>> 0 };
+    const champion = championConfig(run.act);
+    // Only a gladiator near a champion's own measure is worth an exhibition.
+    const challenger = { ...makeOpponent(holder, 'blood'), level: champion.level, strength: champion.strength, attack: champion.attack,
+      ranged: champion.attack, defense: champion.defense, maxHP: champion.maxHP };
+    const first = makeOpponent(holder, 'blood');
+    const second = makeOpponent(holder, 'blood');
+    // Two fighters on the sand need telling apart.
+    if (second.name === first.name) second.name = pick(holder, opponentNames.filter(name => name !== first.name));
+    if (String(second.color) === String(first.color)) second.color = pick(holder, opponentColors.filter(color => String(color) !== String(first.color)));
+    const seed = () => Math.floor(roll(holder) * 4294967296);
+    return [
+      { key: 'champion', fighters: [champion, challenger], seed: seed() },
+      { key: 'undercard', fighters: [first, second], seed: seed() }
+    ];
+  }
+
+  // `duel(seed, first, second)` says whether the first fighter wins. Returns what each side pays, or null for no bets.
+  const books = new Map();
+  function bookOdds(bout, duel) {
+    const [first, second] = bout.fighters;
+    const key = JSON.stringify(bout.fighters);
+    if (!books.has(key)) {
+      let wins = 0;
+      for (let i = 0; i < bookTrials; i++) wins += duel(3000 + i * 389, first, second) ? 1 : 0;
+      const share = (wins + 1) / (bookTrials + 2);
+      books.set(key, [share, 1 - share].map(chance => {
+        const pays = Math.floor(Math.min(maxPays, (1 - houseCut) / chance) * 20) / 20;
+        return pays >= minPays ? pays : null;
+      }));
+    }
+    return books.get(key);
+  }
+
+  const maxStake = run => Math.max(0, Math.min(run.gold, wage(run)));
+
+  // The bout, the bet and its result are all fixed here and saved before anything is shown.
+  function startWatch(run, key, duel, side = 0, stake = 0) {
+    if (busy(run)) return null;
+    if (!Number.isInteger(stake) || stake < 0 || stake > maxStake(run) || (side !== 0 && side !== 1)) return null;
+    const bout = billFor(run).find(item => item.key === key);
+    if (!bout) return null;
+    const pays = stake ? bookOdds(bout, duel)[side] : null;
+    if (stake && !pays) return null;
+    const [first, second] = bout.fighters;
+    run.visitor = null;
+    run.gold -= stake;
+    run.pending = { kind: 'watch', bout: key, seed: bout.seed, hero: first, foe: second, side, stake, pays,
+      winner: duel(bout.seed, first, second) ? 0 : 1 };
+    return run.pending;
+  }
+
+  function finishWatch(run) {
+    const { bout, hero, foe, side, stake, pays, winner } = run.pending;
+    run.pending = null;
+    const [won, lost] = winner ? [foe, hero] : [hero, foe];
+    const events = [won.name + ' beats ' + lost.name + (bout === 'champion' ? '. Champions fight exhibitions to first blood.' : '.')];
+    if (stake && side === winner) {
+      const paid = Math.floor(stake * pays);
+      run.gold += paid;
+      events.push('Your bet pays ' + paid + ' gold for ' + stake + ' staked.');
+    } else if (stake) {
+      events.push('Your ' + stake + ' gold stays with the bookmaker.');
+    }
+    if (bout === 'champion' && !scoutedOf(run)) {
+      run.scouted = { ...run.scouted, [run.act]: true };
+      events.push('You have studied ' + champions[run.act].name + '. The champion wall shows their gear and habits.');
+    }
+    return endDay(run, events);
+  }
+
+  // After watching a champion: try each stance, then each target, and name what does clearly better.
+  function study(run, duel) {
+    const hero = heroConfig(run);
+    const foe = championConfig(run.act);
+    const wins = changes => {
+      let total = 0;
+      for (let i = 0; i < studyTrials; i++) total += duel(5000 + i * 271, { ...hero, ...changes }, foe) ? 1 : 0;
+      return total;
+    };
+    const best = (keys, field, fixed, plain) => {
+      const base = wins({ ...fixed, [field]: plain });
+      return keys.filter(key => key !== plain).reduce((top, key) => {
+        const total = wins({ ...fixed, [field]: key });
+        return total > top.wins && total >= base + 3 ? { key, wins: total } : top;
+      }, { key: plain, wins: base }).key;
+    };
+    const tactic = best(tacticKeys, 'tactic', { aimAt: 'any' }, 'balanced');
+    return { tactic, aimAt: best(aimKeys, 'aimAt', { tactic }, 'any') };
+  }
+
   function finishFight(run, result) {
+    if (run.pending.kind === 'watch') return finishWatch(run);
     const { kind, foe } = run.pending;
     run.pending = null;
     if (kind === 'duel') run.duel = null;
@@ -517,6 +625,6 @@ const Rules = (() => {
   return {
     races, statNames, visitors, metOf, visitorOffer, visitorTerms, acceptBargain, declineBargain, triggerKeys, spellPool, triggerFor, setTrigger, pageCost, pageOnSale, buyPage, wounds, woundDays, woundBelow, tacticKeys, aimKeys, woundsOf, surgeonCost, treat, setTactic, setAim, drills, catalog, trophies, champions, renownNeeded,
     rollStats, stat, newRun, heroConfig, championConfig, price, sellPrice, shopStock, slotOf, trainingCost, purse, wage,
-    debtDue, daysToDebt, championReady, buy, sell, equip, equipped, train, rest, work, startFight, finishFight, learnSpell, toggleSpell
+    debtDue, daysToDebt, championReady, scoutedOf, billFor, bookOdds, maxStake, startWatch, study, buy, sell, equip, equipped, train, rest, work, startFight, finishFight, learnSpell, toggleSpell
   };
 })();
