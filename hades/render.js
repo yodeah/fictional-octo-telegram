@@ -19,7 +19,7 @@
   let shake = 0, clock = 0;
   const fallen = new Map();
   const shown = [];
-  let vignette, foreground, fallArt, mistArt, shaftArt, shadeArt;
+  let vignette, fallArt, mistArt, shaftArt, shadeArt;
   let excitement = 0;
   const bursts = new Map();
   let impacts = [];
@@ -77,11 +77,6 @@
     ellipsePath(g, 0, 0, rx - .12, ry - .08);
     g.clip();
     paving(g, r);
-    // Tufts of dark grass and pale flowers creeping in from the edge.
-    for (let i = 0; i < 90; i++) {
-      const angle = r() * Math.PI * 2, d = .84 + r() * .17;
-      tuft(g, Math.cos(angle) * d * rx, Math.sin(angle) * d * ry, .22 + r() * .26, r);
-    }
     fissures(g, r);
     seal(g, r);
     floorLight(g, ry);
@@ -322,13 +317,11 @@
       const [x, y] = around(a);
       if (Math.sin(a) < -.35) continue;
       if (i % 2) urn(g, x, y + .1, .5 + r() * .25);
-      for (let k = 0; k < 3; k++) tuft(g, x + (r() - .5) * 1.7, y + (r() - .5) * .8, .35 + r() * .35, r);
     }
     // Far side, drawn from the corners inward so nearer pieces overlap farther ones.
     for (const [a, kind, tall] of [[-1.571, 'statue'], [-2.0, 'column', 2.6], [-1.14, 'column', 2.6], [-2.36, 'statue'], [-.78, 'statue'],
       [-2.68, 'column', 1.7], [-.46, 'column', 2.1], [-2.94, 'column', 2.3], [-.2, 'column', 1.4]]) {
       const [x, y] = around(a, .35);
-      for (let k = 0; k < 2; k++) tuft(g, x + (k ? .8 : -.8), y + .1, .55, r);
       // Kept low enough that heads and fire bowls stay inside the camera's view.
       g.save();
       g.translate(x, y);
@@ -386,25 +379,6 @@
     shapeAt(g, at([[-.34, 1.86], [-.2, 2.12], [.2, 2.12], [.34, 1.86]]), '#4b8586');
     shapeAt(g, at([[-.62, 1.85], [-.9, 2.2], [-.42, 2.28], [-.3, 2.05]]), '#8d7440');
     shapeAt(g, at([[.62, 1.85], [.9, 2.2], [.42, 2.28], [.3, 2.05]]), '#6d5830');
-  }
-
-  function tuft(g, x, y, size, r) {
-    const hue = 158 + r() * 40;
-    for (let k = 0; k < 11; k++) {
-      const lean = (r() - .5) * 2.4, tall = size * (.5 + r() * .8);
-      const baseX = x + (r() - .5) * size * 1.5, baseY = y + (r() - .5) * size * .5;
-      g.beginPath();
-      g.moveTo(baseX - size * .09, baseY);
-      g.quadraticCurveTo(baseX + lean * tall * .2, baseY - tall * .8, baseX + lean * tall * .6, baseY - tall);
-      g.quadraticCurveTo(baseX + lean * tall * .25, baseY - tall * .5, baseX + size * .09, baseY);
-      g.fillStyle = `hsl(${hue + r() * 14}, ${38 + r() * 20}%, ${14 + k * 1.8}%)`;
-      g.fill();
-    }
-    if (r() < .35) for (let k = 0; k < 3; k++) {
-      const fx = x + (r() - .5) * size * 1.4, fy = y - size * (.3 + r() * .6);
-      for (let p = 0; p < 5; p++) blob(g, fx + Math.cos(p * 1.256) * .045, fy + Math.sin(p * 1.256) * .035, .033, '#cfeeff');
-      blob(g, fx, fy, .025, '#ffd76a');
-    }
   }
 
   // One cut stone: face, lit upper edge, shaded lower edge and a few chips.
@@ -599,7 +573,7 @@
     g.fillRect(x - s * .55, y - s * .66, s * 1.1, s * .09);
   }
 
-  // The four cover blocks: overgrown stone planters on the diagonal.
+  // The four cover blocks: carved stone plinths on the diagonal.
   function paintPillar(g, r) {
     const n = noise(19);
     const corners = [0, 1, 2, 3].map(i => [Math.cos(i * Math.PI / 2) * r * 1.12, Math.sin(i * Math.PI / 2) * r * 1.12 * K]);
@@ -645,51 +619,37 @@
     g.strokeStyle = ink;
     g.lineWidth = .055;
     g.stroke();
-    const leaf = (x, y, angle, long, color) => {
-      g.save();
-      g.translate(x, y);
-      g.rotate(angle);
+    // The top: a recessed stone slab ringed in gold with a glowing gem, no growth.
+    const top = scale => corners.map(([x, y]) => [x * scale, y * scale - tall]);
+    const slab = (points, fill, line) => {
       g.beginPath();
-      g.moveTo(0, 0);
-      g.quadraticCurveTo(long * .5, -long * .36, long, 0);
-      g.quadraticCurveTo(long * .5, long * .36, 0, 0);
-      g.fillStyle = color;
+      points.forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](x, y));
+      g.closePath();
+      g.fillStyle = fill;
       g.fill();
-      g.strokeStyle = ink;
-      g.lineWidth = .022;
+      if (!line) return;
+      g.strokeStyle = line;
+      g.lineWidth = .035;
       g.stroke();
-      g.strokeStyle = 'rgba(210,255,225,.35)';
-      g.beginPath();
-      g.moveTo(long * .1, 0);
-      g.lineTo(long * .8, 0);
-      g.stroke();
-      g.restore();
     };
-    // Three tiers of pointed leaves, darkest at the bottom.
-    for (const [count, spread, lift, light] of [[34, 1, .1, 17], [24, .75, .3, 25], [12, .45, .48, 34]]) {
-      for (let i = 0; i < count; i++) {
-        const a = i / count * Math.PI * 2 + n();
-        const d = (.35 + n() * .5) * r * spread;
-        leaf(Math.cos(a) * d * .6, Math.sin(a) * d * K * .5 - tall - lift, a + (n() - .5) * .9, .34 + n() * .22,
-          `hsl(${150 + n() * 40}, 42%, ${light + n() * 8}%)`);
-      }
-    }
-    for (const [dx, dy] of [[-.34, -.34], [.3, -.5], [.04, -.74], [.46, -.18], [-.1, -.2]]) {
-      for (let i = 0; i < 5; i++) leaf(dx, dy - tall, i * 1.256, .13, '#e6f6ff');
-      blob(g, dx, dy - tall, .04, '#ffcf55');
-    }
-    // Vines hanging down the two front faces.
-    for (const [x, y, long] of [[-.62, .1, .5], [-.22, .34, .34], [.4, .24, .62]]) {
-      g.strokeStyle = '#173f2e';
-      g.lineWidth = .045;
-      g.beginPath();
-      g.moveTo(x, y - tall);
-      g.quadraticCurveTo(x - .1, y - tall + long * .6, x + .04, y - tall + long);
-      g.stroke();
-      for (let i = 1; i < 5; i++) {
-        leaf(x - .04, y - tall + long * i / 5, i % 2 ? .5 : 2.6, .16, `hsl(${150 + i * 8}, 45%, ${26 + i * 3}%)`);
-      }
-    }
+    slab(top(.96), '#3c6a70');
+    slab(top(.78), '#264c55', '#c0964a');
+    slab(top(.5), '#1a3a44', '#83652f');
+    const gem = g.createRadialGradient(0, -tall, 0, 0, -tall, r * .4);
+    gem.addColorStop(0, 'rgba(160,255,225,.9)');
+    gem.addColorStop(.35, 'rgba(70,200,170,.45)');
+    gem.addColorStop(1, 'rgba(70,200,170,0)');
+    g.fillStyle = gem;
+    g.fillRect(-r, -tall - r * .5, r * 2, r);
+    shapeAt(g, [[0, -tall - .1], [.14, -tall], [0, -tall + .1], [-.14, -tall]], '#7ff5d2', .025);
+    // Chipped edges and a crack so the stone reads as old.
+    g.strokeStyle = 'rgba(8,20,26,.8)';
+    g.lineWidth = .03;
+    g.beginPath();
+    g.moveTo(west[0] * .9, west[1] * .9 - tall + .02);
+    g.lineTo(west[0] * .6, west[1] * .6 - tall + .1);
+    g.lineTo(west[0] * .45, west[1] * .4 - tall + .05);
+    g.stroke();
   }
 
   // Effect art is painted once, like Hades' effect frames, then rotated and stamped.
@@ -759,7 +719,7 @@
     return crescents.get(key);
   }
 
-  // Dark growth framing the near edge, and the screen-edge shadow. Both are painted once per size.
+  // The screen-edge shadow, painted once per size.
   function paintFrame() {
     vignette = makeCanvas(width * dpr / 2, height * dpr / 2);
     let g = vignette.getContext('2d');
@@ -769,28 +729,6 @@
     edge.addColorStop(1, 'rgba(8,2,26,.74)');
     g.fillStyle = edge;
     g.fillRect(0, 0, w, h);
-    foreground = makeCanvas(width * dpr, height * dpr);
-    g = foreground.getContext('2d');
-    const r = noise(113);
-    const leaf = (x, y, angle, long, color) => {
-      g.save();
-      g.translate(x, y);
-      g.rotate(angle);
-      g.beginPath();
-      g.moveTo(0, 0);
-      g.quadraticCurveTo(long * .45, -long * .24, long, 0);
-      g.quadraticCurveTo(long * .45, long * .24, 0, 0);
-      g.fillStyle = color;
-      g.fill();
-      g.restore();
-    };
-    for (const [cx, dir] of [[0, -1], [foreground.width, -2.1]]) {
-      for (let i = 0; i < 46; i++) {
-        const long = foreground.width * (.035 + r() * .07);
-        const x = cx + (cx ? -1 : 1) * r() * foreground.width * .09, y = foreground.height - r() * foreground.height * .12;
-        leaf(x, y, dir + (r() - .5) * 1.9, long, `hsl(${205 + r() * 55}, 55%, ${4 + r() * 8}%)`);
-      }
-    }
   }
 
   // Falling water and mist are painted once and slid past each frame.
@@ -1540,7 +1478,9 @@
     const sprawl = duel.winner === null ? 0 : 1.5;
     const left = Math.min(a.x, b.x) - 2.4 - sprawl, right = Math.max(a.x, b.x) + 2.4 + sprawl;
     const top = Math.min(a.y, b.y) * K - 4.2, bottom = Math.max(a.y, b.y) * K + 1.4 + sprawl;
-    const zoom = clamp(Math.min(width / unit / (right - left), height / unit / (bottom - top)), 1, duel.winner === null ? 1.42 : 1.3);
+    // Held 10% further out than a tight fit, so the fight has room around it.
+    const fit = Math.min(width / unit / (right - left), height / unit / (bottom - top)) / 1.1;
+    const zoom = clamp(fit, 1 / 1.1, duel.winner === null ? 1.29 : 1.18);
     // Never pan far enough to show past the painted scenery.
     const roomX = Math.max(0, 12.4 - width / unit / zoom / 2), roomY = Math.max(0, 7.6 - height / unit / zoom / 2);
     const tx = clamp((left + right) / 2, -roomX, roomX);
@@ -1679,7 +1619,6 @@
     // Screen-space framing.
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.drawImage(vignette, 0, 0, width, height);
-    ctx.drawImage(foreground, -camera.x * unit * .25, 8 - camera.y * unit * .2, width, height);
   }
 
   function reset() {

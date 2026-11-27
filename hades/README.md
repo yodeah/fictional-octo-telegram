@@ -36,7 +36,7 @@ As in the main game, fights are fully idle. Choose a class for each side (or lea
 - **Two weapons each:** every class carries a main and a backup and swaps for 7 energy. Melee fighters take a couple of shots when they cannot close; shooters and mages draw steel when caught with no escape; a spear gives way to a sword up close and a maul to a sword when tired. The spare is worn on the back.
 - **Quick movement:** melee **dashes** to close in or sidestep, shooters **roll** away, mages **blink**. Each has limited charges (the pips under the health bar), costs energy and gives a moment of invulnerability. An escape also grants a short burst of speed. A melee dash that ends beside the rival flows into a **dash-strike**: half the windup, 20% more damage.
 - **Shared with the side-view battler:** HP, mana, energy, stance and stagger, shield blocks, perfect blocks and riposte bashes, shields broken by axes and mauls, the combat triangle (gentler here), spellbooks, crowded shots and blood.
-- **New with a floor to move on:** attacks have a shape (sweep, thrust, slam, bolt) written on the ground during the windup, shields only cover the front, hits from behind are stronger, stone planters block shots, and being knocked into stone staggers.
+- **New with a floor to move on:** attacks have a shape (sweep, thrust, slam, bolt) written on the ground during the windup, shields only cover the front, hits from behind are stronger, carved stone plinths block shots, and being knocked into stone staggers.
 - After 45 seconds damage rises steadily, so a cautious bout still ends.
 
 ## How the picture is made
@@ -46,7 +46,7 @@ This follows the pipeline of the original Hades, where characters were [built in
 - **Fighters are 2D sprites.** A small rig poses each frame once; it is painted in flat color with a heavy shadow side, a hot rim light and an ink outline, then cached. There are 16 facing directions and animations for idle, run, dash, windup, strike, recover, hurt, stagger and death. A broken stance drops the fighter into a staggered stance: buckled onto the back knee, weapon hanging with the blade dragging, guard sagging and head lolling while the body reels.
 - **Each class has its own headgear**: crests, pelts, horns, hoods, crowns and halos over the team color.
 - **Baked on first use**, about 1 ms a frame, with at most 900 frames kept.
-- **Scenery and effects are prepainted** too: floor, planters, foreground growth, vignette, glows, sweep crescents and impact bursts are stamped, not rebuilt.
+- **Scenery and effects are prepainted** too: floor, stone plinths, vignette, glows, sweep crescents and impact bursts are stamped, not rebuilt.
 - **Backdrop:** a drowned temple in a cavern with flowing falls, mist and light shafts. A crowd of shades hops at big blows and cheers a kill; it is drawing only and never affects the bout.
 - **Camera:** fixed high angle that zooms in while keeping both fighters in view.
 
