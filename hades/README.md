@@ -47,7 +47,7 @@ This follows the pipeline of the original Hades, where characters were [built in
 - **Fighters are 2D sprites.** A small rig poses each frame once; it is painted in flat color with a heavy shadow side, a hot rim light and an ink outline, then cached. There are 16 facing directions and animations for idle, run, dash, windup, strike, recover, hurt, stagger and death. A broken stance drops the fighter into a staggered stance: buckled onto the back knee, weapon hanging with the blade dragging, guard sagging and head lolling while the body reels.
 - **Each class has its own headgear**: crests, pelts, horns, hoods, crowns and halos over the team color.
 - **Baked on first use**, about 1 ms a frame, with at most 1,400 frames kept; the champions get extra in-between frames, breathe while idle, swing their arms on the run, coil deeper before a blow and settle back to guard with a slight overshoot.
-- **Scenery and effects are prepainted** too: floor, stone plinths, vignette, glows, sweep crescents and impact bursts are stamped, not rebuilt.
+- **Scenery and effects are prepainted** too: floor (with old bloodstains, broken blades, dropped shields, dented helmets and spent arrows near the edge), stone plinths, vignette, glows, sweep crescents and impact bursts are stamped, not rebuilt.
 - **Backdrop:** a drowned temple in a cavern with flowing falls, mist and light shafts. A crowd of shades hops at big blows and cheers a kill; it is drawing only and never affects the bout.
 - **Camera:** fixed high angle that zooms in while keeping both fighters in view.
 

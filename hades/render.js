@@ -79,6 +79,7 @@
     paving(g, r);
     fissures(g, r);
     seal(g, r);
+    debris(g, noise(57), rx, ry);
     floorLight(g, ry);
     const light = g.createRadialGradient(-2, -1.5, 1, 0, 0, rx);
     light.addColorStop(0, 'rgba(150,255,225,.14)');
@@ -329,6 +330,93 @@
       if (kind === 'column') column(g, 0, 0, tall * .8, r);
       else statue(g, 0, 0, x > .1 ? -1 : 1);
       g.restore();
+    }
+  }
+
+  // What earlier bouts left behind near the edge: old bloodstains, broken blades, a dropped shield,
+  // a dented helmet and spent arrows. Painted into the floor once, so it costs nothing per frame.
+  function debris(g, r, rx, ry) {
+    const spot = (d0, d1) => {
+      const a = r() * Math.PI * 2, d = d0 + r() * (d1 - d0);
+      return [Math.cos(a) * d * rx, Math.sin(a) * d * ry];
+    };
+    for (let i = 0; i < 16; i++) {
+      const [x, y] = spot(.45, .92), size = .25 + r() * .45;
+      for (let k = 0; k < 4; k++) {
+        g.fillStyle = `rgba(${60 + r() * 30},8,${18 + r() * 10},${.16 + r() * .14})`;
+        g.beginPath();
+        g.ellipse(x + (r() - .5) * size, y + (r() - .5) * size * K, size * (.3 + r() * .5), size * K * (.25 + r() * .4), r() * 3, 0, Math.PI * 2);
+        g.fill();
+      }
+      for (let k = 0; k < 5; k++) blob(g, x + (r() - .5) * size * 2.4, y + (r() - .5) * size * 1.4 * K, .02 + r() * .04, 'rgba(70,6,16,.35)');
+    }
+    const shadow = (x, y, w) => {
+      g.fillStyle = 'rgba(0,12,18,.4)';
+      g.beginPath();
+      g.ellipse(x + .06, y + .06, w * 1.7, w * 1.7 * K * .45, 0, 0, Math.PI * 2);
+      g.fill();
+    };
+    const kinds = ['blade', 'arrows', 'shield', 'spear', 'helm', 'arrows', 'blade', 'shield', 'arrows', 'helm'];
+    for (const kind of kinds) {
+      const [x, y] = spot(.74, .88), turn = r() * Math.PI * 2;
+      const c = Math.cos(turn), sn = Math.sin(turn);
+      const S = 1.7;
+      const at = (u, v) => [x + (u * c - v * sn) * S, y + (u * sn + v * c) * K * S];
+      if (kind === 'blade') {
+        shadow(x, y, .4);
+        shapeAt(g, [at(-.36, -.04), at(-.12, -.05), at(.18, -.04), at(.26, .02), at(.12, .05), at(-.36, .04)], '#a9bcc6', .03);
+        g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = .015;
+        g.beginPath(); g.moveTo(...at(-.3, -.015)); g.lineTo(...at(.12, -.02)); g.stroke();
+        shapeAt(g, [at(-.4, -.13), at(-.36, -.13), at(-.36, .13), at(-.4, .13)], '#8a6a2e', .025);
+        shapeAt(g, [at(-.58, -.035), at(-.4, -.035), at(-.4, .035), at(-.58, .035)], '#4a2a1c', .025);
+        blob(g, ...at(-.6, 0), .045, '#b58a3a');
+      } else if (kind === 'spear') {
+        shadow(x, y, .7);
+        g.strokeStyle = ink; g.lineWidth = .075;
+        g.beginPath(); g.moveTo(...at(-.75, 0)); g.lineTo(...at(.4, 0)); g.stroke();
+        g.strokeStyle = '#7a4a2c'; g.lineWidth = .045;
+        g.beginPath(); g.moveTo(...at(-.75, 0)); g.lineTo(...at(.4, 0)); g.stroke();
+        shapeAt(g, [at(.38, -.07), at(.7, 0), at(.38, .07)], '#a9bcc6', .025);
+        // Snapped: a splintered stub lies apart from the head.
+        g.strokeStyle = '#5e3824'; g.lineWidth = .04;
+        g.beginPath(); g.moveTo(...at(-.9, .2)); g.lineTo(...at(-1.15, .32)); g.stroke();
+      } else if (kind === 'shield') {
+        shadow(x, y, .38);
+        g.save();
+        g.translate(x, y);
+        g.scale(S, K * S);
+        g.rotate(turn);
+        for (const [rad, color] of [[.36, '#8a6a2e'], [.3, r() < .5 ? '#7c2230' : '#25507e'], [.08, '#c39b4c']]) {
+          g.beginPath(); g.arc(0, 0, rad, 0, Math.PI * 2);
+          g.fillStyle = color; g.fill();
+          g.strokeStyle = ink; g.lineWidth = .03; g.stroke();
+        }
+        g.strokeStyle = 'rgba(10,4,8,.8)'; g.lineWidth = .025;
+        g.beginPath(); g.moveTo(.06, -.06); g.lineTo(.18, -.16); g.lineTo(.16, -.26); g.stroke();
+        g.restore();
+      } else if (kind === 'helm') {
+        shadow(x, y, .28);
+        g.save();
+        g.translate(x, y);
+        g.scale(S, K * S);
+        g.fillStyle = '#9a7432'; g.strokeStyle = ink; g.lineWidth = .03;
+        g.beginPath(); g.ellipse(0, .03, .27, .2, turn, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = '#7d8e9a';
+        g.beginPath(); g.arc(0, -.02, .17, 0, Math.PI * 2); g.fill(); g.stroke();
+        g.fillStyle = 'rgba(255,255,255,.45)';
+        g.beginPath(); g.arc(-.05, -.07, .05, 0, Math.PI * 2); g.fill();
+        g.restore();
+      } else {
+        for (let k = 0; k < 3; k++) {
+          const u = (r() - .5) * .8, v = (r() - .5) * .8, a2 = turn + (r() - .5) * .8;
+          const tip = [x + u + Math.cos(a2) * .5, y + (v + Math.sin(a2) * .5) * K], tail = [x + u - Math.cos(a2) * .5, y + (v - Math.sin(a2) * .5) * K];
+          g.strokeStyle = ink; g.lineWidth = .045;
+          g.beginPath(); g.moveTo(...tail); g.lineTo(...tip); g.stroke();
+          g.strokeStyle = '#d6b27a'; g.lineWidth = .022;
+          g.beginPath(); g.moveTo(...tail); g.lineTo(...tip); g.stroke();
+          blob(g, ...tail, .07, k % 2 ? '#c83b3b' : '#f2ead8');
+        }
+      }
     }
   }
 
