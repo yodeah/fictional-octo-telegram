@@ -1238,6 +1238,13 @@
         jolt(.25);
       }
       if (e.shape === 'nova') rings.push({ x: who.x, y: who.y, z: .5, r: .4, to: e.reach, age: 0, life: .35, color: '#d7c2ff' });
+    } else if (e.type === 'bash') {
+      floater(who, 'SHIELD BASH', '#ffe2a0', .6);
+    } else if (e.type === 'kick') {
+      floater(who, 'KICK', '#ffd9a8', .6);
+    } else if (e.type === 'interrupt') {
+      floater(who, 'INTERRUPTED', '#ff9d7a', .7);
+      jolt(.1);
     } else if (e.type === 'dodge') {
       floater(who, 'DODGE', '#c8f5ff', .55);
     } else if (e.type === 'swap') {
@@ -1341,7 +1348,7 @@
         ctx.stroke();
         continue;
       }
-      if (t.shape === 'slam' || t.shape === 'nova') continue;
+      if (t.shape === 'slam' || t.shape === 'nova' || t.shape === 'kick') continue;
       const rgb = looks[t.who].glow;
       if (t.shape === 'thrust') {
         const c = Math.cos(t.angle), s = Math.sin(t.angle);

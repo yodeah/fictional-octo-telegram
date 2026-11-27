@@ -20,7 +20,7 @@
       spare: weapon === k.weapon ? k.reserve : k.weapon, shield: k.shield !== 'none' && !D.weapons[weapon].twoHanded ? k.shield : null, cracks: 0 };
     const unit = Number(q.get('unit') || 100);
     S.setResolution(unit);
-    const shape = D.weapons[weapon].shape;
+    const shape = q.get('shape') || D.weapons[weapon].shape;
     const rows = (q.get('rows') || 'idle,run,windup,active,recover,dash,hurt,stun,dead').split(',');
     const facings = [0, 2, 4, 6, 8, 10, 12, 14].map(d => d / 16 * Math.PI * 2);
     const cell = unit * 3.2, c = document.getElementById('sheet'), g = c.getContext('2d');

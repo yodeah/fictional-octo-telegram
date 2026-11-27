@@ -34,7 +34,7 @@
       action: null, dash: null, readyAt: .5 + index * .12, stunnedUntil: 0, frozenUntil: 0, chilledUntil: 0,
       hastedUntil: 0, safeUntil: 0, detour: 0, fleetUntil: 0, hinderedUntil: 0, counterUntil: 0, riposte: false, lastStanceHit: -9, lastHurt: -9,
       cooldowns: {}, novaReady: 0, strafe: index ? 1 : -1, strafeUntil: 0, threatSeen: null, stride: 0, gait: 0,
-      dead: false, dealt: 0, escapes: 0, nextClose: 0
+      dead: false, dealt: 0, escapes: 0, nextClose: 0, kickReady: 2, bashReady: 2
     };
   }
 
@@ -196,7 +196,8 @@
     const weapon = weapons[f.weapon];
     const spellKey = kind === 'attack' && weapon.style === 'magic' ? pickSpell(duel, f, rival) : null;
     const spell = spells[spellKey];
-    const bash = kind === 'bash', nova = kind === 'nova';
+    const bash = kind === 'bash', nova = kind === 'nova', kick = kind === 'kick';
+    if (kick) return startKick(duel, f, rival);
     const cost = bash ? 14 : nova ? 8 : weapon.energy;
     const fatigue = clamp(f.energy / cost, 0, 1);
     const pace = (f.chilledUntil > duel.time ? 1.3 : 1) * (1.2 - .2 * fatigue);
@@ -213,6 +214,21 @@
     };
     if (bash) { f.riposte = false; f.counterUntil = 0; }
     if (spell) emit(duel, 'cast', { who: f.index, spell: spellKey });
+  }
+
+  // A front kick: quick, unblockable, light on damage but heavy on knockback, so it drives the rival
+  // off a shield, out of reach of a blade or into the wall. It also knocks the wind out of them.
+  const kickMove = { cost: 12, windup: .22, active: .1, recover: .34, reach: 1.45, spread: 1.1, damage: 6, stance: 30, push: 1.6, winded: 16 };
+  function startKick(duel, f, rival) {
+    const pace = (f.chilledUntil > duel.time ? 1.3 : 1);
+    f.energy = Math.max(0, f.energy - kickMove.cost);
+    f.kickReady = duel.time + 3.4;
+    f.facing = Math.atan2(rival.y - f.y, rival.x - f.x);
+    f.action = {
+      id: duel.nextId++, kind: 'kick', weapon: f.weapon, shape: 'kick', reach: kickMove.reach, spread: kickMove.spread,
+      t: 0, windup: kickMove.windup * pace, active: kickMove.active, recover: kickMove.recover * pace, hit: false, angle: f.facing,
+      aimed: false, fatigue: 1, name: 'Kick'
+    };
   }
 
   // A melee dash that ends beside the rival flows into a quicker, harder blow.
@@ -332,7 +348,7 @@
     const spell = spells[hit.spellKey];
     emit(duel, 'hit', {
       who: defender.index, by: attacker.index, damage, warded, critical, rear, style: hit.style, color: spell?.color,
-      dirX: hit.dirX, dirY: hit.dirY, heavy: hit.heavy, x: defender.x, y: defender.y
+      dirX: hit.dirX, dirY: hit.dirY, heavy: hit.heavy, kick: hit.kick, x: defender.x, y: defender.y
     });
     if (spell && damage) {
       if (spell.chill) defender.chilledUntil = duel.time + spell.chill;
@@ -347,6 +363,14 @@
         if (healed > 0 && !attacker.dead) { attacker.hp += healed; emit(duel, 'heal', { who: attacker.index, amount: healed }); }
       }
       if (spell.energyDrain) defender.energy = Math.max(0, defender.energy - spell.energyDrain);
+    }
+    if (hit.winded) defender.energy = Math.max(0, defender.energy - hit.winded);
+    // Bashes and kicks knock a windup out of the rival's hands.
+    const busyWith = defender.action;
+    if (hit.interrupt && busyWith && busyWith.t < busyWith.windup && !defender.dead) {
+      defender.action = null;
+      defender.readyAt = Math.max(defender.readyAt, duel.time + .3);
+      emit(duel, 'interrupt', { who: defender.index, name: busyWith.name });
     }
     // A heavy weapon moves the body in the direction of the blow.
     const push = hit.push || (hit.heavy ? 1.5 : hit.style === 'melee' ? .45 : .18);
@@ -390,7 +414,14 @@
     const weapon = weapons[action.weapon];
     const bash = action.kind === 'bash', nova = action.kind === 'nova';
     const [dirX, dirY] = unit(rival.x - f.x, rival.y - f.y);
+    if (action.kind === 'kick') {
+      return void strike(duel, f, rival, {
+        damage: kickMove.damage, style: 'melee', stance: kickMove.stance, block: 0, unblockable: true, push: kickMove.push,
+        winded: kickMove.winded, interrupt: true, kick: true, dirX, dirY
+      });
+    }
     strike(duel, f, rival, {
+      interrupt: bash,
       damage: bash ? 7 * (action.riposte ? 1.5 : 1) : nova ? 6 : weapon.damage * (.7 + .3 * action.fatigue) * (action.power || 1),
       style: nova ? 'magic' : 'melee', stance: bash ? 44 : nova ? 18 : weapon.stance,
       block: bash ? .05 : weapon.block, heavy: !bash && !nova && weapon.heavy, breaks: !bash && !nova && weapon.breaks,
@@ -579,6 +610,7 @@
     const canBash = shieldUp(f) && f.energy >= 14 && f.counterUntil > duel.time && d < 1.8
       && (!f.action || f.action.t > f.action.windup + f.action.active);
     if (canBash && (f.riposte || duel.random() < .08)) return startAttack(duel, f, rival, 'bash');
+    if (free && d < 1.75 && !rival.dead && lineOfSight(f, rival, 0) && closeMove(duel, f, rival, d)) return;
 
     if (weapon.style !== 'melee') {
       const meleeRival = styleOf(rival) === 'melee';
@@ -620,6 +652,41 @@
     const inReach = weapon.shape === 'slam'
       ? Math.abs(d - weapon.reach) < weapon.radius * .8 : d <= weapon.reach + radius * .3;
     if (free && inReach && f.energy >= weapon.energy * .45) startAttack(duel, f, rival);
+  }
+
+  // Up close a fighter may bash with the shield or kick instead of swinging. Champions pick their
+  // moments: a bash to break a windup, a kick to send a rival into the wall, off a raised shield or,
+  // for the archer, away to make room to shoot.
+  function closeMove(duel, f, rival, d) {
+    const smart = f.kit.champion;
+    const ra = rival.action;
+    const winding = ra && ra.t < ra.windup && ra.windup - ra.t > .14;
+    if (shieldUp(f) && duel.time >= f.bashReady && f.energy >= 14 && d < 1.6) {
+      const want = winding ? (smart ? .85 : .3) : smart && rival.stance > stanceLimit(rival) * .55 ? .3 : smart ? .08 : .01;
+      if (duel.random() < want) {
+        f.bashReady = duel.time + 2.6;
+        startAttack(duel, f, rival, 'bash');
+        emit(duel, 'bash', { who: f.index });
+        return true;
+      }
+    }
+    if (duel.time < f.kickReady || f.energy < kickMove.cost || d > kickMove.reach + radius * .4) return false;
+    const [ux, uy] = unit(rival.x - f.x, rival.y - f.y);
+    const behind = { x: rival.x + ux * 1.6, y: rival.y + uy * 1.6 };
+    const wallBehind = Math.hypot(behind.x / arena.a, behind.y / arena.b) > .97 || !lineOfSight(rival, behind, radius);
+    const ranged = styleOf(f) !== 'melee';
+    let want = .008;
+    if (smart) {
+      if (wallBehind) want = .6;
+      else if (ranged) want = f.charges < 1 ? .7 : .3;
+      else if (shieldUp(rival) && rival.counterUntil <= duel.time) want = .35;
+      else if (winding) want = .5;
+      else want = .12;
+    } else if (wallBehind) want = .1;
+    if (duel.random() >= want) return false;
+    startKick(duel, f, rival);
+    emit(duel, 'kick', { who: f.index });
+    return true;
   }
 
   function stepFighter(duel, f, dt) {

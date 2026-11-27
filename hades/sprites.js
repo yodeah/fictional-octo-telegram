@@ -38,7 +38,7 @@
   // Weapon and body parameters for one frame. yaw turns around the body (positive to the right),
   // pitch lifts the weapon, out is the hand's distance in front.
   function posture(weapon, anim, shape, t) {
-    const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0 };
+    const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0 };
     if (weapon === 'spear') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
     if (['maul', 'greatsword', 'mace', 'axe'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
@@ -75,6 +75,12 @@
       } else if (shape === 'nova' || shape === 'self') {
         p.pitch = key(p.pitch, 1.57, 1.45); p.high = key(p.high, 1.75, 1.2); p.lean = key(.06, -.16, .12);
         p.charge = anim === 'windup' ? t : anim === 'active' ? 1 : 1 - t;
+      } else if (shape === 'kick') {
+        // Knee chambers up, the heel drives out, the body leans back over the standing leg.
+        p.chamber = anim === 'windup' ? ease(t) : anim === 'active' ? 1 - ease(t) * .6 : .4 * (1 - ease(t));
+        p.kick = anim === 'active' ? ease(Math.min(1, t * 1.4)) : anim === 'recover' ? 1 - ease(t) : 0;
+        p.lean = key(.06, -.1, -.26); p.lunge = key(0, -.06, .18); p.out = key(p.out, .16, .1); p.high = key(p.high, 1.12, 1.18);
+        p.yaw = key(p.yaw, .9, 1.1); p.sway = key(.06, .12, .3); p.crouch = key(.04, .02, 0);
       } else if (shape === 'bash') {
         p.lunge = key(0, -.2, .55); p.lean = key(.06, -.14, .4);
       } else {
@@ -115,9 +121,9 @@
     const st = p.stride;
     const j = {
       hipL: P(shift, -.15, hipZ), hipR: P(shift, .15, hipZ),
-      footL: P(.12 + st * .52 + p.lunge * .5, -.24, Math.max(0, st) * .2),
+      footL: P(.12 + st * .52 + p.lunge * .5 + p.chamber * .12 + p.kick * .8, -.2, Math.max(0, st) * .2 + p.chamber * .4 + p.kick * .32),
       footR: P(-.16 - st * .52 - p.lunge * .2 - p.kneel * .34, .24, Math.max(0, -st) * .2),
-      kneeL: P(.2 + st * .28 + p.crouch * .5, -.24, hipZ * .52 + Math.max(0, st) * .1),
+      kneeL: P(.2 + st * .28 + p.crouch * .5 + p.chamber * .3 + p.kick * .4, -.22, hipZ * .52 + Math.max(0, st) * .1 + p.chamber * .42 + p.kick * .16),
       kneeR: P(.04 - st * .22 + p.crouch * .4 - p.kneel * .1, .24, hipZ * .52 + Math.max(0, -st) * .1 - p.kneel * .36),
       waist: P(shift + lean * .3, 0, hipZ + .1),
       chest: P(shift + lean * .72, 0, chestZ),
