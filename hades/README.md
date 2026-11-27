@@ -4,10 +4,26 @@ A 1v1 idle duel seen from a high three-quarter camera, inspired by the feel of H
 
 ## Run
 
-From the project folder:
+From the project folder, open the file directly:
 
 ```bash
 open hades.html
+```
+
+Or serve it (stop with Ctrl+C) and visit <http://localhost:8000/hades.html>:
+
+```bash
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+## Live
+
+<https://yodeah.github.io/fictional-octo-telegram/underworld/hades.html>
+
+The Pages workflow lives on `swords-and-sandals` and `claude/detailed-2d-assets-poc-63e424`; it copies this branch into `/underworld/`. A push here does not deploy by itself. After pushing, rerun the latest deploy:
+
+```bash
+gh run rerun $(gh run list -w pages.yml -L 1 --json databaseId -q '.[0].databaseId')
 ```
 
 ## How it plays
