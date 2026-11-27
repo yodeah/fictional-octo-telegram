@@ -158,14 +158,27 @@
     g.stroke();
   }
 
-  // A tapered, round-ended shape from a to b: the basic brush stroke of a limb.
-  function taper(a, b, wa, wb, color, line = true) {
+  function taperPath(a, b, wa, wb) {
     const ax = px(a), ay = py(a), bx = px(b), by = py(b);
     const angle = Math.atan2(by - ay, bx - ax);
     g.beginPath();
     g.arc(ax, ay, wa * res / 2, angle + Math.PI / 2, angle - Math.PI / 2);
     g.arc(bx, by, wb * res / 2, angle - Math.PI / 2, angle + Math.PI / 2);
     g.closePath();
+  }
+
+  // Several segments inked as one body part: every outline first, then every fill, so the joints
+  // melt together instead of showing a ring. Each segment is [from, to, fromWidth, toWidth, color].
+  function fused(segments) {
+    g.strokeStyle = ink;
+    g.lineWidth = res * .06;
+    for (const [a, b, wa, wb] of segments) { taperPath(a, b, wa, wb); g.stroke(); }
+    for (const [a, b, wa, wb, color] of segments) { taperPath(a, b, wa, wb); g.fillStyle = color; g.fill(); }
+  }
+
+  // A tapered, round-ended shape from a to b: the basic brush stroke of a limb.
+  function taper(a, b, wa, wb, color, line = true) {
+    taperPath(a, b, wa, wb);
     g.fillStyle = color;
     g.fill();
     if (!line) return;
@@ -351,12 +364,18 @@
     // Legs.
     for (const [hip, knee, foot] of [[j.hipL, j.kneeL, j.footL], [j.hipR, j.kneeR, j.footR]]) {
       part(lerp(hip, foot, .5), () => {
-        taper(hip, knee, .25, .17, robes ? look.deep : plate ? '#2c2236' : look.skin);
         const ankle = add(foot, [0, 0, .07]);
-        taper(knee, ankle, .19, .13, plate ? metal.iron : '#3e2430');
-        taper(ankle, add(foot, add(vector(.19, 0, 0), [0, 0, .02])), .17, .1, plate ? metal.dark : '#2a1820');
-        stroke([lerp(knee, ankle, .12), lerp(knee, ankle, .78)], .05, plate ? metal.gold : look.trim);
-        if (plate) disc(knee, .095, metal.gold);
+        const toe = add(foot, add(vector(.2, 0, 0), [0, 0, .02]));
+        const thigh = robes ? look.deep : plate ? '#2c2236' : look.skin;
+        const shin = plate ? metal.iron : '#4a2a36';
+        const calf = lerp(knee, ankle, .35);
+        fused([[hip, knee, .27, .16, thigh], [knee, calf, .16, .2, shin], [calf, ankle, .2, .11, shin],
+          [ankle, toe, .17, .09, plate ? metal.dark : '#2a1820']]);
+        // Boot cuff, shin guard and thigh muscle.
+        taper(lerp(knee, ankle, .08), lerp(knee, ankle, .18), .19, .2, plate ? metal.gold : look.deep);
+        stroke([lerp(knee, ankle, .28), lerp(knee, ankle, .8)], .045, plate ? metal.steel : look.trim);
+        if (!plate && !robes) stroke([lerp(hip, knee, .45), lerp(hip, knee, .86)], .022, look.shade);
+        if (plate) poly([add(knee, [0, 0, .12]), add(knee, vector(.1, .09, 0)), add(knee, [0, 0, -.1]), add(knee, vector(.1, -.09, 0))], metal.gold);
       });
     }
 
@@ -397,25 +416,38 @@
     // Torso: wide shoulders, narrow waist.
     part(lerp(j.waist, j.chest, .6), () => {
       const body = plate ? metal.iron : robes ? look.main : look.skin;
-      taper(P(lean * .3, 0, hipZ), j.waist, .36, .32, robes ? look.main : '#2c1c28');
-      taper(j.waist, j.chest, .34, .6, body);
-      taper(P(lean * .76, -.22, chestZ + .06), P(lean * .76, .22, chestZ + .06), .36, .36, body, false);
+      const yokeL = P(lean * .76, -.24, chestZ + .07), yokeR = P(lean * .76, .24, chestZ + .07);
+      fused([[P(lean * .3, 0, hipZ), j.waist, .36, .3, robes ? look.main : '#2c1c28'], [j.waist, j.chest, .3, .58, body],
+        [yokeL, yokeR, .34, .34, body], [j.chest, j.neck, .22, .15, plate ? metal.dark : robes ? look.deep : look.skin]]);
       const front = Math.sin(facing) > -.35;
+      // Points on the front of the chest.
+      const on = (right, up, out = .24) => P(lean * (.3 + .46 * Math.min(1, (up - hipZ) / (chestZ - hipZ))) + out, right, up);
       if (front) {
         if (plate) {
-          stroke([P(lean * .76 + .2, -.22, chestZ + .06), P(lean * .7 + .27, 0, chestZ - .08), P(lean * .76 + .2, .22, chestZ + .06)], .045, metal.gold);
-          stroke([P(lean * .7 + .27, 0, chestZ - .08), P(lean * .35 + .2, 0, hipZ + .16)], .028, ink);
-          disc(P(lean * .76 + .27, 0, chestZ + .03), .075, look.light);
+          poly([on(-.27, chestZ + .12, .17), on(0, chestZ + .16), on(.27, chestZ + .12, .17), on(.2, chestZ - .16, .2),
+            on(0, chestZ - .27, .27), on(-.2, chestZ - .16, .2)], metal.steel);
+          poly([on(0, chestZ + .16), on(.27, chestZ + .12, .17), on(.2, chestZ - .16, .2), on(0, chestZ - .27, .27)], metal.iron, false);
+          stroke([on(-.26, chestZ + .13, .18), on(0, chestZ + .04, .27), on(.26, chestZ + .13, .18)], .04, metal.gold);
+          stroke([on(0, chestZ + .04, .28), on(0, chestZ - .27, .28)], .022, ink);
+          for (const drop of [.34, .43]) stroke([on(-.15, chestZ - drop, .19), on(0, chestZ - drop - .03, .23), on(.15, chestZ - drop, .19)], .045, metal.dark);
+          poly([on(0, chestZ + .1, .29), on(.07, chestZ + .02, .3), on(0, chestZ - .07, .3), on(-.07, chestZ + .02, .3)], look.light);
         } else if (!robes) {
-          // A leather strap across a bare chest.
-          stroke([P(lean * .76 + .16, -.26, chestZ + .16), P(lean * .55 + .26, 0, chestZ - .16), P(lean * .35 + .2, .18, hipZ + .14)], .11, '#4a2630');
-          stroke([P(lean * .7 + .25, 0, chestZ - .02), P(lean * .55 + .22, 0, chestZ - .24)], .018, look.shade);
-          disc(P(lean * .6 + .28, -.02, chestZ - .14), .062, metal.gold);
+          // Chest and stomach muscle, then a studded leather strap.
+          for (const side of [-1, 1]) stroke([on(side * .25, chestZ + .03, .17), on(side * .13, chestZ - .08), on(side * .02, chestZ - .05)], .028, look.shade);
+          stroke([on(0, chestZ + .02), on(0, hipZ + .2, .2)], .02, look.shade);
+          for (const drop of [.17, .26]) stroke([on(-.09, chestZ - drop, .22), on(.09, chestZ - drop, .22)], .016, look.shade);
+          stroke([on(-.27, chestZ + .17, .14), on(0, chestZ - .13, .27), on(.18, hipZ + .15, .19)], .12, ink);
+          stroke([on(-.27, chestZ + .17, .14), on(0, chestZ - .13, .27), on(.18, hipZ + .15, .19)], .085, look.deep);
+          disc(on(-.01, chestZ - .13, .29), .065, metal.gold);
+          disc(on(-.01, chestZ - .13, .31), .028, look.light, false);
         } else {
-          stroke([P(lean * .76 + .18, -.2, chestZ + .16), P(lean * .5 + .28, 0, chestZ - .26), P(lean * .76 + .18, .2, chestZ + .16)], .06, look.trim);
-          disc(P(lean * .6 + .3, 0, chestZ - .1), .062, look.light);
-          shine(P(lean * .6 + .32, 0, chestZ - .1), .18, `rgba(${look.glow},.6)`);
+          poly([on(-.22, chestZ + .16, .18), on(0, chestZ - .3, .28), on(.22, chestZ + .16, .18), on(0, chestZ + .06, .27)], look.deep);
+          stroke([on(-.22, chestZ + .16, .19), on(0, chestZ - .3, .29), on(.22, chestZ + .16, .19)], .055, look.trim);
+          disc(on(0, chestZ - .08, .3), .062, look.light);
+          shine(on(0, chestZ - .08, .32), .18, `rgba(${look.glow},.6)`);
         }
+      } else {
+        stroke([P(lean * .76 - .24, 0, chestZ + .12), P(lean * .45 - .2, 0, hipZ + .2)], .025, plate ? metal.dark : robes ? look.deep : look.shade);
       }
       taper(P(lean * .32, -.17, hipZ + .1), P(lean * .32, .17, hipZ + .1), .13, .13, metal.goldDeep);
       if (front) disc(P(lean * .32 + .18, 0, hipZ + .1), .085, metal.gold);
@@ -427,17 +459,26 @@
           right ? look.deep : look.main);
         }
       }
-      taper(j.chest, j.neck, .18, .14, look.shade, false);
     }, .06);
 
     // Arms and shoulders.
     for (const [shoulder, elbow, hand, left] of [[j.shoulderL, j.elbowL, j.handL, true], [j.shoulderR, j.elbowR, j.handR, false]]) {
       part(lerp(shoulder, hand, .55), () => {
-        taper(shoulder, elbow, .21, .15, robes ? look.main : look.skin);
-        taper(elbow, hand, robes ? .17 : .16, robes ? .25 : .12, plate ? metal.iron : robes ? look.main : look.skin);
-        if (!robes) stroke([lerp(elbow, hand, .3), lerp(elbow, hand, .8)], .13, plate ? metal.gold : '#4a2630');
-        else stroke([lerp(elbow, hand, .86), lerp(elbow, hand, .95)], .22, look.trim);
-        disc(hand, .1, plate ? metal.dark : look.skin);
+        const upper = robes ? look.main : look.skin;
+        const lower = plate ? metal.iron : upper;
+        const bicep = lerp(shoulder, elbow, .45), forearm = lerp(elbow, hand, .3);
+        fused([[shoulder, bicep, .22, .2, upper], [bicep, elbow, .2, .13, upper], [elbow, forearm, .13, robes ? .19 : .17, lower],
+          [forearm, hand, robes ? .19 : .17, robes ? .26 : .1, lower]]);
+        if (!robes) {
+          // Bracer with gilded bands.
+          taper(lerp(elbow, hand, .34), lerp(elbow, hand, .82), .17, .12, plate ? metal.steel : '#4a2630');
+          for (const at of [.4, .76]) stroke([lerp(elbow, hand, at), lerp(elbow, hand, at + .05)], .15 - at * .03, metal.gold);
+          stroke([lerp(shoulder, elbow, .3), lerp(shoulder, elbow, .74)], .02, look.shade);
+        } else stroke([lerp(elbow, hand, .86), lerp(elbow, hand, .95)], .22, look.trim);
+        // A closed fist.
+        const knuckle = lerp(hand, add(hand, sub(hand, elbow)), .13);
+        fused([[lerp(hand, elbow, .06), knuckle, .15, .13, plate ? metal.dark : look.skin]]);
+        stroke([hand, knuckle], .018, plate ? metal.steel : look.shade);
       }, .07);
       part(shoulder, () => {
         const big = plate ? 1.25 : left && !robes ? 1.1 : robes ? .8 : .62;
@@ -448,7 +489,7 @@
           stroke([at(.2, -.1, .06), at(0, 0, .2 * big), at(-.1, .2 * big, .22 * big), at(0, .3 * big, -.04)], .045, metal.gold);
           if (plate) poly([at(-.02, .12, .22), at(-.14, .34, .46), at(.04, .24, .16)], metal.gold);
           disc(at(.08, .08, .03), .052, look.light);
-        } else disc(shoulder, .12, look.skin);
+        } else disc(shoulder, .105, robes ? look.main : look.skin, false);
       }, .12);
     }
 
