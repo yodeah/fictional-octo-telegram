@@ -19,7 +19,7 @@
   let shake = 0, clock = 0;
   const fallen = new Map();
   const shown = [];
-  let vignette, foreground, fallArt, mistArt;
+  let vignette, foreground, fallArt, mistArt, shaftArt;
   const bursts = new Map();
   let impacts = [];
 
@@ -83,6 +83,7 @@
     }
     fissures(g, r);
     seal(g, r);
+    floorLight(g, ry);
     const light = g.createRadialGradient(-2, -1.5, 1, 0, 0, rx);
     light.addColorStop(0, 'rgba(150,255,225,.14)');
     light.addColorStop(.65, 'rgba(10,50,60,0)');
@@ -92,6 +93,30 @@
     g.restore();
     platformRim(g, rx, ry);
     surroundings(g, r, rx, ry);
+  }
+
+  // Painted light: the sunset spills over the far side, the water throws teal up from the flanks,
+  // and the rest falls toward violet shadow. Drawn inside the floor's clip.
+  function floorLight(g, ry) {
+    const pool = (x, y, radius, rgb, alpha, mode = 'screen') => {
+      g.save();
+      g.globalCompositeOperation = mode;
+      g.translate(x, y);
+      g.scale(1, K);
+      const light = g.createRadialGradient(0, 0, 0, 0, 0, radius);
+      light.addColorStop(0, `rgba(${rgb},${alpha})`);
+      light.addColorStop(.55, `rgba(${rgb},${alpha * .45})`);
+      light.addColorStop(1, `rgba(${rgb},0)`);
+      g.fillStyle = light;
+      g.fillRect(-radius, -radius, radius * 2, radius * 2);
+      g.restore();
+    };
+    pool(0, -ry - .5, 7.5, '255,120,120', .34);
+    pool(-10.5, .5, 6, '60,255,215', .2);
+    pool(10.5, .5, 6, '60,255,215', .2);
+    pool(0, .2, 4.2, '255,225,160', .12);
+    pool(-8, ry, 7, '60,20,110', .42, 'multiply');
+    pool(8, ry, 7, '60,20,110', .42, 'multiply');
   }
 
   // The drop below the floor: a lit stone wall with arched niches, falling into shadow.
@@ -783,6 +808,18 @@
         g.fillRect(x, y + shift, wide, long);
       }
     }
+    // A beam that is brightest at its core and top, fading out below.
+    shaftArt = makeCanvas(128, 512);
+    g = shaftArt.getContext('2d');
+    for (let i = 0; i < 64; i++) {
+      const edge = Math.sin((i + .5) / 64 * Math.PI) ** 2;
+      const fade = g.createLinearGradient(0, 0, 0, 512);
+      fade.addColorStop(0, `rgba(255,235,205,${edge * .9})`);
+      fade.addColorStop(.6, `rgba(190,245,230,${edge * .35})`);
+      fade.addColorStop(1, 'rgba(190,245,230,0)');
+      g.fillStyle = fade;
+      g.fillRect(i * 2, 0, 2, 512);
+    }
     mistArt = makeCanvas(512, 96);
     g = mistArt.getContext('2d');
     for (let i = 0; i < 70; i++) {
@@ -826,6 +863,20 @@
         const t = (clock * .9 + i / 5 + x) % 1;
         glow(sx(x + (i - 2) * wide * .22), (bottom - Math.sin(t * Math.PI) * .45) * unit, unit * .09, '200,255,240', 1 - t);
       }
+    }
+    ctx.restore();
+  }
+
+  function drawShafts() {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const [x, wide, long, lean, phase] of [[-7.4, 2.2, 10.5, -.42, 0], [-3.2, 1.1, 9, -.36, 2.1], [3.9, 2.7, 11, -.4, 4.2], [8.6, 1.3, 9.5, -.34, 1.3]]) {
+      ctx.save();
+      ctx.translate(sx(x), -7.6 * unit);
+      ctx.rotate(lean + Math.sin(clock * .23 + phase) * .025);
+      ctx.globalAlpha = .13 + Math.sin(clock * .6 + phase) * .035;
+      ctx.drawImage(shaftArt, -wide / 2 * unit, 0, wide * unit, long * unit);
+      ctx.restore();
     }
     ctx.restore();
   }
@@ -1482,6 +1533,7 @@
     items.sort((a, b) => a.y - b.y).forEach(item => item.draw());
 
     drawMist(6.1, .5, .35, 1.9);
+    drawShafts();
     drawTrails();
     ctx.save();
     for (const p of particles) {
