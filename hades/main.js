@@ -213,7 +213,8 @@
 
   let last = performance.now();
   function frame(now) {
-    const real = Math.min(.05, (now - last) / 1000);
+    // The first animation frame can be stamped before the page started its clock.
+    const real = Math.max(0, Math.min(.05, (now - last) / 1000));
     last = now;
     const dt = advance(real);
     const before = performance.now();

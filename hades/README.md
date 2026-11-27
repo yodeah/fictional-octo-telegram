@@ -10,10 +10,10 @@ From the project folder, open the file directly:
 open hades.html
 ```
 
-Or serve it (stop with Ctrl+C) and visit <http://localhost:8000/hades.html>:
+Or serve it (stop with Ctrl+C) and visit <http://localhost:8157/hades.html>:
 
 ```bash
-python3 -m http.server 8000 --bind 127.0.0.1
+python3 -m http.server 8157 --bind 127.0.0.1
 ```
 
 ## Live
