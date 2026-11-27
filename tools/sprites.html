@@ -22,8 +22,10 @@
     S.setResolution(unit);
     const shape = q.get('shape') || D.weapons[weapon].shape;
     const rows = (q.get('rows') || 'idle,run,windup,active,recover,dash,hurt,stun,dead').split(',');
-    const facings = [0, 2, 4, 6, 8, 10, 12, 14].map(d => d / 16 * Math.PI * 2);
-    const cell = unit * 3.2, c = document.getElementById('sheet'), g = c.getContext('2d');
+    // ?facings=3,5 picks directions (0-15); ?scale=2 enlarges the drawing for close inspection.
+    const facings = (q.get('facings') || '0,2,4,6,8,10,12,14').split(',').map(d => Number(d) / 16 * Math.PI * 2);
+    const zoom = Number(q.get('scale') || 1);
+    const cell = unit * 3.2 * zoom, c = document.getElementById('sheet'), g = c.getContext('2d');
     c.width = cell * facings.length; c.height = cell * rows.length;
     g.fillStyle = '#2c4a50'; g.fillRect(0, 0, c.width, c.height);
     g.fillStyle = '#cfe'; g.font = '12px system-ui';
@@ -31,8 +33,9 @@
       const t = anim === 'dead' ? 1 : anim === 'stun' ? .3 : .5;
       const sprite = S.get(spec, facing, anim, ['windup', 'active', 'recover'].includes(anim) ? shape : null, t);
       const x = col * cell + cell / 2, y = row * cell + cell * .78;
-      g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x, y, unit * .55, unit * .55 * .64, 0, 0, 7); g.fill();
-      g.drawImage(sprite.image, x + sprite.x * unit, y + sprite.y * unit, sprite.w * unit, sprite.h * unit);
+      const u = unit * zoom;
+      g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(x, y, u * .55, u * .55 * .64, 0, 0, 7); g.fill();
+      g.drawImage(sprite.image, x + sprite.x * u, y + sprite.y * u, sprite.w * u, sprite.h * u);
       g.fillStyle = '#cfe'; g.fillText(anim, col * cell + 4, row * cell + 14);
     }));
   </script>

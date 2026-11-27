@@ -740,6 +740,10 @@
         poly([pt(s * .14, .08), pt(s * .48, .5), pt(s * .78, .58), pt(s * .58, .36), pt(s * .8, .34), pt(s * .52, .16), pt(s * .7, .06), pt(s * .2, -.04)], metal.gold, .012);
         stroke([pt(s * .1, -.14), pt(s * .32, -.34), pt(s * .2, -.4), pt(s * .42, -.66)], .035, metal.gold);
       }
+      fine([...edge(.84), edge(.84)[0]], c.bronzeDeep, .012);
+      taper(pt(0, .7), pt(0, -.7), .07, .07, look.deep, false);
+      fine([pt(.02, .7), pt(.02, -.7)], look.light, .01);
+      for (let i = -4; i <= 4; i++) for (const v of [.835, -.835]) disc(pt(i * .2, v), .014, c.bronzeLight, false);
       poly([pt(-.17, .2), pt(.17, .2), pt(.17, -.2), pt(-.17, -.2)], c.bronzeDeep);
       disc(pt(0, 0), .095, c.bronze);
       disc(pt(-.06, .05), .04, c.bronzeLight, false);
@@ -778,6 +782,9 @@
           taper(lerp(knee, ankle, .04), lerp(knee, ankle, .94), .24, .15, metal.steel);
           fine([add(lerp(knee, ankle, .12), vector(0, .04, 0)), add(lerp(knee, ankle, .86), vector(0, .03, 0))], metal.edge, .02);
           for (const t of [.3, .6]) fine(across(lerp(knee, ankle, t), .1), metal.dark, .012);
+          disc(lerp(knee, ankle, .42), .055, c.bronze, .012);
+          disc(add(lerp(knee, ankle, .42), [0, 0, .015]), .022, c.bronzeLight, false);
+          for (const t of [.22, .78]) fine(across(lerp(knee, ankle, t), .12, -.02), c.leather, .02);
           disc(add(knee, [0, 0, .03]), .11, c.bronze);
           disc(add(knee, [0, 0, .05]), .045, c.bronzeLight, false);
         } else if (varro) {
@@ -790,6 +797,8 @@
           const lace = [];
           for (let i = 0; i < 6; i++) lace.push(add(lerp(knee, ankle, .18 + i * .14), vector(0, i % 2 ? .07 : -.07, 0)));
           fine(lace, c.leatherLight, .014);
+          taper(lerp(knee, ankle, .08), lerp(knee, ankle, .2), .26, .25, '#8c7b66');
+          for (const side of [-.08, 0, .08]) fine([add(lerp(knee, ankle, .1), vector(0, side, 0)), add(lerp(knee, ankle, .2), vector(.02, side * 1.1, 0))], '#5e5040', .01);
           disc(add(knee, [0, 0, .02]), .09, c.leather);
           fine([add(knee, vector(0, -.06, .03)), add(knee, vector(0, .06, .03))], c.leatherLight, .014);
         }
@@ -822,16 +831,19 @@
     // The spare weapon and Cassian's quiver ride on the back or hip.
     part(P(-.42, 0, 1.1), () => {
       if (!varro) {
-        const top = P(lean * .6 - .3, .2, chestZ + .22), bottom = P(-.3, -.14, hipZ - .02);
-        for (let i = 0; i < 5; i++) {
-          const base = lerp(top, bottom, .02);
-          const tip = add(base, vector(-.12 + i * .04, .1 - i * .06, .26 + (i % 2) * .05));
-          taper(base, tip, .025, .02, '#d6b27a', false);
-          poly([tip, add(tip, vector(-.03, -.05, -.12)), add(tip, vector(.03, .05, -.1))], i % 2 ? '#c83b3b' : c.fletch, .01);
+        const top = P(lean * .6 - .34, .2, chestZ + .16), bottom = P(-.32, -.14, hipZ);
+        // Arrows fan out of the mouth, each with a two-colored fletching.
+        for (let i = 0; i < 6; i++) {
+          const base = add(top, vector(0, (i - 2.5) * .025, 0));
+          const tip = add(base, vector(-.06 + i * .02, .12 - i * .045, .2 + (i % 2) * .04));
+          taper(base, tip, .022, .02, '#d6b27a', false);
+          poly([tip, add(tip, vector(-.02, -.06, -.13)), add(tip, vector(0, 0, -.16)), add(tip, vector(.02, .06, -.12))],
+            i % 2 ? '#c83b3b' : c.fletch, .009);
         }
-        taper(top, bottom, .2, .16, c.leather);
-        for (const t of [.12, .82]) taper(lerp(top, bottom, t), lerp(top, bottom, t + .06), .21, .2, c.bronze);
-        fine([lerp(top, bottom, .2), lerp(top, bottom, .78)], c.leatherLight, .016);
+        taper(top, bottom, .16, .13, c.leatherDeep);
+        fine([lerp(top, bottom, .14), lerp(top, bottom, .86)], c.leather, .05);
+        for (const t of [.06, .86]) taper(lerp(top, bottom, t), lerp(top, bottom, t + .06), .17, .15, c.bronze);
+        disc(lerp(top, bottom, .5), .03, c.bronze, false);
       }
       if (spec.spare === 'pilum') {
         // Two javelins crossed low on the back, points over the shoulders.
@@ -888,6 +900,11 @@
         if (front) {
           disc(P(lean * .32 + .2, 0, hipZ + .12), .05, c.bronze);
           disc(P(lean * .32 + .21, -.01, hipZ + .13), .02, c.bronzeLight, false);
+          // A pouch with a flap on the right hip.
+          const pouch = (f, r, u) => P(lean * .32 + .14 + f, .22 + r, hipZ + u);
+          poly([pouch(0, -.07, .08), pouch(0, .07, .08), pouch(.02, .07, -.06), pouch(.02, -.07, -.06)], c.leather, .012);
+          poly([pouch(.01, -.075, .09), pouch(.01, .075, .09), pouch(.025, 0, .01)], c.leatherDeep, .012);
+          disc(pouch(.03, 0, .02), .014, c.bronze, false);
         }
       }
     }, .05);
@@ -927,12 +944,17 @@
             if (Math.abs(right) > .25 - row * .012) continue;
             poly([on(right - .036, z), on(right + .036, z), on(right + .032, z - .06), on(right, z - .088), on(right - .032, z - .06)],
               (row + col) % 3 ? c.scale : c.scaleDeep, .01);
+            fine([on(right - .024, z - .014), on(right, z - .02), on(right + .024, z - .014)], 'rgba(255,255,255,.6)', .009);
           }
         }
         fine([on(-.26, chestZ - .3), on(0, chestZ - .33), on(.26, chestZ - .3)], c.bronze, .03);
         inked([on(.27, chestZ + .17), on(0, chestZ - .06), on(-.2, hipZ + .16)], .06, c.leatherDeep);
         disc(on(.02, chestZ - .07), .04, c.bronze, .01);
         poly([on(-.1, chestZ + .21), on(.1, chestZ + .21), on(0, chestZ + .12)], c.skin, .01);
+        // The cloak's brooch on the right shoulder.
+        disc(on(.25, chestZ + .15), .055, c.bronze, .012);
+        disc(on(.25, chestZ + .15), .025, look.light, false);
+        shine(on(.25, chestZ + .15, .3), .07, `rgba(${look.glow},.6)`);
       } else {
         fine([P(lean * .76 - .24, 0, chestZ + .12), P(lean * .45 - .2, 0, hipZ + .2)], c.leatherDeep, .025);
         inked([P(lean * .7 - .24, .26, chestZ + .15), P(lean * .5 - .22, -.2, hipZ + .18)], .06, c.leatherDeep);
@@ -953,18 +975,23 @@
           for (let i = 0; i < 8; i++) {
             const t = .03 + i * .115;
             taper(along(path, t), along(path, t + .13), .23 - i * .013, .21 - i * .013, i % 2 ? metal.iron : metal.steel);
+            fine([along(path, t + .02), along(path, t + .1)], i % 2 ? metal.steel : metal.edge, .012);
             disc(along(path, t + .06), .016, i % 2 ? metal.steel : metal.dark, false);
           }
+          for (const t of [.42, .5]) fine(across(along(path, t), .11, .02), c.leather, .022);
         } else if (varro) {
+          taper(lerp(elbow, hand, .3), lerp(elbow, hand, .6), .16, .15, c.linen);
+          for (const t of [.36, .44, .52]) fine(across(lerp(elbow, hand, t), .075, .02), c.linenShade, .01);
           taper(lerp(elbow, hand, .62), lerp(elbow, hand, .86), .17, .14, c.leather);
           fine([lerp(elbow, hand, .68), lerp(elbow, hand, .8)], c.bronze, .02);
         } else {
           // Sleeve hem, a laced bracer on the bow arm, a glove on the draw hand.
-          fine(across(bicep, .1), look.trim, .03);
+          fine(across(bicep, .1), metal.gold, .02);
           taper(lerp(elbow, hand, .3), lerp(elbow, hand, .85), .18, .13, c.leatherDeep);
           const lace = [];
           for (let i = 0; i < 5; i++) lace.push(add(lerp(elbow, hand, .35 + i * .11), vector(0, i % 2 ? .05 : -.05, .02)));
           fine(lace, c.leatherLight, .012);
+          for (const t of [.36, .58, .8]) disc(add(lerp(elbow, hand, t), [0, 0, .03]), .014, c.bronze, false);
         }
         const knuckle = lerp(hand, add(hand, sub(hand, elbow)), .13);
         fused([[lerp(hand, elbow, .06), knuckle, .14, .12, varro && !left ? '#3a2218' : !varro && !left ? c.leather : c.skin]]);
@@ -982,8 +1009,19 @@
           fine([at(.14, .02, -.02), at(0, .14, .02), at(-.14, .04, -.02)], c.bronzeDeep, .014);
         } else if (varro) disc(shoulder, .1, c.skin, false);
         else {
-          poly([at(.16, -.06, .05), at(.02, 0, .17), at(-.12, .18, .16), at(-.04, .26, -.04), at(.14, .08, -.08)], c.leather);
-          fine([at(.1, 0, .06), at(-.06, .16, .1)], c.leatherLight, .014);
+          // Three overlapping leather lames, the lowest the widest, riveted in bronze.
+          for (let k = 2; k >= 0; k--) {
+            const drop = k * .075, grow = 1 + k * .12;
+            poly(Array.from({ length: 9 }, (_, i) => {
+              const a = i / 8 * Math.PI;
+              return at(Math.cos(a) * .13 * grow, .07 + Math.sin(a) * .13 * grow + k * .03, .06 - drop + Math.sin(a) * .1 - (1 - Math.sin(a)) * .04);
+            }), k % 2 ? c.leatherDeep : c.leather, .014);
+            fine(Array.from({ length: 5 }, (_, i) => {
+              const a = .5 + i / 4 * 2.1;
+              return at(Math.cos(a) * .13 * grow, .07 + Math.sin(a) * .13 * grow + k * .03, .07 - drop + Math.sin(a) * .1);
+            }), c.leatherLight, .01);
+            disc(at(0, .2 + k * .045, .1 - drop), .018, c.bronze, false);
+          }
         }
       }, .12);
     }
@@ -1009,6 +1047,10 @@
       const a = Math.PI / 2 + i / 10 * Math.PI;
       return at(Math.cos(a) * .33 - .03, Math.sin(a) * .34, -.06 - Math.max(0, -Math.cos(a)) * .08);
     }), c.bronzeDeep, .014);
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI / 2 + i / 8 * Math.PI;
+      disc(at(Math.cos(a) * .33 - .03, Math.sin(a) * .34, -.04), .016, c.bronzeLight, false);
+    }
     disc(at(-.03, 0, .07), .24, metal.iron);
     disc(at(-.07, -.06, .14), .13, '#a9bccb', false);
     fine([at(-.02, -.16, .2), at(-.08, -.04, .28), at(-.16, .08, .25)], metal.edge, .02);
@@ -1028,6 +1070,9 @@
     const crest = [at(.14, 0, .2), at(.08, 0, .44), at(-.08, 0, .58), at(-.3, 0, .52), at(-.38, 0, .26), at(-.2, 0, .26)];
     poly(crest, c.bronze);
     fine([at(.1, 0, .34), at(-.06, 0, .5), at(-.26, 0, .46)], c.bronzeLight, .018);
+    for (const [a, b] of [[[.06, .26], [-.04, .42]], [[-.06, .27], [-.16, .44]], [[-.18, .27], [-.27, .42]]]) {
+      fine([at(a[0], 0, a[1]), at(b[0], 0, b[1])], c.bronzeDeep, .012);
+    }
     const ridge = [at(.06, 0, .46), at(-.08, 0, .6), at(-.3, 0, .54)];
     const strands = [];
     for (let k = 0; k < 9; k++) {
@@ -1044,8 +1089,11 @@
     const front = Math.sin(facing) > -.3 && p.fall < .5;
     // The hood, its point trailing behind.
     poly([at(-.14, -.08, .22), at(-.4 - p.sway * .25, 0, .08), at(-.14, .08, .22)], look.deep);
-    poly([at(.02, -.28, -.18), at(-.04, -.28, .14), at(-.1, 0, .33), at(-.04, .28, .14), at(.02, .28, -.18), at(-.18, 0, -.26)], look.main);
-    disc(at(-.03, 0, .04), .24, look.main);
+    // A rounded cowl, lightly peaked on top, falling to the shoulders.
+    poly(Array.from({ length: 16 }, (_, i) => {
+      const a = i / 16 * Math.PI * 2, up = Math.sin(a);
+      return at(-.06 - Math.max(0, -Math.cos(a)) * .06, Math.cos(a) * .28, .04 + up * (up > 0 ? .29 : .26) + Math.max(0, up) ** 6 * .05);
+    }), look.main);
     fine([at(-.08, -.16, .2), at(-.1, 0, .27), at(-.08, .16, .2)], look.light, .02);
     if (front) {
       // A bearded face in the shadow of the hood.
