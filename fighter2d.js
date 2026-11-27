@@ -18,6 +18,7 @@ const ArenaArt2D = (() => {
   const WOOD = [126, 82, 48];
 
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+  const mix = (from, to, amount) => from + (to - from) * amount;
   // amount > 0 mixes toward warm white, amount < 0 toward a cool dark, which reads richer than gray.
   function tone(rgb, amount) {
     const to = amount > 0 ? [255, 244, 222] : [24, 12, 26];
@@ -1244,11 +1245,15 @@ const ArenaArt2D = (() => {
     // Back to front. Stowed gear and the cloak sit behind everything.
     if (view.shield?.stowed) drawShield();
     if (view.spare) drawWeapon(view.spare.key, view.spare.mount, view.spare.angle, view.spare.scale, view.spare.draw, view.spare.chains, true);
+    // Upright, the cape hangs half way between the spine and the ground. As the body goes over it
+    // turns with the spine and stops swinging, so it lies along a fallen fighter, not through the floor.
+    const fallen = clamp((Math.abs(torsoTurn) - .5) / .7, 0, 1);
     if (parts.cape) place(view.torsoPoint([-.1, .62, -.2]), () => {
       // A cape that flares out also lifts a little.
-      g.transform(1, 0, swing, 1 - Math.min(.16, Math.abs(swing) * .2), 0, 0);
+      const flare = swing * (1 - fallen);
+      g.transform(1, 0, flare, 1 - Math.min(.16, Math.abs(flare) * .2), 0, 0);
       stamp(g, parts.cape, frost);
-    }, torsoTurn * .5);
+    }, torsoTurn * (.5 + .5 * fallen), 1 - .55 * fallen, 1 - .12 * fallen);
     // The far arm and its weapon pass behind the body unless the swing brings them across it.
     const across = j.weaponHand[2] > -.08;
     arm('weapon', parts.far);
@@ -1260,11 +1265,21 @@ const ArenaArt2D = (() => {
       const [ax] = j.frontAnkle;
       const [bx] = j.rearAnkle;
       const drop = Math.max(.12, j.hips[1] - .27);
+      // Standing, the hem keeps its height and shears after the feet. Once the hips are down the
+      // skirt turns to lie along the legs instead.
+      const down = clamp((.8 - j.hips[1]) / .45, 0, 1);
+      const feet = [0, 1, 2].map(axis => (j.frontAnkle[axis] + j.rearAnkle[axis]) / 2);
+      const [hipX, hipY, unit] = toScreen(j.hips);
+      const [footX, footY] = toScreen(feet);
+      const along = Math.atan2(hipX - footX, footY - hipY);
+      const reach = Math.hypot(footX - hipX, footY - hipY) / unit;
+      const shear = clamp(((ax + bx) / 2 - j.hips[0]) / drop + swing * .15, -2.4, 2.4);
       place(j.hips, () => {
-        // The hem follows the feet and lags a little behind the body.
-        g.transform(1, 0, clamp(((ax + bx) / 2 - j.hips[0]) / drop + swing * .15, -2.4, 2.4), 1, 0, 0);
+        g.transform(1, 0, shear * (1 - down), 1, 0, 0);
         stamp(g, parts.skirt, frost);
-      }, 0, clamp(1 + (Math.abs(ax - bx) - .71) * .4, .85, 1.35), clamp(drop / .825, .2, 1.1));
+      }, along * down,
+      mix(clamp(1 + (Math.abs(ax - bx) - .71) * .4, .85, 1.35), .7, down),
+      mix(clamp(drop / .825, .2, 1.1), clamp(reach / .9, .5, 1.1), down));
     }
     torsoFrame(() => stamp(g, parts.torso, frost));
     if (pose.severed) {
