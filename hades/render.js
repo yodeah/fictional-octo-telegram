@@ -2007,7 +2007,8 @@
     const [anim, shapeName, progress] = animation(duel, f);
     const fall = fallen.get(f.index);
     // A falling body keeps facing the blow that felled it, so it topples along it.
-    const facing = fall ? Math.atan2(-fall.y, -fall.x) : f.facing;
+    // A whirlwind turns the whole body once round during the blow.
+    const facing = fall ? Math.atan2(-fall.y, -fall.x) : f.facing + (shapeName === 'spin' && anim === 'active' ? progress * Math.PI * 2 : 0);
     const sprite = Sprites.get(specOf(duel, f), facing, anim, shapeName, progress);
     shown[f.index] = sprite;
     blit(sprite, f.x, f.y);
@@ -2098,7 +2099,7 @@
       const x = f.x + Math.cos(a.angle) * a.reach, y = f.y + Math.sin(a.angle) * a.reach;
       paint(circle(x, y, a.radius), .1);
       paint(circle(x, y, a.radius * t), .26, false);
-    } else if (a.shape === 'nova') {
+    } else if (a.shape === 'nova' || a.shape === 'spin') {
       paint(circle(f.x, f.y, a.reach), .08);
       paint(circle(f.x, f.y, a.reach * t), .2, false);
     } else if (a.shape === 'bolt') {
@@ -2162,9 +2163,18 @@
     decalCtx.fill();
   }
 
+  // Floating text. size is relative to a normal callout; big ones live a little longer. Text on the
+  // same fighter a moment apart stacks upward instead of printing over the last one.
   function floater(who, text, color, size = 1, tag = '') {
-    floaters.push({ x: who.x + rand(-.3, .3), y: who.y, z: 2.8, text, tag, color, size, age: 0 });
+    let z = 2.8;
+    for (const f of floaters) {
+      if (f.who === who && f.age < .4) z = Math.max(z, f.z + f.age * .9 + .42 * (f.size * .8 + size * (tag ? .95 : .2)));
+    }
+    floaters.push({ who, x: who.x + rand(-.3, .3), y: who.y, z, text, tag, color, size, age: 0, life: .85 + Math.min(.45, size * .15) });
   }
+
+  // A hit number grows with the damage: a 3 is a small tick, a 60 critical fills the air.
+  const damageSize = (damage, critical) => clamp(.42 + damage / 26, .5, 2.5) * (critical ? 1.2 : 1);
 
   const jolt = amount => { if (!reducedMotion) shake = Math.max(shake, amount); };
 
@@ -2178,7 +2188,7 @@
     if (e.type === 'hit') {
       const rgb = e.color || (e.critical ? '#ffd23f' : '#fff4e6');
       if (e.damage) {
-        floater(who, String(e.damage), rgb, clamp(.85 + e.damage / 45, .9, 1.9) * (e.critical ? 1.18 : 1),
+        floater(who, String(e.damage), rgb, damageSize(e.damage, e.critical),
           e.rear ? 'BACKSTAB' : e.critical ? 'CRITICAL' : e.warded ? e.warded + ' WARDED' : '');
       } else floater(who, 'ABSORBED', who.wardColor || '#fff', .9);
       if (e.style !== 'magic' && e.damage) {
@@ -2196,11 +2206,12 @@
     } else if (e.type === 'block') {
       spray(e.x, e.y, 1.15, e.perfect ? 30 : 14, ['#ffe9a8', '#ffb63f', '#fff'], { dirX: -e.dirX, dirY: -e.dirY, speed: 4, glowing: true, size: .05, life: .3 });
       impacts.push({ x: e.x, y: e.y, z: 1.2, size: e.perfect ? 2.4 : 1.3, turn: rand(0, 6.3), age: 0, life: .2, rgb: '255,190,80' });
-      floater(who, e.perfect ? 'PERFECT' : 'BLOCK', e.perfect ? '#fff0a0' : '#ffd79a', e.perfect ? 1.1 : .8);
+      floater(who, e.perfect ? 'PERFECT' : 'BLOCK', e.perfect ? '#fff0a0' : '#ffd79a', e.perfect ? 1.15 : .7);
       rings.push({ x: e.x, y: e.y, z: 1.15, r: .15, to: e.perfect ? 1.5 : .8, age: 0, life: .22, color: '#ffe2a0' });
       jolt(e.perfect ? .14 : .05);
     } else if (e.type === 'swing') {
-      trails.push({ x: who.x, y: who.y, who: e.who, team: who.team, shape: e.shape, angle: e.angle, reach: e.reach, spread: e.spread, radius: e.radius, heavy: e.heavy, age: 0, life: e.heavy ? .34 : .24 });
+      trails.push({ x: who.x, y: who.y, who: e.who, team: who.team, shape: e.shape, angle: e.angle, reach: e.reach, spread: e.spread, radius: e.radius, heavy: e.heavy, age: 0, life: e.shape === 'spin' ? .4 : e.heavy ? .34 : .24 });
+      if (e.shape === 'spin') rings.push({ x: who.x, y: who.y, z: .9, r: .5, to: e.reach + .3, age: 0, life: .32, color: looks[who.team].trim });
       if (e.shape === 'slam') {
         const x = who.x + Math.cos(e.angle) * e.reach, y = who.y + Math.sin(e.angle) * e.reach;
         spray(x, y, .1, 34, ['#6fb3a3', '#9fd6c4', '#3d7a72'], { speed: 4.5, up: 3, size: .09 });
@@ -2209,16 +2220,22 @@
       }
       if (e.shape === 'nova') rings.push({ x: who.x, y: who.y, z: .5, r: .4, to: e.reach, age: 0, life: .35, color: '#d7c2ff' });
     } else if (e.type === 'bash') {
-      floater(who, 'SHIELD BASH', '#ffe2a0', .6);
+      floater(who, 'SHIELD BASH', '#ffe2a0', .62);
     } else if (e.type === 'kick') {
       floater(who, 'KICK', '#ffd9a8', .6);
     } else if (e.type === 'interrupt') {
-      floater(who, 'INTERRUPTED', '#ff9d7a', .7);
+      floater(who, 'INTERRUPTED', '#ff9d7a', .9);
       jolt(.1);
     } else if (e.type === 'dodge') {
-      floater(who, 'DODGE', '#c8f5ff', .55);
+      floater(who, 'DODGE', '#c8f5ff', .5);
     } else if (e.type === 'swap') {
-      floater(who, weapons[e.weapon].name.toUpperCase(), '#d9f4e8', .62);
+      floater(who, weapons[e.weapon].name.toUpperCase(), '#d9f4e8', .55);
+    } else if (e.type === 'technique') {
+      // A weapon's second attack is named as it starts, so the viewer learns the moves.
+      floater(who, e.name.toUpperCase(), looks[who.team].trim, .66);
+    } else if (e.type === 'guardbreak') {
+      floater(who, 'GUARD OPEN', '#ffc07a', 1.05);
+      jolt(.08);
     } else if (e.type === 'dashstrike') {
       floater(who, 'DASH-STRIKE', looks[who.team].trim, .75);
       rings.push({ x: who.x, y: who.y, z: .05, r: .3, to: 1.5, age: 0, life: .28, color: looks[who.team].trim });
@@ -2236,21 +2253,21 @@
       spray(who.x, who.y, .4, 26, [e.color, '#fff'], { speed: 1.2, up: 3.4, gravity: -.5, glowing: true, size: .06, life: .8 });
       rings.push({ x: who.x, y: who.y, z: .05, r: .2, to: 1.3, age: 0, life: .45, color: e.color });
     } else if (e.type === 'heal') {
-      floater(who, '+' + e.amount, '#c2f5a1', .85);
+      floater(who, '+' + e.amount, '#c2f5a1', damageSize(e.amount) * .9);
     } else if (e.type === 'fizzle') {
       spray(e.x, e.y, 1.1, 9, [e.color || '#d9c7a0', '#fff'], { speed: 2, gravity: 5, glowing: !!e.color, size: .05, life: .3 });
     } else if (e.type === 'stagger') {
-      floater(who, 'STAGGERED', '#ffbe5c', 1);
+      floater(who, 'STAGGERED', '#ffbe5c', 1.45);
       jolt(.14);
     } else if (e.type === 'wallslam') {
-      floater(who, 'WALL SLAM', '#ff9d5c', 1.1);
+      floater(who, 'WALL SLAM', '#ff9d5c', 1.6);
       spray(e.x, e.y, .6, 26, ['#bfe0d4', '#6fa596'], { speed: 4, size: .1 });
       jolt(.3);
     } else if (e.type === 'shieldbreak') {
-      floater(who, 'SHIELD BROKEN', '#ffd49c', 1);
+      floater(who, 'SHIELD BROKEN', '#ffd49c', 1.4);
       spray(who.x, who.y, 1.1, 22, ['#8a5a3c', '#d9a84e', '#c9a06b'], { speed: 4, size: .1, life: .8 });
     } else if (e.type === 'freeze') {
-      floater(who, 'FROZEN', '#c5ecff', 1);
+      floater(who, 'FROZEN', '#c5ecff', 1.3);
       spray(who.x, who.y, .8, 20, ['#c5ecff', '#fff'], { speed: 2.4, glowing: true });
     } else if (e.type === 'death') {
       fallen.set(e.who, { x: e.dirX, y: e.dirY, age: 0 });
@@ -2282,7 +2299,7 @@
     }
     particles = particles.filter(p => p.age < p.life);
     for (const group of [floaters, trails, rings, impacts]) for (const item of group) item.age += dt;
-    floaters = floaters.filter(f => f.age < 1);
+    floaters = floaters.filter(f => f.age < f.life);
     trails = trails.filter(t => t.age < t.life);
     rings = rings.filter(r => r.age < r.life);
     impacts = impacts.filter(i => i.age < i.life);
@@ -2327,16 +2344,18 @@
           [t.x + c * .6 + s * side, t.y + s * .6 - c * side, 1.05]], `rgba(${rgb},${fade * .75})`, false);
         continue;
       }
-      // A sweeping crescent, stamped flat on the plane of the swing.
+      // A sweeping crescent, stamped flat on the plane of the swing. A backhand sweeps the other
+      // way; a whirlwind carries it once round.
       const grow = ease(clamp(t.age / (t.life * .45), 0, 1));
-      const art = crescent(t.team, t.spread, !!t.heavy);
+      const spin = t.shape === 'spin', back = t.shape === 'hook';
+      const art = crescent(t.team, spin ? 2.6 : t.spread, !!t.heavy);
       const size = (t.reach + .55) * unit;
       ctx.save();
       ctx.globalAlpha = fade;
       ctx.translate(sx(t.x), sy(t.y, 1.05));
       ctx.scale(1, K);
-      ctx.rotate(t.angle + mix(.75, -.25, grow));
-      ctx.scale(1, -1);
+      ctx.rotate(t.angle + (spin ? grow * Math.PI * 2 - .75 : back ? mix(-.75, .25, grow) : mix(.75, -.25, grow)));
+      ctx.scale(1, back ? 1 : -1);
       ctx.drawImage(art, -size, -size, size * 2, size * 2);
       ctx.restore();
     }
@@ -2393,8 +2412,10 @@
       return;
     }
     if (!spell && p.weapon === 'sling') {
-      // A sling stone: a fast grey pebble with a faint streak, loosed from over the head.
-      const z = 1.55;
+      // A sling stone: a fast grey pebble with a faint streak, loosed from over the head. A lob
+      // climbs high and drops onto the rival.
+      const u = p.lob ? clamp(1 - p.life / p.flight, 0, 1) : 0;
+      const z = 1.55 - u * .5 + Math.sin(u * Math.PI) * 2.6;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const tail = ctx.createLinearGradient(sx(p.x), sy(p.y, z), sx(p.x - dx * 1.8), sy(p.y - dy * 1.8, z));
@@ -2634,9 +2655,9 @@
     ctx.lineJoin = 'round';
     for (const f of floaters) {
       const pop = 1 + Math.max(0, .14 - f.age) * 3;
-      const size = Math.max(11, unit * .42 * f.size) * pop;
+      const size = Math.max(9, unit * .42 * f.size) * pop;
       const x = sx(f.x), y = sy(f.y, f.z + f.age * .9);
-      ctx.globalAlpha = clamp((1 - f.age) * 3, 0, 1);
+      ctx.globalAlpha = clamp((f.life - f.age) * 3, 0, 1);
       ctx.font = `900 ${size}px "Trebuchet MS", "Avenir Next", sans-serif`;
       ctx.strokeStyle = ink;
       ctx.lineWidth = size * .24;

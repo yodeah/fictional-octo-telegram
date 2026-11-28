@@ -4,13 +4,16 @@ Improvement ideas for the 2.5D arena. Score is impact (1–5) per 10k estimated 
 
 | Idea | Impact | Est. tokens | Score |
 | --- | --- | --- | --- |
+| Hit-stop and a slow-motion killing blow: a 60 ms freeze on heavy hits and criticals, and the last blow at 0.3× with a short zoom | 4 | 6k | 6.7 |
 | Rotate the map between bouts when Auto-rematch is on | 2 | 3k | 6.7 |
 | Map hazards: a fighter knocked against the forge pit's edge is burned for a few points, with a flash | 3 | 8k | 3.8 |
 | Synthesized sound for swings, hits, blocks, dashes and deaths, with a mute button | 4 | 12k | 3.3 |
+| Combos between second attacks: a shield hook, leg wrap or hamstring sets up a follow-up the AI chains (a free chop, a lunge), with a combo callout | 4 | 14k | 2.9 |
 | Boons: before each bout both sides draw a random blessing (burning dash, chain lightning, lifesteal) | 5 | 18k | 2.8 |
 | Floor spike traps that knockback can push fighters into | 4 | 15k | 2.7 |
 | Champion-level AI for every class (or a wits stat): the champions now dodge so well that they beat the generic shooters and mages 95–100% | 3 | 12k | 2.5 |
 | Show each item's stats (damage, speed, defense, mobility) as a tooltip or line in the loadout row | 2 | 8k | 2.5 |
+| Crowd favor: big moments (staggers, wall slams, guard breaks) fill a meter over the HUD; a full meter lets that fighter's next killing blow be a rare weapon-specific execution | 5 | 22k | 2.3 |
 | Better fallen poses and rare weapon-specific finishers | 3 | 15k | 2.0 |
 | Painted portraits and a Hades-style versus card between bouts | 3 | 15k | 2.0 |
 | Rebalance the older weapons: the axe, mace and greatsword win only 15–25% against Varro's own gladius | 2 | 10k | 2.0 |

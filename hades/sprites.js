@@ -101,6 +101,14 @@
       if (shape === 'arc') {
         p.yaw = key(p.yaw, 2.3, -1.95); p.pitch = key(p.pitch, .45, -.18); p.out = key(p.out, .3, .5);
         p.lunge = key(0, -.14, .3); p.lean = key(.06, -.12, .36); p.sway = key(.06, .1, .55);
+      } else if (shape === 'hook') {
+        // A backhand: the weapon crosses to the off side, then whips back across to the weapon side.
+        p.yaw = key(p.yaw, -1.45, 1.95); p.pitch = key(p.pitch, .3, -.12); p.out = key(p.out, .22, .52);
+        p.lunge = key(0, -.1, .3); p.lean = key(.06, -.08, .32);
+      } else if (shape === 'spin') {
+        // A full turn (the picture turns the body round): the blade held flat out at the side.
+        p.yaw = key(p.yaw, 2.1, 1.45); p.pitch = key(p.pitch, .4, .02); p.out = key(p.out, .3, .62);
+        p.lunge = key(0, -.12, .14); p.lean = key(.06, -.1, .2); p.crouch = key(.04, .16, .2);
       } else if (shape === 'thrust') {
         p.yaw = key(p.yaw, .16, 0); p.pitch = key(p.pitch, .05, 0); p.out = key(p.out, -.26, .92);
         p.lunge = key(0, -.22, .48); p.lean = key(.06, -.16, .44); p.sway = key(.06, .1, .6);

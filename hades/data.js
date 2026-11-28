@@ -31,6 +31,50 @@
     staff: { name: 'Staff', style: 'magic', shape: 'bolt', reach: 8, speed: 11, damage: 8, energy: 6, windup: .42, recover: .42, stance: 10, block: .10, spellPower: 1.3 }
   };
 
+  // Every weapon's second attack. A fighter uses it when the moment fits (use names the rule in
+  // sim.js altRules) and then waits cooldown seconds. Unset values come from the weapon. hook is a
+  // backhand cut, spin a full turn that hits all round. push below zero drags the rival in;
+  // guardBreak keeps a shield down that long; pierce ignores armor; lob flies over pillars.
+  const techniques = {
+    // Just past reach: a long lunge after a rival who steps back.
+    sword: { name: 'Lunge', use: 'lunge', shape: 'thrust', reach: 2.75, spread: .4, damage: 14, energy: 15, windup: .27, recover: .48, stance: 24, cooldown: 2.4 },
+    // Too close for the point: sweep the shaft and shove the rival back out to spear range.
+    spear: { name: 'Shaft sweep', use: 'crowded', shape: 'arc', reach: 2.0, spread: 2.3, damage: 7, energy: 12, windup: .24, recover: .32, stance: 30, block: .2, push: 1.5, interrupt: true, cooldown: 2.6 },
+    // The bearded head hooks the shield rim and drags it down: the next blow cannot be blocked.
+    axe: { name: 'Shield hook', use: 'shielded', shape: 'hook', reach: 1.95, spread: 1.0, damage: 6, energy: 13, windup: .28, recover: .32, stance: 22, unblockable: true, push: -1, guardBreak: 1.1, cooldown: 3.4 },
+    // The maul is slow to lift: a quick shove with the haft knocks a rival's own swing away first.
+    maul: { name: 'Haft jab', use: 'winding', shape: 'thrust', reach: 1.45, spread: .9, damage: 8, energy: 10, windup: .19, recover: .3, stance: 28, push: 1.3, interrupt: true, cooldown: 2.8 },
+    // A full turn with the blade out: hits everyone round the fighter, and a sidestep cannot beat it.
+    greatsword: { name: 'Whirlwind', use: 'surrounded', shape: 'spin', reach: 2.3, damage: 19, energy: 24, windup: .48, active: .22, recover: .55, stance: 34, heavy: true, cooldown: 5 },
+    // An overhead blow on the helmet to finish off a rival already reeling.
+    mace: { name: 'Crown smash', use: 'reeling', shape: 'slam', reach: 1.45, radius: .85, damage: 14, energy: 18, windup: .4, recover: .44, stance: 62, breaks: true, winded: 10, cooldown: 3 },
+    // Feet set, a long aim: a heavy bolt that flies fast and goes through most guards.
+    crossbow: { name: 'Braced shot', use: 'clear', shape: 'bolt', windup: .9, recover: .5, damage: 32, energy: 14, speed: 25, stance: 34, push: 1.2, block: .12, hinder: 1, cooldown: 4.5 },
+    // Three arrows in a fan for a rival who keeps dodging.
+    bow: { name: 'Volley', use: 'dodgy', shape: 'bolt', windup: .48, recover: .4, damage: 9, energy: 12, count: 3, fan: .13, stance: 9, hinder: .3, cooldown: 3.5 },
+    // Under the rim of a raised shield.
+    gladius: { name: 'Low stab', use: 'shielded', shape: 'thrust', reach: 1.65, spread: .5, damage: 15, energy: 12, windup: .22, recover: .3, stance: 22, block: .06, cooldown: 2.2 },
+    // Thrown at a shield, the soft iron shank bends and sticks: the shield is weighed down for a while.
+    pilum: { name: 'Shield-pinning throw', use: 'shielded', shape: 'bolt', windup: .55, recover: .5, damage: 17, energy: 14, stance: 24, breaks: true, guardBreak: 1.8, cooldown: 4 },
+    // A quick shot from the hip at a blade closing in: weaker and wilder, but it slows the rush.
+    recurve: { name: 'Snap shot', use: 'pressed', shape: 'bolt', windup: .17, recover: .26, damage: 11, energy: 8, stance: 18, hinder: .7, wild: .12, cooldown: 2.6 },
+    // A backhand slash at the back of the knee: the rival limps for a while.
+    sica: { name: 'Hamstring', use: 'slow', shape: 'hook', reach: 1.8, spread: 1.2, damage: 9, energy: 11, windup: .25, recover: .3, stance: 18, block: .12, hinder: 1.8, cooldown: 3.2 },
+    // A low sweep of the prongs that takes the legs of a rival who got too close.
+    trident: { name: 'Leg sweep', use: 'crowded', shape: 'arc', reach: 2.4, spread: 1.9, damage: 6, energy: 13, windup: .3, recover: .36, stance: 42, block: .15, hinder: 1.2, interrupt: true, cooldown: 3 },
+    // The chain wraps the legs under the shield and yanks.
+    flail: { name: 'Leg wrap', use: 'slow', shape: 'hook', reach: 2.25, spread: 1.1, damage: 7, energy: 14, windup: .3, recover: .38, stance: 34, unblockable: true, hinder: 1.8, push: -.6, cooldown: 3.2 },
+    // The hooked tip reaches round and reaps the rival back into range.
+    falx: { name: 'Reaping hook', use: 'reachEdge', shape: 'hook', reach: 2.65, spread: 1.2, damage: 14, energy: 17, windup: .36, recover: .4, stance: 30, block: .12, push: -1.5, heavy: false, cooldown: 3 },
+    // The back spike punches through armor and shield alike.
+    hammer: { name: 'Spike', use: 'armored', shape: 'thrust', reach: 1.75, spread: .5, damage: 15, energy: 16, windup: .36, recover: .4, stance: 22, pierce: true, breaks: true, cooldown: 2.6 },
+    // A high, slow stone that drops over a pillar onto a rival hiding behind it.
+    sling: { name: 'Lob', use: 'hidden', shape: 'bolt', windup: .55, recover: .34, damage: 14, energy: 9, speed: 12, stance: 40, lob: true, cooldown: 2.5 },
+    // A caster with no blink left sweeps the staff to trip and shove a blade off them.
+    staff: { name: 'Staff sweep', use: 'crowded', shape: 'arc', reach: 1.9, spread: 1.8, damage: 6, energy: 10, windup: .22, recover: .32, stance: 36, block: .1, push: 1.4, interrupt: true, cooldown: 3 }
+  };
+  for (const [key, technique] of Object.entries(techniques)) weapons[key].alt = { ...technique, heavy: !!technique.heavy, breaks: !!technique.breaks };
+
   const shields = {
     none: { name: 'No shield', defense: 0, mobility: 1, energy: 0, durability: 0, block: 0 },
     buckler: { name: 'Buckler', defense: 11, mobility: 1.05, energy: 9, durability: 2, block: .02, radius: .27 },
