@@ -1080,7 +1080,8 @@
       disc(al(-.26), .045, metal.iron);
       taper(al(.62), al(.7), .07, .07, look.main);
       fine([al(.63), al(.69)], look.light, .016);
-      const W = flatAcross(aim, side);
+      // A cut swings the head toward -side, so the edge goes there and leads the blow.
+      const W = flatAcross(aim, side).map(v => -v);
       const at = (d, w) => add(al(d), W.map(v => v * w));
       taper(al(.8), al(1.0), .1, .09, metal.dark);
       // The blade: neck, toe, the curved edge and the beard hooking back to the haft.
