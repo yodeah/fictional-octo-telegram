@@ -3,7 +3,9 @@
 // react to is pushed to duel.events. A seed makes a bout repeatable.
 (function (root) {
   const D = typeof module !== 'undefined' ? require('./data.js') : root.HadesData;
-  const { weapons, shields, armors, spells, moves, kits, arena, switchCost } = D;
+  const { weapons, shields, armors, spells, moves, kits, maps, switchCost } = D;
+  // The floor of the bout being stepped: set by step(), read by everything below.
+  let arena = maps.temple;
 
   const radius = .46;
   const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -45,16 +47,18 @@
     };
   }
 
-  function createDuel(kitA, kitB, seed = Date.now(), names = ['Varro', 'Cassian']) {
-    return createBattle([{ entry: kitA, team: 0, name: names[0] }, { entry: kitB, team: 1, name: names[1] }], seed);
+  function createDuel(kitA, kitB, seed = Date.now(), names = ['Varro', 'Cassian'], map = 'temple') {
+    return createBattle([{ entry: kitA, team: 0, name: names[0] }, { entry: kitB, team: 1, name: names[1] }], seed, map);
   }
 
   // Any number of fighters on two teams: lineup is [{ entry, team, name }]. winner is a team.
-  function createBattle(lineup, seed = Date.now()) {
+  // map is a key of HadesData.maps.
+  function createBattle(lineup, seed = Date.now(), map = 'temple') {
     const size = team => lineup.filter(l => l.team === team).length;
     const slots = [0, 0];
     return {
       time: 0, seed, random: seeded(seed), winner: null, events: [], projectiles: [], nextId: 1,
+      map: maps[map] ? map : 'temple', arena: maps[map] || maps.temple,
       fighters: lineup.map((l, i) => createFighter(i, l.entry, l.name, l.team, slots[l.team]++, size(l.team)))
     };
   }
@@ -114,23 +118,64 @@
   // Long bouts turn into sudden death so two cautious fighters cannot circle forever.
   const frenzy = duel => 1 + Math.max(0, duel.time - 45) * .025;
 
-  function lineOfSight(from, to, pad = .12) {
-    const dx = to.x - from.x, dy = to.y - from.y;
-    const len2 = dx * dx + dy * dy || 1;
-    return arena.pillars.every(p => {
-      const t = clamp(((p.x - from.x) * dx + (p.y - from.y) * dy) / len2, 0, 1);
-      return Math.hypot(from.x + dx * t - p.x, from.y + dy * t - p.y) > p.r + pad;
-    });
+  // ---- Obstacles ----
+  // A circle is { x, y, r }; a wall is { x, y, x2, y2, r }, a line with rounded ends.
+
+  // The point of an obstacle's middle line nearest to (x, y): a circle's centre, or a point on a wall.
+  function spine(o, x, y) {
+    if (o.x2 === undefined) return o;
+    const dx = o.x2 - o.x, dy = o.y2 - o.y;
+    const t = clamp(((x - o.x) * dx + (y - o.y) * dy) / (dx * dx + dy * dy), 0, 1);
+    return { x: o.x + dx * t, y: o.y + dy * t };
   }
 
-  // Keeps a point on the floor and out of pillars. Returns true when it hit the outer wall.
+  // Closest approach between the segment from -> to and an obstacle's middle line, and where along
+  // from -> to (0..1) it happens.
+  function approach(o, from, to) {
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const len2 = dx * dx + dy * dy || 1;
+    if (o.x2 === undefined) {
+      const t = clamp(((o.x - from.x) * dx + (o.y - from.y) * dy) / len2, 0, 1);
+      return { gap: Math.hypot(from.x + dx * t - o.x, from.y + dy * t - o.y), t };
+    }
+    // Two segments: crossing, or else the nearest of the four end-to-segment distances.
+    const ex = o.x2 - o.x, ey = o.y2 - o.y, cross = dx * ey - dy * ex;
+    if (cross) {
+      const t = ((o.x - from.x) * ey - (o.y - from.y) * ex) / cross, u = ((o.x - from.x) * dy - (o.y - from.y) * dx) / cross;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return { gap: 0, t };
+    }
+    let best = { gap: Infinity, t: 0 };
+    for (const end of [{ x: o.x, y: o.y }, { x: o.x2, y: o.y2 }]) {
+      const t = clamp(((end.x - from.x) * dx + (end.y - from.y) * dy) / len2, 0, 1);
+      const gap = Math.hypot(from.x + dx * t - end.x, from.y + dy * t - end.y);
+      if (gap < best.gap) best = { gap, t };
+    }
+    for (const [end, t] of [[from, 0], [to, 1]]) {
+      const p = spine(o, end.x, end.y), gap = Math.hypot(end.x - p.x, end.y - p.y);
+      if (gap < best.gap) best = { gap, t };
+    }
+    return best;
+  }
+
+  // Shots and sight: blocked by tall obstacles only. A low one (a pit, a balustrade) is seen over.
+  function lineOfSight(from, to, pad = .12) {
+    return arena.obstacles.every(o => o.low || approach(o, from, to).gap > o.r + pad);
+  }
+
+  // Walking: blocked by every obstacle.
+  function pathClear(from, to, pad = .12) {
+    return arena.obstacles.every(o => approach(o, from, to).gap > o.r + pad);
+  }
+
+  // Keeps a point on the floor and out of obstacles. Returns true when it hit the outer wall.
   function constrain(body, r = radius) {
     let wall = false;
     const a = arena.a - r, b = arena.b - r;
     const d = Math.hypot(body.x / a, body.y / b);
     if (d > 1) { body.x /= d; body.y /= d; wall = true; }
-    for (const p of arena.pillars) {
-      const gap = Math.hypot(body.x - p.x, body.y - p.y), min = p.r + r;
+    for (const o of arena.obstacles) {
+      const p = spine(o, body.x, body.y);
+      const gap = Math.hypot(body.x - p.x, body.y - p.y), min = o.r + r;
       if (gap < min) {
         const [ux, uy] = unit(body.x - p.x, body.y - p.y);
         body.x = p.x + ux * min; body.y = p.y + uy * min;
@@ -516,7 +561,11 @@
       const steps = Math.ceil(Math.hypot(p.vx, p.vy) * dt / .3);
       for (let i = 0; i < steps && p.life > 0; i++) {
         p.x += p.vx * dt / steps; p.y += p.vy * dt / steps;
-        const pillar = arena.pillars.some(q => Math.hypot(p.x - q.x, p.y - q.y) < q.r);
+        const pillar = arena.obstacles.some(o => {
+          if (o.low) return false;
+          const q = spine(o, p.x, p.y);
+          return Math.hypot(p.x - q.x, p.y - q.y) < o.r;
+        });
         if (pillar || Math.hypot(p.x / arena.a, p.y / arena.b) > 1.06) {
           p.life = 0;
           emit(duel, 'fizzle', { x: p.x, y: p.y, color: spell?.color });
@@ -572,24 +621,33 @@
     return startDash(duel, f, angle, 'evade');
   }
 
-  // Heading toward the rival that goes around whichever pillar is in the way.
+  // Heading toward the rival that goes around whichever obstacle is in the way. Along a wall it
+  // slides toward one end, then rounds it.
   function route(f, rival) {
     const dx = rival.x - f.x, dy = rival.y - f.y;
-    const len2 = dx * dx + dy * dy || 1;
     let nearest = null, nearestT = 2;
-    for (const p of arena.pillars) {
-      const t = clamp(((p.x - f.x) * dx + (p.y - f.y) * dy) / len2, 0, 1);
-      if (t < nearestT && Math.hypot(f.x + dx * t - p.x, f.y + dy * t - p.y) < p.r + radius + .1) {
-        nearest = p; nearestT = t;
-      }
+    for (const o of arena.obstacles) {
+      const { gap, t } = approach(o, f, rival);
+      if (t < nearestT && gap < o.r + radius + .1) { nearest = o; nearestT = t; }
     }
     if (!nearest) { f.detour = 0; return unit(dx, dy); }
-    // Pick a side once and keep it until the way is clear, so the walker never dithers.
-    f.detour ||= Math.sign(dx * (nearest.y - f.y) - dy * (nearest.x - f.x)) || f.strafe;
-    const away = Math.atan2(f.y - nearest.y, f.x - nearest.x);
+    const centre = spine(nearest, f.x, f.y);
+    // Pick a side once and keep it until the way is clear, so the walker never dithers. Round a wall
+    // by its nearer end.
+    if (!f.detour && nearest.x2 !== undefined) {
+      const ex = nearest.x2 - nearest.x, ey = nearest.y2 - nearest.y;
+      // Where the line to the rival crosses the wall, from its middle: positive toward (x2, y2).
+      const mid = { x: (nearest.x + nearest.x2) / 2, y: (nearest.y + nearest.y2) / 2 };
+      const along = ((f.x - mid.x) * dy - (f.y - mid.y) * dx) / (ex * dy - ey * dx || 1);
+      // Turning the way out from the wall by detour * .9 moves along it by detour * (out x wall).
+      const ax = f.x - centre.x, ay = f.y - centre.y;
+      f.detour = Math.sign((ax * ey - ay * ex) * (along > 0 ? 1 : -1)) || f.strafe;
+    }
+    f.detour ||= Math.sign(dx * (centre.y - f.y) - dy * (centre.x - f.x)) || f.strafe;
+    const away = Math.atan2(f.y - centre.y, f.x - centre.x);
     const around = away + f.detour * .9;
     const reach = nearest.r + radius + .35;
-    return unit(nearest.x + Math.cos(around) * reach - f.x, nearest.y + Math.sin(around) * reach - f.y);
+    return unit(centre.x + Math.cos(around) * reach - f.x, centre.y + Math.sin(around) * reach - f.y);
   }
 
   // Champions read incoming shots. A bolt or spell already in the air is sidestepped off its line.
@@ -639,8 +697,10 @@
       const dodge = juke(duel, f, rival);
       if (dodge) return dodge;
     }
+    // Out of sight, or walled off by something low that a blade cannot reach across: go around.
     const sight = lineOfSight(f, rival, radius * .8);
-    if (!sight) {
+    const walledOff = sight && !pathClear(f, rival, radius * .8) && d > (weapon.style === 'melee' ? weapon.reach : 6.6);
+    if (!sight || walledOff) {
       // Two fighters going round a pillar the same way can chase each other forever: after a while
       // out of sight, turn back the other way.
       f.blindSince ??= duel.time + duel.random() * 1.5;
@@ -711,7 +771,7 @@
     const canBash = shieldUp(f) && f.energy >= 14 && f.counterUntil > duel.time && d < 1.8
       && (!f.action || f.action.t > f.action.windup + f.action.active);
     if (canBash && (f.riposte || duel.random() < .08)) return startAttack(duel, f, rival, 'bash');
-    if (free && d < 1.75 && !rival.dead && lineOfSight(f, rival, 0) && closeMove(duel, f, rival, d)) return;
+    if (free && d < 1.75 && !rival.dead && pathClear(f, rival, 0) && closeMove(duel, f, rival, d)) return;
 
     if (weapon.style !== 'melee') {
       const meleeRival = styleOf(rival) === 'melee';
@@ -733,7 +793,7 @@
     }
     // A champion bursts in on an opening: a shooter still recovering from a shot, out of escapes or
     // staggered, or anyone staggered within reach of a dash.
-    if (f.kit.champion && free && f.charges > 0 && duel.time >= f.nextClose && d > 2.6 && d < 6.8 && lineOfSight(f, rival, .5)) {
+    if (f.kit.champion && free && f.charges > 0 && duel.time >= f.nextClose && d > 2.6 && d < 6.8 && pathClear(f, rival, .5)) {
       const ra = rival.action;
       const staggered = rival.stunnedUntil > duel.time + .25 || rival.frozenUntil > duel.time + .25;
       const opening = staggered || styleOf(rival) !== 'melee'
@@ -745,7 +805,7 @@
       }
     }
     // Melee: burst across the gap at a shooter, otherwise walk in.
-    if (free && f.charges > (styleOf(rival) === 'melee' ? 1 : 0) && duel.time >= f.nextClose && d > 3.4 && d < 8 && lineOfSight(f, rival, .5)
+    if (free && f.charges > (styleOf(rival) === 'melee' ? 1 : 0) && duel.time >= f.nextClose && d > 3.4 && d < 8 && pathClear(f, rival, .5)
       && duel.random() < (styleOf(rival) === 'melee' ? .008 : .035)) {
       f.nextClose = duel.time + 3.2;
       return void startDash(duel, f, Math.atan2(rival.y - f.y, rival.x - f.x), 'close');
@@ -774,7 +834,7 @@
     if (duel.time < f.kickReady || f.energy < kickMove.cost || d > kickMove.reach + radius * .4) return false;
     const [ux, uy] = unit(rival.x - f.x, rival.y - f.y);
     const behind = { x: rival.x + ux * 1.6, y: rival.y + uy * 1.6 };
-    const wallBehind = Math.hypot(behind.x / arena.a, behind.y / arena.b) > .97 || !lineOfSight(rival, behind, radius);
+    const wallBehind = Math.hypot(behind.x / arena.a, behind.y / arena.b) > .97 || !pathClear(rival, behind, radius);
     const ranged = styleOf(f) !== 'melee';
     let want = .008;
     if (smart) {
@@ -881,6 +941,7 @@
   }
 
   function step(duel, dt) {
+    arena = duel.arena;
     duel.time += dt;
     // Rotate who acts first so no one wins ties.
     const n = duel.fighters.length, first = (Math.floor(duel.time * 60) + 1) % n;

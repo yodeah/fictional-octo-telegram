@@ -1,7 +1,9 @@
 // The picture: a high three-quarter camera over a painted Underworld arena, inked procedural
 // fighters built from 3D joints, and all effects. Reads the duel, never changes it.
 (function (root) {
-  const { weapons, shields, spells, arena, moves } = root.HadesData;
+  const { weapons, shields, spells, maps, moves } = root.HadesData;
+  // The map being shown; draw() switches it to the bout's and repaints the scenery.
+  let arena = maps.temple, mapKey = 'temple';
   const Sprites = root.HadesSprites;
 
   const K = .64;      // how much floor depth is foreshortened
@@ -12,7 +14,7 @@
   const reducedMotion = root.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   let canvas, ctx, width = 0, height = 0, unit = 40, dpr = 1;
-  let floor, decals, decalCtx, pillarSprite, brazierSprite;
+  let floor, decals, decalCtx, brazierSprite, obstacleArt = [];
   const bounds = { x: -15, y: -10, w: 30, h: 20 }; // painted area, in screen units
   const camera = { x: 0, y: 0, zoom: 1 };
   let particles = [], floaters = [], trails = [], ghosts = [], rings = [], pools = [];
@@ -51,15 +53,14 @@
   }
 
   function paintFloor(g) {
+    const t = theme();
     const r = noise(71);
     const water = g.createRadialGradient(0, 0, 3, 0, 0, 17);
-    water.addColorStop(0, '#127a6c');
-    water.addColorStop(.55, '#14305c');
-    water.addColorStop(1, '#14082a');
+    t.moat.forEach((color, i) => water.addColorStop([0, .55, 1][i], color));
     g.fillStyle = water;
     g.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
     for (let i = 0; i < 260; i++) {
-      g.strokeStyle = `rgba(${90 + r() * 80},230,210,${.04 + r() * .09})`;
+      g.strokeStyle = t.ripple(r);
       g.lineWidth = .04;
       const x = bounds.x + r() * bounds.w, y = bounds.y + r() * bounds.h;
       g.beginPath();
@@ -67,34 +68,33 @@
       g.quadraticCurveTo(x + .5, y - .12, x + 1 + r(), y);
       g.stroke();
     }
-    cavern(g);
+    t.backdrop(g);
     const rx = arena.a + .75, ry = (arena.b + .75) * K;
-    platformWall(g, rx, ry);
+    platformWall(g, rx, ry, t.wall);
     ellipsePath(g, 0, 0, rx, ry);
-    g.fillStyle = '#2d6a63';
+    g.fillStyle = t.platform;
     g.fill();
     g.save();
     ellipsePath(g, 0, 0, rx - .12, ry - .08);
     g.clip();
-    paving(g, r);
-    fissures(g, r);
-    seal(g, r);
+    tones = t.tones;
+    paving(g, r, t);
+    t.inlay(g, r);
     debris(g, noise(57), rx, ry);
-    floorLight(g, ry);
+    floorLight(g, ry, t.pools);
     const light = g.createRadialGradient(-2, -1.5, 1, 0, 0, rx);
-    light.addColorStop(0, 'rgba(150,255,225,.14)');
-    light.addColorStop(.65, 'rgba(10,50,60,0)');
-    light.addColorStop(1, 'rgba(2,14,24,.55)');
+    t.shade.forEach((color, i) => light.addColorStop([0, .65, 1][i], color));
     g.fillStyle = light;
     g.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+    for (const o of arena.obstacles) if (o.kind === 'pit') paintPit(g, o);
     g.restore();
-    platformRim(g, rx, ry);
-    surroundings(g, r, rx, ry);
+    platformRim(g, rx, ry, t.rim);
+    t.surroundings(g, r, rx, ry);
   }
 
   // Painted light: the sunset spills over the far side, the water throws teal up from the flanks,
   // and the rest falls toward violet shadow. Drawn inside the floor's clip.
-  function floorLight(g, ry) {
+  function floorLight(g, ry, pools) {
     const pool = (x, y, radius, rgb, alpha, mode = 'screen') => {
       g.save();
       g.globalCompositeOperation = mode;
@@ -108,16 +108,11 @@
       g.fillRect(-radius, -radius, radius * 2, radius * 2);
       g.restore();
     };
-    pool(0, -ry - .5, 7.5, '255,120,120', .34);
-    pool(-10.5, .5, 6, '60,255,215', .2);
-    pool(10.5, .5, 6, '60,255,215', .2);
-    pool(0, .2, 4.2, '255,225,160', .12);
-    pool(-8, ry, 7, '60,20,110', .42, 'multiply');
-    pool(8, ry, 7, '60,20,110', .42, 'multiply');
+    for (const [x, y, radius, rgb, alpha, mode] of pools(ry)) pool(x, y, radius, rgb, alpha, mode);
   }
 
   // The drop below the floor: a lit stone wall with arched niches, falling into shadow.
-  function platformWall(g, rx, ry) {
+  function platformWall(g, rx, ry, P) {
     const deep = 1.5;
     ellipsePath(g, 0, deep + .12, rx + .22, ry + .1);
     g.fillStyle = 'rgba(0,8,16,.6)';
@@ -126,7 +121,7 @@
     for (let i = slices; i >= 0; i--) {
       const t = i / slices;
       ellipsePath(g, 0, t * deep, rx, ry);
-      g.fillStyle = `hsl(${184 + t * 55}, 38%, ${25 - t * 17}%)`;
+      g.fillStyle = `hsl(${P.hue + t * P.turn}, ${P.sat}%, ${P.light - t * P.drop}%)`;
       g.fill();
     }
     const at = (a, down) => [Math.cos(a) * rx, Math.sin(a) * ry + down];
@@ -135,19 +130,19 @@
       const a = i / (count / 2) * Math.PI;
       // Buttresses between the niches.
       const [x, y] = at(a, 0);
-      shapeAt(g, [[x - .13, y + .18], [x + .13, y + .18], [x + .09, y + deep * .92], [x - .09, y + deep * .92]], '#2c5c62', .05);
-      g.fillStyle = 'rgba(170,245,225,.22)';
+      shapeAt(g, [[x - .13, y + .18], [x + .13, y + .18], [x + .09, y + deep * .92], [x - .09, y + deep * .92]], P.buttress, .05);
+      g.fillStyle = P.buttressLight;
       g.fillRect(x - .09, y + .22, .05, deep * .6);
       const mid = a + Math.PI / count;
       if (mid > Math.PI - .05) continue;
       const [mx, my] = at(mid, 0);
       const wide = .26 * Math.max(.3, Math.sin(mid));
-      shapeAt(g, [[mx - wide, my + 1.05], [mx - wide, my + .55], [mx, my + .32], [mx + wide, my + .55], [mx + wide, my + 1.05]], '#061820', .06);
+      shapeAt(g, [[mx - wide, my + 1.05], [mx - wide, my + .55], [mx, my + .32], [mx + wide, my + .55], [mx + wide, my + 1.05]], P.niche, .06);
       const lit = i % 3 === 1;
-      blob(g, mx, my + .72, .24, lit ? 'rgba(255,160,90,.28)' : 'rgba(110,255,220,.18)');
-      blob(g, mx, my + .74, .07, lit ? '#ffc07a' : '#8ff7da');
+      blob(g, mx, my + .72, .24, P.glow[lit ? 0 : 2]);
+      blob(g, mx, my + .74, .07, P.glow[lit ? 1 : 3]);
     }
-    for (const [down, wide, color] of [[.16, .13, '#8a6a30'], [deep * .94, .1, '#4c4a3a']]) {
+    for (const [down, wide, color] of [[.16, .13, P.bands[0]], [deep * .94, .1, P.bands[1]]]) {
       g.beginPath();
       g.ellipse(0, down, rx, ry, 0, 0, Math.PI);
       g.strokeStyle = ink;
@@ -160,7 +155,7 @@
   }
 
   // The edge of the floor: a Greek key inlaid in gold, a heavy lip and jeweled bosses.
-  function platformRim(g, rx, ry) {
+  function platformRim(g, rx, ry, P) {
     const keys = 58;
     // u runs around the ring (one key per unit), v from the edge inward.
     const at = (u, v) => {
@@ -175,24 +170,24 @@
     g.lineJoin = 'round';
     path([...ring(.12), ...ring(.72).reverse()]);
     g.closePath();
-    g.fillStyle = 'rgba(8,26,34,.82)';
+    g.fillStyle = P.band;
     g.fill();
     for (const v of [.2, .66]) {
       path(ring(v));
-      g.strokeStyle = 'rgba(201,164,84,.85)';
+      g.strokeStyle = P.line;
       g.lineWidth = .045;
       g.stroke();
     }
     for (let i = 0; i < keys; i++) {
       path([[i, .58], [i, .28], [i + .76, .28], [i + .76, .5], [i + .26, .5], [i + .26, .39], [i + .5, .39]]);
-      g.strokeStyle = '#d2ab58';
+      g.strokeStyle = P.key;
       g.lineWidth = .055;
       g.stroke();
       path([[i, .58], [i + 1, .58]]);
       g.stroke();
     }
     ellipsePath(g, 0, 0, rx - .06, ry - .04);
-    for (const [wide, color] of [[.32, ink], [.2, '#8f6c2e'], [.07, '#f0cf7e']]) {
+    for (const [wide, color] of [[.32, ink], [.2, P.lip[0]], [.07, P.lip[1]]]) {
       g.strokeStyle = color;
       g.lineWidth = wide;
       g.stroke();
@@ -201,11 +196,11 @@
       const [x, y] = at(i / 24 * keys, .06);
       const big = i % 3 === 0, size = big ? .27 : .15;
       blob(g, x, y, size, ink);
-      blob(g, x, y - .02, size * .74, '#c79c48');
-      blob(g, x - size * .18, y - size * .22, size * .22, '#ffeaa8');
+      blob(g, x, y - .02, size * .74, P.boss[0]);
+      blob(g, x - size * .18, y - size * .22, size * .22, P.boss[1]);
       if (!big) continue;
       blob(g, x, y - .02, size * .42, ink);
-      blob(g, x, y - .02, size * .32, i % 6 ? '#6ff0cd' : '#ff6a7c');
+      blob(g, x, y - .02, size * .32, P.gems[i % 6 ? 0 : 1]);
       blob(g, x - .03, y - .06, size * .1, '#ffffff');
     }
   }
@@ -275,8 +270,8 @@
   }
 
   // A drowned temple on the horizon: colonnades, broken pediments and lit doorways.
-  function ruins(g, r) {
-    const stoneDark = '#2b1440', stoneLit = '#6b2e63';
+  function ruins(g, r, P = { dark: '#2b1440', lit: '#6b2e63', door: '#ffc176', doorGlow: 'rgba(255,190,110,.16)' }) {
+    const stoneDark = P.dark, stoneLit = P.lit;
     for (const [cx, columns, tall, broken] of [[-10.6, 4, 2.1, true], [-5.4, 5, 1.7, false], [5.6, 5, 1.7, false], [10.8, 4, 2.2, true], [0, 3, 1.15, true]]) {
       const base = -5.75, wide = columns * .52;
       shapeAt(g, [[cx - wide / 2 - .3, base + .5], [cx - wide / 2 - .15, base], [cx + wide / 2 + .15, base], [cx + wide / 2 + .3, base + .5]], stoneDark, .05);
@@ -289,15 +284,15 @@
         if (high === tall) g.fillRect(x - .17, base - high - .07, .34, .07);
         // A doorway glows between some of the columns.
         if (i < columns - 1 && r() < .5) {
-          blob(g, x + .26, base - .28, .34, 'rgba(255,190,110,.16)');
-          shapeAt(g, [[x + .18, base], [x + .18, base - .34], [x + .26, base - .46], [x + .34, base - .34], [x + .34, base]], '#ffc176', .03);
+          blob(g, x + .26, base - .28, .34, P.doorGlow);
+          shapeAt(g, [[x + .18, base], [x + .18, base - .34], [x + .26, base - .46], [x + .34, base - .34], [x + .34, base]], P.door, .03);
         }
       }
       const y = base - tall - .07;
       if (!broken) {
         shapeAt(g, [[cx - wide / 2 - .1, y], [cx - wide / 2 - .1, y - .2], [cx + wide / 2 + .1, y - .2], [cx + wide / 2 + .1, y]], stoneLit, .05);
         shapeAt(g, [[cx - wide / 2 - .2, y - .2], [cx, y - .85], [cx + wide / 2 + .2, y - .2]], stoneDark, .05);
-        blob(g, cx, y - .43, .12, '#ffc176');
+        blob(g, cx, y - .43, .12, P.door);
       } else {
         shapeAt(g, [[cx - wide / 2 - .1, y], [cx - wide / 2 - .1, y - .2], [cx - .1, y - .2], [cx + .12, y]], stoneLit, .05);
       }
@@ -305,12 +300,12 @@
   }
 
   // Islands of rock in the dark water, then the colonnade and guardians along the far side.
-  function surroundings(g, r, rx, ry) {
+  function surroundings(g, r, rx, ry, L = {}) {
     for (let i = 0; i < 46; i++) {
       const a = r() * Math.PI * 2, far = 1.12 + r() * .5;
       const x = Math.cos(a) * rx * far, y = Math.sin(a) * ry * far;
       if (y < -5.2) continue;
-      rock(g, x, y, .25 + r() * .6, r);
+      rock(g, x, y, .25 + r() * .6, r, L.rock);
     }
     const around = (a, out = 1.05) => [Math.cos(a) * (rx + out), Math.sin(a) * (ry + out * .9)];
     for (let i = 0; i < 30; i++) {
@@ -327,8 +322,8 @@
       g.save();
       g.translate(x, y);
       g.scale(.66, .66);
-      if (kind === 'column') column(g, 0, 0, tall * .8, r);
-      else statue(g, 0, 0, x > .1 ? -1 : 1);
+      if (kind === 'column') column(g, 0, 0, tall * .8, r, L.column);
+      else statue(g, 0, 0, x > .1 ? -1 : 1, L.statue);
       g.restore();
     }
   }
@@ -433,40 +428,53 @@
     g.stroke();
   }
 
-  function rock(g, x, y, s, r) {
+  const rockLooks = {
+    temple: { ring: 'rgba(110,235,215,.2)', under: '#0c2432', top: r => `hsl(${178 + r() * 40}, 32%, ${18 + r() * 9}%)`, lit: 'rgba(150,235,215,.16)' },
+    forge: { ring: 'rgba(255,150,60,.28)', under: '#140605', top: r => `hsl(${8 + r() * 18}, 14%, ${12 + r() * 8}%)`, lit: 'rgba(255,140,70,.22)' },
+    garden: { ring: 'rgba(255,250,220,.3)', under: '#2c4a3c', top: r => `hsl(${70 + r() * 50}, 24%, ${34 + r() * 12}%)`, lit: 'rgba(255,250,210,.25)' }
+  };
+  function rock(g, x, y, s, r, P = rockLooks.temple) {
     const top = Array.from({ length: 7 }, (_, i) => {
       const a = i / 7 * Math.PI * 2, reach = s * (.7 + r() * .55);
       return [x + Math.cos(a) * reach, y + Math.sin(a) * reach * .5];
     });
-    g.strokeStyle = 'rgba(110,235,215,.2)';
+    g.strokeStyle = P.ring;
     g.lineWidth = .06;
     ellipsePath(g, x, y + s * .42, s * 1.35, s * .55);
     g.stroke();
-    shapeAt(g, [top[0], [x + s * .6, y + s * .55], [x, y + s * .8], [x - s * .65, y + s * .5], top[3], top[2], top[1]], '#0c2432');
-    shapeAt(g, top, `hsl(${178 + r() * 40}, 32%, ${18 + r() * 9}%)`, .05);
-    shapeAt(g, [top[4], top[5], top[6], [x, y - s * .05]], 'rgba(150,235,215,.16)', 0);
+    shapeAt(g, [top[0], [x + s * .6, y + s * .55], [x, y + s * .8], [x - s * .65, y + s * .5], top[3], top[2], top[1]], P.under);
+    shapeAt(g, top, P.top(r), .05);
+    shapeAt(g, [top[4], top[5], top[6], [x, y - s * .05]], P.lit, 0);
   }
 
+  const statueLooks = {
+    temple: { base: '#1b414a', band: '#8d7440', bandShade: '#6d5830', robe: '#3f7478', robeShade: '#24505a', fold: '#1d444e', hood: '#4b8586',
+      face: '#07151d', eyeGlow: 'rgba(120,255,220,.22)', eye: '#c8fff0', blade: '#a9c9c9', bladeShade: '#5e868e', guard: '#c39b4c' },
+    forge: { base: '#2a1410', band: '#9a6a32', bandShade: '#6a4422', robe: '#5a3a2c', robeShade: '#3a2218', fold: '#2e1a12', hood: '#6e4a36',
+      face: '#120604', eyeGlow: 'rgba(255,140,60,.3)', eye: '#ffd08a', blade: '#8a8f96', bladeShade: '#4c5058', guard: '#c08a3a' },
+    garden: { base: '#9a9a86', band: '#d8b45c', bandShade: '#a8883e', robe: '#ece6d2', robeShade: '#bdb59c', fold: '#cfc7ae', hood: '#f4efe0',
+      face: '#3a4a52', eyeGlow: 'rgba(255,240,170,.3)', eye: '#fff6c8', blade: '#f0f2f0', bladeShade: '#b4bab8', guard: '#e2bc62' }
+  };
   // A hooded guardian leaning on a greatsword, facing into the arena.
-  function statue(g, x, y, turn) {
+  function statue(g, x, y, turn, P = statueLooks.temple) {
     const at = list => list.map(([dx, dy]) => [x + dx * turn, y - dy]);
-    shapeAt(g, at([[-.95, 0], [-.8, .5], [.8, .5], [.95, 0]]), '#1b414a');
-    shapeAt(g, at([[-.95, .5], [-.95, .66], [.95, .66], [.95, .5]]), '#8d7440');
-    shapeAt(g, at([[-.75, .66], [-.58, 1.9], [-.3, 2.35], [.3, 2.35], [.58, 1.9], [.75, .66]]), '#3f7478');
-    shapeAt(g, at([[.05, .68], [.12, 2.3], [.3, 2.35], [.58, 1.9], [.75, .66]]), '#24505a', 0);
-    for (const fold of [-.46, -.2, .3, .54]) shapeAt(g, at([[fold, .68], [fold * .55, 1.7], [fold + .07, .68]]), '#1d444e', 0);
-    shapeAt(g, at([[-.36, 2.2], [-.42, 2.75], [0, 3.15], [.42, 2.75], [.36, 2.2], [0, 2.05]]), '#4b8586');
-    shapeAt(g, at([[-.22, 2.35], [-.24, 2.7], [0, 2.86], [.24, 2.7], [.22, 2.35], [0, 2.22]]), '#07151d', .04);
+    shapeAt(g, at([[-.95, 0], [-.8, .5], [.8, .5], [.95, 0]]), P.base);
+    shapeAt(g, at([[-.95, .5], [-.95, .66], [.95, .66], [.95, .5]]), P.band);
+    shapeAt(g, at([[-.75, .66], [-.58, 1.9], [-.3, 2.35], [.3, 2.35], [.58, 1.9], [.75, .66]]), P.robe);
+    shapeAt(g, at([[.05, .68], [.12, 2.3], [.3, 2.35], [.58, 1.9], [.75, .66]]), P.robeShade, 0);
+    for (const fold of [-.46, -.2, .3, .54]) shapeAt(g, at([[fold, .68], [fold * .55, 1.7], [fold + .07, .68]]), P.fold, 0);
+    shapeAt(g, at([[-.36, 2.2], [-.42, 2.75], [0, 3.15], [.42, 2.75], [.36, 2.2], [0, 2.05]]), P.hood);
+    shapeAt(g, at([[-.22, 2.35], [-.24, 2.7], [0, 2.86], [.24, 2.7], [.22, 2.35], [0, 2.22]]), P.face, .04);
     for (const dx of [-.09, .09]) {
-      blob(g, x + dx, y - 2.55, .09, 'rgba(120,255,220,.22)');
-      blob(g, x + dx, y - 2.55, .035, '#c8fff0');
+      blob(g, x + dx, y - 2.55, .09, P.eyeGlow);
+      blob(g, x + dx, y - 2.55, .035, P.eye);
     }
-    shapeAt(g, at([[-.09, 1.7], [-.14, .78], [0, .62], [.14, .78], [.09, 1.7]]), '#a9c9c9');
-    shapeAt(g, at([[0, 1.7], [.09, 1.7], [.14, .78], [0, .62]]), '#5e868e', 0);
-    shapeAt(g, at([[-.4, 1.68], [-.4, 1.86], [.4, 1.86], [.4, 1.68]]), '#c39b4c');
-    shapeAt(g, at([[-.34, 1.86], [-.2, 2.12], [.2, 2.12], [.34, 1.86]]), '#4b8586');
-    shapeAt(g, at([[-.62, 1.85], [-.9, 2.2], [-.42, 2.28], [-.3, 2.05]]), '#8d7440');
-    shapeAt(g, at([[.62, 1.85], [.9, 2.2], [.42, 2.28], [.3, 2.05]]), '#6d5830');
+    shapeAt(g, at([[-.09, 1.7], [-.14, .78], [0, .62], [.14, .78], [.09, 1.7]]), P.blade);
+    shapeAt(g, at([[0, 1.7], [.09, 1.7], [.14, .78], [0, .62]]), P.bladeShade, 0);
+    shapeAt(g, at([[-.4, 1.68], [-.4, 1.86], [.4, 1.86], [.4, 1.68]]), P.guard);
+    shapeAt(g, at([[-.34, 1.86], [-.2, 2.12], [.2, 2.12], [.34, 1.86]]), P.hood);
+    shapeAt(g, at([[-.62, 1.85], [-.9, 2.2], [-.42, 2.28], [-.3, 2.05]]), P.band);
+    shapeAt(g, at([[.62, 1.85], [.9, 2.2], [.42, 2.28], [.3, 2.05]]), P.bandShade);
   }
 
   // One cut stone: face, lit upper edge, shaded lower edge and a few chips.
@@ -488,7 +496,7 @@
     g.save();
     path();
     g.clip();
-    for (const [dx, dy, tone] of [[.07, .09, 'rgba(190,255,235,.22)'], [-.08, -.1, 'rgba(0,8,24,.5)']]) {
+    for (const [dx, dy, tone] of [[.07, .09, tones.lit], [-.08, -.1, tones.dark]]) {
       g.save();
       g.translate(dx, dy);
       path();
@@ -498,10 +506,10 @@
       g.restore();
     }
     for (let i = 0; i < 7; i++) {
-      blob(g, cx + (r() - .5) * 1.1, cy + (r() - .5) * 1.1, .02 + r() * .06, r() < .5 ? 'rgba(0,20,30,.24)' : 'rgba(180,240,220,.12)');
+      blob(g, cx + (r() - .5) * 1.1, cy + (r() - .5) * 1.1, .02 + r() * .06, r() < .5 ? tones.chipDark : tones.chipLit);
     }
     if (r() < .3) {
-      g.strokeStyle = 'rgba(4,20,28,.65)';
+      g.strokeStyle = tones.crack;
       g.lineWidth = .028;
       let x = cx + (r() - .5) * .6, y = cy - .6;
       g.beginPath();
@@ -513,12 +521,15 @@
   }
 
   const stoneColor = (r, lift = 0) => `hsl(${172 + r() * 34}, ${26 + r() * 18}%, ${16 + r() * 10 + lift * .7}%)`;
+  // The light and dark edges, chips and cracks of cut stone; set per map by paintFloor.
+  let tones;
 
   // Uneven flagstones on the diagonal, ringed by a course of curved stones around the seal.
-  function paving(g, r) {
+  function paving(g, r, t) {
+    const stoneColor = t.stone;
     g.save();
     g.scale(1, K);
-    g.fillStyle = '#0d2a30';
+    g.fillStyle = t.grout;
     g.fillRect(-14, -12, 28, 24);
     g.save();
     g.rotate(Math.PI / 4);
@@ -551,7 +562,7 @@
   }
 
   // Cracks where the light of the underworld shows through.
-  function fissures(g, r) {
+  function fissures(g, r, colors = ['rgba(60,255,200,.09)', 'rgba(80,255,210,.22)', '#04141a', '#8dffe0']) {
     g.save();
     g.scale(1, K);
     g.lineCap = g.lineJoin = 'round';
@@ -562,7 +573,7 @@
         const a = heading + (r() - .5) * 1.5;
         points.push([x += Math.cos(a) * .52, y += Math.sin(a) * .52]);
       }
-      for (const [w, color] of [[.46, 'rgba(60,255,200,.09)'], [.2, 'rgba(80,255,210,.22)'], [.1, '#04141a'], [.035, '#8dffe0']]) {
+      for (const [w, color] of [.46, .2, .1, .035].map((w, i) => [w, colors[i]])) {
         for (let i = 1; i < points.length; i++) {
           g.strokeStyle = color;
           g.lineWidth = w * (1 - i / points.length * .75);
@@ -618,30 +629,38 @@
     g.restore();
   }
 
+  const columnLooks = {
+    temple: { plinth: '#8d7440', step: '#1f4a52', shaft: '#2f626a', lit: 'rgba(170,250,230,.28)', lit2: 'rgba(170,250,230,.12)', dark: 'rgba(2,14,26,.3)',
+      dark2: 'rgba(2,14,26,.5)', band: '#b28d47', bowl: '#6d5830', rim: '#d4ad5c', glow: ['rgba(80,255,210,.08)', 'rgba(100,255,220,.16)'], flame: '#4fe8c4', core: '#e4fff6' },
+    forge: { plinth: '#6a4426', step: '#2a1612', shaft: '#3a2a26', lit: 'rgba(255,170,110,.22)', lit2: 'rgba(255,170,110,.1)', dark: 'rgba(0,0,0,.3)',
+      dark2: 'rgba(0,0,0,.5)', band: '#9a6430', bowl: '#5a3820', rim: '#c48a44', glow: ['rgba(255,120,40,.1)', 'rgba(255,150,60,.2)'], flame: '#ff8a2a', core: '#fff0b0', rock: rockLooks.forge },
+    garden: { plinth: '#d6b25a', step: '#b8b29a', shaft: '#e6dfc8', lit: 'rgba(255,255,245,.4)', lit2: 'rgba(255,255,245,.18)', dark: 'rgba(80,80,60,.18)',
+      dark2: 'rgba(80,80,60,.32)', band: '#d8b45c', bowl: '#a8883e', rim: '#f0d27e', glow: ['rgba(255,220,130,.1)', 'rgba(255,230,150,.2)'], flame: '#ffc85a', core: '#fffbe0', rock: rockLooks.garden }
+  };
   // A fluted column; the taller ones carry a fire bowl, the rest are snapped off.
-  function column(g, x, y, tall, r) {
+  function column(g, x, y, tall, r, P = columnLooks.temple) {
     const box = (x0, y0, w, h, color, line) => shapeAt(g, [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]], color, line);
-    box(x - .62, y - .22, 1.24, .24, '#8d7440');
-    box(x - .5, y - .38, 1, .17, '#1f4a52');
+    box(x - .62, y - .22, 1.24, .24, P.plinth);
+    box(x - .5, y - .38, 1, .17, P.step);
     const broken = tall < 1.75;
     const crown = broken ? [[x - .4, y - tall], [x - .14, y - tall + .22], [x + .04, y - tall - .14], [x + .2, y - tall + .16], [x + .4, y - tall + .02]]
       : [[x - .38, y - tall], [x + .38, y - tall]];
-    shapeAt(g, [[x - .43, y - .36], ...crown, [x + .43, y - .36]], '#2f626a');
-    for (const [dx, w, color] of [[-.33, .13, 'rgba(170,250,230,.28)'], [-.1, .09, 'rgba(170,250,230,.12)'], [.1, .12, 'rgba(2,14,26,.3)'], [.28, .13, 'rgba(2,14,26,.5)']]) {
+    shapeAt(g, [[x - .43, y - .36], ...crown, [x + .43, y - .36]], P.shaft);
+    for (const [dx, w, color] of [[-.33, .13, P.lit], [-.1, .09, P.lit2], [.1, .12, P.dark], [.28, .13, P.dark2]]) {
       box(x + dx, y - tall + .26, w, tall - .62, color, 0);
     }
-    box(x - .46, y - .62, .92, .13, '#b28d47', .05);
+    box(x - .46, y - .62, .92, .13, P.band, .05);
     if (broken) {
-      for (let k = 0; k < 3; k++) rock(g, x + (r() - .5) * 1.8, y + .15, .14 + r() * .16, r);
+      for (let k = 0; k < 3; k++) rock(g, x + (r() - .5) * 1.8, y + .15, .14 + r() * .16, r, P.rock);
       return;
     }
-    box(x - .55, y - tall - .2, 1.1, .22, '#b28d47');
-    shapeAt(g, [[x - .62, y - tall - .55], [x + .62, y - tall - .55], [x + .34, y - tall - .2], [x - .34, y - tall - .2]], '#6d5830');
-    box(x - .68, y - tall - .66, 1.36, .13, '#d4ad5c', .05);
-    for (const [dx, dy, rad, color] of [[0, 1.25, 1.3, 'rgba(80,255,210,.08)'], [0, .95, .7, 'rgba(100,255,220,.16)']]) blob(g, x, y - tall - dy, rad, color);
+    box(x - .55, y - tall - .2, 1.1, .22, P.band);
+    shapeAt(g, [[x - .62, y - tall - .55], [x + .62, y - tall - .55], [x + .34, y - tall - .2], [x - .34, y - tall - .2]], P.bowl);
+    box(x - .68, y - tall - .66, 1.36, .13, P.rim, .05);
+    for (const [dx, dy, rad, color] of [[0, 1.25, 1.3, P.glow[0]], [0, .95, .7, P.glow[1]]]) blob(g, x, y - tall - dy, rad, color);
     shapeAt(g, [[x - .4, y - tall - .66], [x - .18, y - tall - 1.2], [x - .08, y - tall - .95], [x + .06, y - tall - 1.55],
-      [x + .2, y - tall - 1.02], [x + .34, y - tall - 1.18], [x + .42, y - tall - .66]], '#4fe8c4', .04);
-    shapeAt(g, [[x - .2, y - tall - .66], [x - .04, y - tall - 1.06], [x + .08, y - tall - .86], [x + .22, y - tall - .66]], '#e4fff6', 0);
+      [x + .2, y - tall - 1.02], [x + .34, y - tall - 1.18], [x + .42, y - tall - .66]], P.flame, .04);
+    shapeAt(g, [[x - .2, y - tall - .66], [x - .04, y - tall - 1.06], [x + .08, y - tall - .86], [x + .22, y - tall - .66]], P.core, 0);
   }
 
   function urn(g, x, y, s) {
@@ -821,6 +840,7 @@
 
   // Falling water and mist are painted once and slid past each frame.
   function paintWeather() {
+    const t = theme();
     fallArt = makeCanvas(96, 256);
     let g = fallArt.getContext('2d');
     const r = noise(41);
@@ -828,9 +848,9 @@
       const x = 6 + r() * 84, y = r() * 256, long = 30 + r() * 100, wide = 1 + r() * 4;
       for (const shift of [0, -256]) {
         const streak = g.createLinearGradient(0, y + shift, 0, y + shift + long);
-        streak.addColorStop(0, 'rgba(120,255,225,0)');
-        streak.addColorStop(.7, `rgba(${150 + r() * 100},255,235,${.35 + r() * .5})`);
-        streak.addColorStop(1, 'rgba(120,255,225,0)');
+        streak.addColorStop(0, `rgba(${t.fall.edge},0)`);
+        streak.addColorStop(.7, `rgba(${t.fall.core(r)},${.35 + r() * .5})`);
+        streak.addColorStop(1, `rgba(${t.fall.edge},0)`);
         g.fillStyle = streak;
         g.fillRect(x, y + shift, wide, long);
       }
@@ -841,9 +861,9 @@
     for (let i = 0; i < 64; i++) {
       const edge = Math.sin((i + .5) / 64 * Math.PI) ** 2;
       const fade = g.createLinearGradient(0, 0, 0, 512);
-      fade.addColorStop(0, `rgba(255,235,205,${edge * .9})`);
-      fade.addColorStop(.6, `rgba(190,245,230,${edge * .35})`);
-      fade.addColorStop(1, 'rgba(190,245,230,0)');
+      fade.addColorStop(0, `rgba(${t.shaft[0]},${edge * .9})`);
+      fade.addColorStop(.6, `rgba(${t.shaft[1]},${edge * .35})`);
+      fade.addColorStop(1, `rgba(${t.shaft[1]},0)`);
       g.fillStyle = fade;
       g.fillRect(i * 2, 0, 2, 512);
     }
@@ -853,17 +873,18 @@
       // Puffs stop short of the ends: neighboring strips overlap there without a visible join.
       const x = 48 + r() * 416, y = 48 + (r() - .5) * 34, rad = 16 + r() * 28;
       const puff = g.createRadialGradient(x, y, 0, x, y, rad);
-      puff.addColorStop(0, 'rgba(150,235,225,.2)');
-      puff.addColorStop(1, 'rgba(150,235,225,0)');
+      puff.addColorStop(0, `rgba(${t.mist},.2)`);
+      puff.addColorStop(1, `rgba(${t.mist},0)`);
       g.fillStyle = puff;
       g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
     }
   }
 
   function drawFalls() {
+    const fall = theme().fall;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (const [x, top, bottom, wide] of [[-6.3, -7.7, -5.45, .8], [-2.5, -7.1, -5.35, .55], [2.5, -7.1, -5.35, .55], [6.3, -7.7, -5.45, .8]]) {
+    for (const [x, top, bottom, wide] of fall.at) {
       const left = sx(x - wide / 2), width = wide * unit, from = top * unit, height = (bottom - top) * unit;
       ctx.save();
       ctx.beginPath();
@@ -874,7 +895,7 @@
       ctx.lineTo(left, from + height);
       ctx.closePath();
       ctx.clip();
-      ctx.fillStyle = 'rgba(45,190,175,.2)';
+      ctx.fillStyle = fall.sheet;
       ctx.fillRect(left, from, width, height);
       for (const [speed, alpha] of [[1.5, .55], [.9, .3]]) {
         const slide = (clock * speed + x) % 1 * height;
@@ -884,11 +905,11 @@
       }
       ctx.restore();
       const pulse = Math.sin(clock * 5 + x) * .08;
-      glow(sx(x), bottom * unit, unit * wide * (1.15 + pulse), '110,255,220', .42);
-      glow(sx(x), top * unit, unit * wide * .7, '110,255,220', .22);
+      glow(sx(x), bottom * unit, unit * wide * (1.15 + pulse), fall.glow, .42);
+      glow(sx(x), top * unit, unit * wide * .7, fall.glow, .22);
       for (let i = 0; i < 5; i++) {
         const t = (clock * .9 + i / 5 + x) % 1;
-        glow(sx(x + (i - 2) * wide * .22), (bottom - Math.sin(t * Math.PI) * .45) * unit, unit * .09, '200,255,240', 1 - t);
+        glow(sx(x + (i - 2) * wide * .22), (bottom - Math.sin(t * Math.PI) * .45) * unit, unit * .09, fall.spray, 1 - t);
       }
     }
     ctx.restore();
@@ -896,16 +917,17 @@
 
   // The audience: shades of the dead, painted calm and cheering.
   function paintShades(res) {
+    const P = theme().shades;
     shadeArt = [false, true].map(cheer => {
       const c = makeCanvas(1.5 * res, 1.9 * res), g = c.getContext('2d');
       g.setTransform(res, 0, 0, res, .75 * res, 1.7 * res);
       const body = g.createLinearGradient(0, -1.35, 0, .1);
-      body.addColorStop(0, '#9ef5e0');
-      body.addColorStop(.6, '#3f9fb0');
-      body.addColorStop(1, 'rgba(40,80,140,0)');
+      body.addColorStop(0, P.top);
+      body.addColorStop(.6, P.mid);
+      body.addColorStop(1, P.end);
       if (cheer) for (const side of [-1, 1]) {
-        shapeAt(g, [[side * .2, -.68], [side * .62, -1.24], [side * .7, -1.1], [side * .32, -.5]], '#6ccfcb', .05);
-        blob(g, side * .68, -1.22, .09, '#aef8e6');
+        shapeAt(g, [[side * .2, -.68], [side * .62, -1.24], [side * .7, -1.1], [side * .32, -.5]], P.arm, .05);
+        blob(g, side * .68, -1.22, .09, P.hand);
       }
       g.beginPath();
       g.moveTo(-.4, .05);
@@ -919,12 +941,12 @@
       g.strokeStyle = 'rgba(10,20,40,.8)';
       g.lineWidth = .055;
       g.stroke();
-      shapeAt(g, [[-.2, -.92], [-.18, -1.16], [0, -1.24], [.18, -1.16], [.2, -.92], [0, -.82]], '#0a1c2c', .035);
+      shapeAt(g, [[-.2, -.92], [-.18, -1.16], [0, -1.24], [.18, -1.16], [.2, -.92], [0, -.82]], P.face, .035);
       for (const dx of [-.08, .08]) {
-        blob(g, dx, -1.02, .075, 'rgba(190,255,235,.35)');
-        blob(g, dx, -1.02, cheer ? .04 : .03, '#f2fffa');
+        blob(g, dx, -1.02, .075, P.eye);
+        blob(g, dx, -1.02, cheer ? .04 : .03, P.pupil);
       }
-      if (cheer) blob(g, 0, -.9, .045, '#bfffee');
+      if (cheer) blob(g, 0, -.9, .045, P.mouth);
       return c;
     });
   }
@@ -947,7 +969,7 @@
       ctx.globalAlpha = .62 + keen * .3;
       ctx.drawImage(art, sx(x - .75 * size), (y + bob - hop - 1.7 * size) * unit, 1.5 * size * unit, 1.9 * size * unit);
       ctx.globalCompositeOperation = 'lighter';
-      glow(sx(x), (y + bob - hop - .7 * size) * unit, unit * .65, '90,230,220', .12 + keen * .2);
+      glow(sx(x), (y + bob - hop - .7 * size) * unit, unit * .65, theme().shades.glow, .12 + keen * .2);
     });
     ctx.restore();
   }
@@ -955,7 +977,7 @@
   function drawShafts() {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (const [x, wide, long, lean, phase] of [[-7.4, 2.2, 10.5, -.42, 0], [-3.2, 1.1, 9, -.36, 2.1], [3.9, 2.7, 11, -.4, 4.2], [8.6, 1.3, 9.5, -.34, 1.3]]) {
+    for (const [x, wide, long, lean, phase] of theme().shafts) {
       ctx.save();
       ctx.translate(sx(x), -7.6 * unit);
       ctx.rotate(lean + Math.sin(clock * .23 + phase) * .025);
@@ -1000,19 +1022,696 @@
     if (old) {
       decalCtx.drawImage(old, bounds.x, bounds.y, bounds.w, bounds.h);
     }
-    pillarSprite = makeCanvas(3 * res, 3.4 * res);
     brazierSprite = makeCanvas(2 * res, 2 * res);
     const bg = brazierSprite.getContext('2d');
     bg.setTransform(res, 0, 0, res, res, 1.6 * res);
     paintBrazier(bg);
-    const g = pillarSprite.getContext('2d');
-    g.setTransform(res, 0, 0, res, 1.5 * res, 2.5 * res);
-    paintPillar(g, arena.pillars[0].r);
+    obstacleArt = paintObstacles(res);
+    if (!lavaArt) paintLava();
     Sprites.setResolution(unit * dpr * 1.25);
     paintFrame();
     paintWeather();
     paintShades(unit * dpr * 1.25);
   }
+
+  // ---- Maps ----
+  // Each map's look: colors for the shared painters above, its own backdrop and obstacle art, and
+  // what moves on it each frame. All of it is decoration: none of it reads or changes the bout.
+
+  // A ridge of silhouettes across the backdrop.
+  function ridge(g, r, base, low, high, color, edge) {
+    const left = bounds.x, right = bounds.x + bounds.w;
+    const points = [[left, base + 1]];
+    for (let x = left; x <= right; x += .5 + r() * .8) points.push([x, base - low - r() ** 2 * (high - low)]);
+    points.push([right, base - low], [right, base + 1]);
+    shapeAt(g, points, color, 0);
+    g.strokeStyle = edge;
+    g.lineWidth = .05;
+    g.beginPath();
+    points.slice(1, -1).forEach(([x, y], i) => g[i ? 'lineTo' : 'moveTo'](x, y));
+    g.stroke();
+  }
+
+  function band(g, top, bottom, stops) {
+    const fill = g.createLinearGradient(0, top, 0, bottom);
+    stops.forEach(([at, color]) => fill.addColorStop(at, color));
+    g.fillStyle = fill;
+    g.fillRect(bounds.x, top, bounds.w, bottom - top);
+  }
+
+  function radial(g, x, y, radius, stops) {
+    const fill = g.createRadialGradient(x, y, .1, x, y, radius);
+    stops.forEach(([at, color]) => fill.addColorStop(at, color));
+    g.fillStyle = fill;
+    g.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+  }
+
+  // A hanging chain: open links alternate with links seen edge-on.
+  function chain(g, x, from, to, sway = 0) {
+    for (let y = from, k = 0; y < to; y += .3, k++) {
+      const cx = x + sway * ((y - from) / (to - from)) ** 2;
+      if (k % 2) {
+        ellipsePath(g, cx, y, .1, .19);
+        g.strokeStyle = ink;
+        g.lineWidth = .08;
+        g.stroke();
+        g.strokeStyle = '#4a3a34';
+        g.lineWidth = .04;
+        g.stroke();
+      } else shapeAt(g, [[cx - .035, y - .2], [cx + .035, y - .2], [cx + .035, y + .2], [cx - .035, y + .2]], '#5a463c', .03);
+    }
+  }
+
+  // The far side of the forge: smoke and ember light, chimneys of the great forges and a colossal
+  // anvil on the shore of the molten lake, chains hanging from the dark.
+  function forgeBackdrop(g) {
+    const r = noise(911);
+    const left = bounds.x, right = bounds.x + bounds.w, top = bounds.y;
+    band(g, top, -3.8, [[0, '#0a0405'], [.4, '#2a0b0a'], [.64, '#7a2410'], [.76, 'rgba(110,40,22,.95)'], [1, 'rgba(90,30,16,0)']]);
+    radial(g, 0, -6.2, 6, [[0, 'rgba(255,200,110,.75)'], [.3, 'rgba(255,110,40,.35)'], [1, 'rgba(255,80,30,0)']]);
+    ridge(g, r, -6.1, .35, 2.2, '#2a0d0b', 'rgba(255,140,70,.5)');
+    for (const [x, tall, wide] of [[-10.4, 2.6, .9], [-6.8, 3.1, 1.1], [6.9, 3.2, 1.1], [10.5, 2.5, .9]]) {
+      const base = -5.7;
+      for (let k = 0; k < 6; k++) blob(g, x + (r() - .5) * .8 + k * .14, base - tall - .4 - k * .5, .45 + k * .18, `rgba(28,12,12,${.55 - k * .07})`);
+      shapeAt(g, [[x - wide / 2, base], [x - wide * .36, base - tall], [x + wide * .36, base - tall], [x + wide / 2, base]], '#1c0a09', .05);
+      g.fillStyle = 'rgba(255,120,50,.3)';
+      g.fillRect(x - wide * .36 + .05, base - tall + .1, .07, tall - .2);
+      shapeAt(g, [[x - wide * .44, base - tall], [x - wide * .44, base - tall - .16], [x + wide * .44, base - tall - .16], [x + wide * .44, base - tall]], '#3a1a12', .04);
+      blob(g, x, base - tall - .1, wide * .5, 'rgba(255,150,60,.35)');
+      blob(g, x, base - .4, .34, 'rgba(255,170,80,.35)');
+      shapeAt(g, [[x - .16, base], [x - .16, base - .36], [x, base - .5], [x + .16, base - .36], [x + .16, base]], '#ffb060', .03);
+    }
+    // The anvil: a stepped foot, a narrow waist and a long face ending in a horn.
+    const ay = -5.68;
+    shapeAt(g, [[-1.7, ay], [-1.2, ay - .38], [-.6, ay - .46], [-.6, ay - .92], [-2.9, ay - 1.02], [-2.3, ay - 1.3], [2.2, ay - 1.3], [2.3, ay - .98],
+      [.6, ay - .92], [.6, ay - .46], [1.2, ay - .38], [1.7, ay]], '#170909', .06);
+    g.strokeStyle = 'rgba(255,160,80,.6)';
+    g.lineWidth = .05;
+    g.beginPath();
+    g.moveTo(-2.3, ay - 1.3);
+    g.lineTo(2.2, ay - 1.3);
+    g.stroke();
+    ridge(g, r, -5.5, .2, .9, '#1a0807', 'rgba(255,130,60,.4)');
+    for (let x = left; x < right; x += .55 + r() * .9) {
+      const long = .5 + r() ** 2 * 2.6 + (Math.abs(x) > 8 ? 1 : 0), wide = .18 + r() * .34;
+      shapeAt(g, [[x - wide, top], [x + wide, top], [x + wide * .6, -9.3 + long * .35], [x + r() * .1, -9.3 + long], [x - wide * .55, -9.3 + long * .3]], '#0d0505', .04);
+    }
+    for (const [x, sway] of [[-8.7, .3], [-4.9, -.2], [5.1, .25], [8.6, -.3]]) chain(g, x, top, -7.3 + Math.abs(x) * .1, sway);
+    band(g, -6.4, -4.4, [[0, 'rgba(255,120,50,0)'], [.5, 'rgba(255,130,60,.24)'], [1, 'rgba(255,100,40,0)']]);
+    for (let i = 0; i < 130; i++) {
+      const y = -5.4 + r() * 1.5, x = (r() - .5) * (2 + (y + 5.4) * 5);
+      g.fillStyle = `rgba(255,${150 + r() * 90},70,${.08 + r() * .22})`;
+      g.fillRect(x, y, .1 + r() * .55, .035);
+    }
+  }
+
+  // Elysium: a sunset over green hills, a marble temple and cypresses, a river of light below.
+  function gardenBackdrop(g) {
+    const r = noise(523);
+    const left = bounds.x, right = bounds.x + bounds.w, top = bounds.y;
+    band(g, top, -3.8, [[0, '#1c2656'], [.38, '#5052a0'], [.62, '#f0b07a'], [.75, 'rgba(240,222,176,.95)'], [1, 'rgba(200,230,200,0)']]);
+    radial(g, 0, -6.6, 5, [[0, 'rgba(255,246,206,.9)'], [.25, 'rgba(255,210,150,.35)'], [1, 'rgba(255,190,140,0)']]);
+    for (let i = 0; i < 9; i++) {
+      const y = -9.4 + r() * 2.6, x = left + r() * bounds.w;
+      g.fillStyle = `rgba(255,${210 + r() * 30},${190 + r() * 30},${.1 + r() * .12})`;
+      ellipsePath(g, x, y, 1.6 + r() * 2.4, .1 + r() * .14);
+      g.fill();
+    }
+    ridge(g, r, -6.2, .5, 2.1, '#6c6a9c', 'rgba(255,232,200,.55)');
+    ruins(g, r, { dark: '#c9c2ae', lit: '#f6f1e2', door: '#ffe6a8', doorGlow: 'rgba(255,230,160,.25)' });
+    // Cypresses: dark green flames along the far shore, kept clear of the middle.
+    for (let x = left + .4; x < right; x += .7 + r() * 1.1) {
+      if (Math.abs(x) < 2.2) continue;
+      const tall = 1.1 + r() * 1.5, wide = .22 + r() * .14, base = -5.55 - r() * .3;
+      shapeAt(g, [[x - wide, base], [x - wide * 1.1, base - tall * .45], [x - wide * .5, base - tall * .85], [x, base - tall], [x + wide * .5, base - tall * .85],
+        [x + wide * 1.1, base - tall * .45], [x + wide, base]], `hsl(${140 + r() * 20}, 30%, ${18 + r() * 8}%)`, .04);
+      g.strokeStyle = 'rgba(255,230,170,.35)';
+      g.lineWidth = .04;
+      g.beginPath();
+      g.moveTo(x - wide * 1.05, base - tall * .45);
+      g.lineTo(x - wide * .5, base - tall * .85);
+      g.lineTo(x, base - tall);
+      g.stroke();
+    }
+    ridge(g, r, -5.5, .2, .8, '#3c6250', 'rgba(255,240,200,.45)');
+    // Leaves framing the top corners.
+    for (let i = 0; i < 60; i++) {
+      const side = i % 2 ? 1 : -1, x = side * (11 + r() * 4.5), y = top + r() * 3.2 * (1 - Math.abs(x) / 30);
+      blob(g, x, y, .3 + r() * .5, `hsl(${120 + r() * 40}, ${28 + r() * 14}%, ${14 + r() * 12}%)`);
+    }
+    band(g, -6.4, -4.4, [[0, 'rgba(255,240,210,0)'], [.5, 'rgba(255,244,214,.3)'], [1, 'rgba(220,250,230,0)']]);
+    for (let i = 0; i < 130; i++) {
+      const y = -5.4 + r() * 1.5, x = (r() - .5) * (2 + (y + 5.4) * 5);
+      g.fillStyle = `rgba(255,${230 + r() * 25},${170 + r() * 60},${.1 + r() * .22})`;
+      g.fillRect(x, y, .1 + r() * .55, .035);
+    }
+  }
+
+  // Grass and small flowers in the joints of the garden's paving, and a gold laurel ring under the
+  // middle column.
+  function gardenInlay(g, r) {
+    g.save();
+    g.scale(1, K);
+    g.lineCap = 'round';
+    for (let i = 0; i < 520; i++) {
+      const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 10.6, x = Math.cos(a) * d, y = Math.sin(a) * d * .7;
+      g.strokeStyle = `hsl(${85 + r() * 40}, ${35 + r() * 25}%, ${26 + r() * 16}%)`;
+      g.lineWidth = .03 + r() * .03;
+      g.beginPath();
+      for (let k = 0; k < 3; k++) {
+        g.moveTo(x + k * .05, y);
+        g.lineTo(x + k * .05 + (r() - .5) * .14, y - .1 - r() * .16);
+      }
+      g.stroke();
+      if (r() < .22) blob(g, x + .05, y - .14, .035 + r() * .03, ['#fff6e8', '#ffd2e2', '#ffe27a', '#c8b8ff'][Math.floor(r() * 4)]);
+    }
+    // A mosaic disc inside the course of curved stones: pale marble, green and gold petals.
+    blob(g, 0, 0, 2.92, ink);
+    blob(g, 0, 0, 2.85, '#d8cfb2');
+    for (let i = 0; i < 16; i++) {
+      const a = i / 16 * Math.PI * 2;
+      g.save();
+      g.rotate(a);
+      shapeAt(g, [[2.0, 0], [2.4, -.26], [2.75, 0], [2.4, .26]], i % 2 ? '#8fb86a' : '#c9a24e', .03);
+      shapeAt(g, [[2.12, 0], [2.4, -.13], [2.62, 0], [2.4, .13]], i % 2 ? '#c4e0a0' : '#f2d27a', 0);
+      g.restore();
+    }
+    blob(g, 0, 0, 1.92, '#bfb596');
+    blob(g, 0, 0, 1.4, '#e2dac2');
+    for (const [radius, w, color] of [[1.55, .2, ink], [1.55, .13, '#a8883e'], [1.55, .05, '#f2d27a'], [1.98, .04, 'rgba(242,210,122,.7)']]) {
+      g.strokeStyle = color;
+      g.lineWidth = w;
+      ellipsePath(g, 0, 0, radius, radius);
+      g.stroke();
+    }
+    for (let i = 0; i < 28; i++) {
+      const a = i / 28 * Math.PI * 2, x = Math.cos(a) * 1.76, y = Math.sin(a) * 1.76;
+      g.save();
+      g.translate(x, y);
+      g.rotate(a + Math.PI / 2);
+      shapeAt(g, [[0, -.13], [.07, 0], [0, .13], [-.07, 0]], i % 2 ? '#7fae5a' : '#5e8e46', .025);
+      g.restore();
+    }
+    g.restore();
+  }
+
+  // The molten pit, painted into the floor: an iron-bound rim, the far inner wall lit from below
+  // and the surface of the metal with dark crust. drawPit animates it.
+  function paintPit(g, o) {
+    const r = noise(47), x = o.x, y = o.y * K, R = o.r;
+    ellipsePath(g, x, y + .08, R + .5, (R + .5) * K);
+    g.fillStyle = 'rgba(0,0,0,.45)';
+    g.fill();
+    for (let i = 0; i < 16; i++) {
+      const a0 = i / 16 * Math.PI * 2, a1 = (i + 1) / 16 * Math.PI * 2, at = (a, d) => [x + Math.cos(a) * d, y + Math.sin(a) * d * K];
+      shapeAt(g, [at(a0 + .02, R), at(a0 + .02, R + .4), at(a1 - .02, R + .4), at(a1 - .02, R)], `hsl(${10 + r() * 14}, 12%, ${14 + r() * 7}%)`, .04);
+      blob(g, ...at(a0 + .2, R + .2), .04, '#8a8f98');
+    }
+    ellipsePath(g, x, y, R + .04, (R + .04) * K);
+    g.strokeStyle = '#b06a30';
+    g.lineWidth = .05;
+    g.stroke();
+    g.save();
+    ellipsePath(g, x, y, R, R * K);
+    g.clip();
+    const wall = g.createLinearGradient(0, y - R * K, 0, y + R * K * .3);
+    wall.addColorStop(0, '#140605');
+    wall.addColorStop(.5, '#5a1608');
+    wall.addColorStop(1, '#e0601a');
+    g.fillStyle = wall;
+    g.fillRect(x - R, y - R * K, R * 2, R * K * 2);
+    for (let i = 0; i < 9; i++) {
+      const px = x - R * .9 + i * R * .22;
+      shapeAt(g, [[px, y - R * K - .1], [px + .1, y - R * K * .2 + r() * .3], [px + .2, y - R * K - .1]], 'rgba(10,2,2,.45)', 0);
+    }
+    const lava = g.createRadialGradient(x, y + .3, .1, x, y + .3, R);
+    lava.addColorStop(0, '#fff2a8');
+    lava.addColorStop(.35, '#ffb43c');
+    lava.addColorStop(.75, '#e2480e');
+    lava.addColorStop(1, '#7a1606');
+    g.fillStyle = lava;
+    ellipsePath(g, x, y + .3, R * .97, R * K * .92);
+    g.fill();
+    // Ragged plates of cooling crust, thicker toward the cooler rim.
+    for (let i = 0; i < 16; i++) {
+      const a = r() * Math.PI * 2, d = R * (.3 + r() * .62), cx = x + Math.cos(a) * d, cy = y + .3 + Math.sin(a) * d * K * .9, s = .1 + r() * .18 * d / R;
+      const plate = Array.from({ length: 8 }, (_, k) => [cx + Math.cos(k * .785 + r() * .3) * s * (.55 + r() * .6), cy + Math.sin(k * .785 + r() * .3) * s * K * (.55 + r() * .6)]);
+      shapeAt(g, plate, `rgba(${50 + r() * 30},${12 + r() * 10},6,${.45 + d / R * .35})`, 0);
+    }
+    g.restore();
+  }
+
+  // Lava texture slid across the pit each frame.
+  let lavaArt;
+  function paintLava() {
+    lavaArt = makeCanvas(256, 128);
+    const g = lavaArt.getContext('2d'), r = noise(83);
+    g.lineCap = 'round';
+    for (let i = 0; i < 26; i++) {
+      let x = r() * 256, y = r() * 128;
+      g.strokeStyle = `rgba(255,${200 + r() * 55},${110 + r() * 80},${.35 + r() * .45})`;
+      g.lineWidth = 1 + r() * 3;
+      g.beginPath();
+      g.moveTo(x, y);
+      for (let k = 0; k < 5; k++) g.lineTo(x += (r() - .3) * 30, y += (r() - .5) * 16);
+      g.stroke();
+    }
+    for (let i = 0; i < 18; i++) {
+      const x = r() * 256, y = r() * 128, rad = 8 + r() * 18;
+      const spot = g.createRadialGradient(x, y, 0, x, y, rad);
+      spot.addColorStop(0, 'rgba(255,240,170,.55)');
+      spot.addColorStop(1, 'rgba(255,160,60,0)');
+      g.fillStyle = spot;
+      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+  }
+
+  function drawPit(o) {
+    const x = sx(o.x), y = sy(o.y), R = o.r * unit;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(x, y);
+    ctx.scale(1, K);
+    glow(0, 0, R * 2.3, '255,120,40', .22 + Math.sin(clock * 1.3) * .05);
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(x, y, R, R * K, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.ellipse(x, y + .3 * unit, R * .97, R * K * .92, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    const wide = R * 2.4, tall = R * K * 2.2;
+    for (const [speed, alpha, flip] of [[.08, .5, 1], [-.05, .35, -1]]) {
+      const slide = ((clock * speed) % 1 + 1) % 1 * wide;
+      ctx.globalAlpha = alpha * (.8 + Math.sin(clock * 2.1 + flip) * .2);
+      for (const dx of [-wide, 0]) ctx.drawImage(lavaArt, x - R * 1.2 + slide + dx, y - tall / 2 + .3 * unit, wide, tall * flip);
+    }
+    ctx.globalAlpha = 1;
+    // Bubbles swell and burst in a new place each time.
+    for (let i = 0; i < 4; i++) {
+      const cycle = clock * .5 + i * .27, t = cycle % 1, seed = Math.floor(cycle) * 7 + i * 13;
+      const a = seed * 2.39, d = .2 + (seed * .618 % 1) * .6;
+      const bx = x + Math.cos(a) * R * d, by = y + .3 * unit + Math.sin(a) * R * K * .85 * d;
+      glow(bx, by, unit * (.08 + t * .22), t < .85 ? '255,240,170' : '255,255,230', t < .85 ? .6 : (1 - t) * 6);
+    }
+    ctx.restore();
+  }
+
+  // ---- Obstacle art ----
+  // Each obstacle is painted once into a sprite of its own and drawn in depth order with the
+  // fighters. A low wall is cut into short pieces so the sort stays right along it.
+  function piecesOf(o, i) {
+    if (o.kind === 'pit') return [];
+    if (o.kind === 'column') {
+      const r = noise(31 + i * 17), whole = !!o.whole, tall = whole ? 2.5 : 1.05 + r() * .7, base = o.r * 1.14;
+      return [{ x: o.x, y: o.y, left: -base - .4, top: -tall * Z - (whole ? 1.2 : .6), w: base * 2.9 + .9, h: tall * Z + base * K + (whole ? 1.6 : 1),
+        depth: o.y + .1, tall: true, x0: o.x, x1: o.x, paint: g => paintColumn(g, o, tall, whole, r), live: whole ? () => sacredFlame(o, tall) : null }];
+    }
+    if (o.kind === 'hearth') {
+      const L = o.x2 - o.x, R = o.r;
+      return [{ x: o.x, y: o.y, left: -R - .4, top: -R * K - .8 - 1.1, w: L + R * 2 + .8, h: R * K * 2 + 2.3, depth: o.y + .2, tall: true,
+        x0: o.x, x1: o.x2, paint: g => paintHearth(g, o, noise(61 + i)), live: () => hearthFire(o) }];
+    }
+    if (o.kind === 'balustrade') return balustradePieces(o);
+    return [{ x: o.x, y: o.y, left: -1.5, top: -2.5, w: 3, h: 3.4, depth: o.y + .2, tall: true, x0: o.x, x1: o.x, paint: g => paintPillar(g, o.r) }];
+  }
+
+  function paintObstacles(res) {
+    const art = [];
+    arena.obstacles.forEach((o, i) => {
+      for (const piece of piecesOf(o, i)) {
+        piece.canvas = makeCanvas(piece.w * res, piece.h * res);
+        const g = piece.canvas.getContext('2d');
+        g.setTransform(res, 0, 0, res, -piece.left * res, -piece.top * res);
+        piece.paint(g);
+        art.push(piece);
+      }
+    });
+    return art;
+  }
+
+  // A marble column on a round base, lit from the left: whole with a capital and a fire bowl, or
+  // snapped off with a rough break, ivy and moss.
+  function paintColumn(g, o, tall, whole, r) {
+    const base = o.r * 1.14, R = o.r * .84, h = tall * Z;
+    g.fillStyle = 'rgba(30,40,20,.32)';
+    ellipsePath(g, base * .5, .06, base * 1.7, base * K * 1.15);
+    g.fill();
+    const drum = (radius, from, to, light, mid, dark) => {
+      const fill = g.createLinearGradient(-radius, 0, radius, 0);
+      fill.addColorStop(0, light);
+      fill.addColorStop(.45, mid);
+      fill.addColorStop(1, dark);
+      g.beginPath();
+      g.ellipse(0, -from, radius, radius * K, 0, 0, Math.PI);
+      g.ellipse(0, -to, radius, radius * K, 0, Math.PI, 0, true);
+      g.closePath();
+      g.fillStyle = fill;
+      g.fill();
+      g.strokeStyle = ink;
+      g.lineWidth = .05;
+      g.stroke();
+    };
+    const lid = (radius, z, color) => {
+      ellipsePath(g, 0, -z, radius, radius * K);
+      g.fillStyle = color;
+      g.fill();
+      g.strokeStyle = ink;
+      g.lineWidth = .04;
+      g.stroke();
+    };
+    drum(base, 0, .2, '#f4eedc', '#d6cdb4', '#8e8774');
+    lid(base, .2, '#ebe4cf');
+    drum(base * .92, .2, .3, '#e9c56a', '#c49a46', '#7c5a26');
+    lid(base * .92, .3, '#dcb560');
+    drum(R, .3, h, '#f7f1df', '#d8cfb6', '#8f8874');
+    // Fluting follows the curve of the shaft.
+    for (let k = 1; k < 8; k++) {
+      const a = k / 8 * Math.PI, x = -Math.cos(a) * R, bow = Math.sin(a) * R * K;
+      g.strokeStyle = k < 4 ? 'rgba(255,255,245,.5)' : 'rgba(80,72,56,.3)';
+      g.lineWidth = .03;
+      g.beginPath();
+      g.moveTo(x, -.32 + bow);
+      g.lineTo(x, -h + bow + (whole ? 0 : .2));
+      g.stroke();
+    }
+    for (let k = 0; k < 7; k++) blob(g, (r() - .5) * base * 2, (r() - .2) * base * K * .8, .06 + r() * .08, `rgba(${80 + r() * 30},${120 + r() * 30},60,.6)`);
+    if (whole) {
+      drum(R * 1.12, h, h + .12, '#f0d888', '#caa24c', '#7a5826');
+      shapeAt(g, [[-R * 1.5, -h - .12], [R * 1.5, -h - .12], [R * 1.5, -h - .3], [-R * 1.5, -h - .3]], '#efe8d4', .04);
+      for (const side of [-1, 1]) {
+        blob(g, side * R * 1.45, -h - .2, .13, ink);
+        blob(g, side * R * 1.45, -h - .2, .1, '#e8e0c8');
+        blob(g, side * R * 1.45, -h - .2, .045, '#b4a888');
+      }
+      shapeAt(g, [[-R * 1.25, -h - .3], [R * 1.25, -h - .3], [R * 1.25, -h - .42], [-R * 1.25, -h - .42]], '#f7f2e4', .04);
+      // A bronze bowl on top for the sacred flame.
+      shapeAt(g, [[-.32, -h - .42], [.32, -h - .42], [.24, -h - .6], [-.24, -h - .6]], '#a8883e', .04);
+      shapeAt(g, [[-.4, -h - .6], [.4, -h - .6], [.34, -h - .68], [-.34, -h - .68]], '#e8c46a', .04);
+      return;
+    }
+    // A rough break: a jagged rim around a pale cross-section, then a crack and some ivy.
+    const rim = Array.from({ length: 18 }, (_, k) => {
+      const a = k / 18 * Math.PI * 2, far = Math.sin(a) < 0;
+      return [Math.cos(a) * R, -h + Math.sin(a) * R * K - (far ? .05 + r() * .3 : r() * .1)];
+    });
+    shapeAt(g, rim, '#f1ead6', .045);
+    shapeAt(g, rim.map(([x, y]) => [x * .55 - .03, (y + h) * .55 - h - .04]), 'rgba(170,160,130,.35)', 0);
+    g.strokeStyle = 'rgba(70,62,46,.7)';
+    g.lineWidth = .03;
+    g.beginPath();
+    g.moveTo(-R * .3, -h + .05);
+    g.lineTo(-R * .1, -h * .7);
+    g.lineTo(-R * .35, -h * .45);
+    g.stroke();
+    if (r() < .7) {
+      g.strokeStyle = '#4f7a3a';
+      g.lineWidth = .035;
+      g.beginPath();
+      for (let k = 0; k <= 10; k++) {
+        const z = .3 + k / 10 * (h - .4), x = Math.sin(k * .9 + r()) * R * .8;
+        g[k ? 'lineTo' : 'moveTo'](x, -z + Math.cos(k * .9) * R * K * .5);
+        if (k % 2) blob(g, x + .05, -z, .06, k % 4 ? '#6fa04a' : '#4f8a3a');
+      }
+      g.stroke();
+    }
+    for (let k = 0; k < 2; k++) {
+      const cx = base * (1.1 + r() * .5) * (k ? 1 : -1), cy = base * K * (.4 + r() * .4);
+      shapeAt(g, [[cx - .12, cy], [cx - .06, cy - .1], [cx + .1, cy - .08], [cx + .13, cy]], '#e4dcc6', .03);
+    }
+  }
+
+  function sacredFlame(o, tall) {
+    const x = sx(o.x), top = sy(o.y, tall) - .68 * unit;
+    const wave = k => Math.sin(clock * (6 + k * 2) + k * 2);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    glow(x, top - unit * .3, unit * 1.1, '255,210,120', .45 + wave(0) * .05);
+    tongue(x, top, unit * .22, unit * (.6 + wave(1) * .08), unit * wave(2) * .06, 'rgba(255,200,90,.85)');
+    tongue(x, top, unit * .11, unit * (.36 + wave(3) * .06), unit * wave(0) * .04, 'rgba(255,250,220,.95)');
+    ctx.restore();
+  }
+
+  // A long brick forge hearth with three fire mouths, iron straps, a bed of coals on top and an
+  // anvil at one end. Drawn for walls that run east to west.
+  function paintHearth(g, o, r) {
+    const R = o.r, L = o.x2 - o.x, x0 = -R, x1 = L + R, near = R * K, far = -R * K, hz = .8;
+    g.fillStyle = 'rgba(0,0,0,.4)';
+    g.fillRect(x0 + .14, near - .04, x1 - x0, .24);
+    shapeAt(g, [[x0, near], [x1, near], [x1, near - hz], [x0, near - hz]], '#3e1e18', .06);
+    g.save();
+    g.beginPath();
+    g.rect(x0, near - hz, x1 - x0, hz);
+    g.clip();
+    for (let y = near, row = 0; y > near - hz; y -= .14, row++) {
+      for (let x = x0 - (row % 2) * .17; x < x1; x += .34) {
+        g.fillStyle = `hsl(${6 + r() * 12}, ${34 + r() * 16}%, ${16 + r() * 10}%)`;
+        g.fillRect(x + .015, y - .125, .31, .11);
+      }
+    }
+    const heat = g.createLinearGradient(0, near, 0, near - hz);
+    heat.addColorStop(0, 'rgba(255,110,40,.25)');
+    heat.addColorStop(1, 'rgba(255,110,40,0)');
+    g.fillStyle = heat;
+    g.fillRect(x0, near - hz, x1 - x0, hz);
+    g.restore();
+    for (const mx of [L / 2 - L * .32, L / 2, L / 2 + L * .32]) {
+      const mouth = [[mx - .25, near - .05], [mx - .25, near - .34], [mx, near - .5], [mx + .25, near - .34], [mx + .25, near - .05]];
+      shapeAt(g, mouth, '#160504', .05);
+      g.save();
+      g.beginPath();
+      mouth.forEach(([x, y], k) => g[k ? 'lineTo' : 'moveTo'](x, y));
+      g.clip();
+      radial(g, mx, near - .14, .42, [[0, 'rgba(255,236,150,.95)'], [.4, 'rgba(255,130,40,.7)'], [1, 'rgba(255,80,20,0)']]);
+      for (let k = 0; k < 5; k++) blob(g, mx + (r() - .5) * .4, near - .08 - r() * .06, .05 + r() * .04, r() < .5 ? '#ffd36a' : '#7a200c');
+      g.restore();
+    }
+    for (const x of [x0 + .1, L / 2 - L * .16, L / 2 + L * .16, x1 - .1]) {
+      shapeAt(g, [[x - .05, near], [x + .05, near], [x + .05, near - hz], [x - .05, near - hz]], '#2c2f36', .03);
+      for (const y of [near - .12, near - hz + .12]) blob(g, x, y, .025, '#9aa0a8');
+    }
+    shapeAt(g, [[x0 - .05, near - hz], [x1 + .05, near - hz], [x1 + .05, far - hz], [x0 - .05, far - hz]], '#5a4840', .06);
+    g.fillStyle = 'rgba(255,190,140,.4)';
+    g.fillRect(x0, near - hz - .05, x1 - x0, .04);
+    shapeAt(g, [[x0 + .2, near - hz - .07], [x1 - .2, near - hz - .07], [x1 - .2, far - hz + .07], [x0 + .2, far - hz + .07]], '#1e0805', .03);
+    for (let k = 0; k < 90; k++) {
+      const x = x0 + .26 + r() * (x1 - x0 - .52), y = far - hz + .1 + r() * (near - far - .2), heatLevel = r();
+      blob(g, x, y, .03 + r() * .04, heatLevel < .45 ? '#3a120a' : heatLevel < .8 ? '#9a2a0c' : heatLevel < .95 ? '#ff7a2a' : '#ffd36a');
+    }
+    // The anvil: foot, waist and a face with a horn pointing to the middle of the hearth.
+    const side = o.y < 0 ? 1 : -1, ax = side > 0 ? x1 - .6 : x0 + .6, ay = (near + far) / 2 - hz - .04;
+    const at = list => list.map(([dx, dy]) => [ax + dx * side, ay - dy]);
+    shapeAt(g, at([[-.3, 0], [.3, 0], [.2, .12], [.1, .14], [.1, .34], [.36, .38], [.36, .5], [-.3, .5], [-.62, .44], [-.3, .38], [-.1, .34], [-.1, .14], [-.2, .12]]), '#3c424c', .045);
+    shapeAt(g, at([[-.3, .46], [.36, .46], [.36, .5], [-.3, .5]]), '#a8b0ba', 0);
+  }
+
+  function hearthFire(o) {
+    const L = o.x2 - o.x, y = sy(o.y) + (o.r * K - .2) * unit;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    [L / 2 - L * .32, L / 2, L / 2 + L * .32].forEach((mx, k) => {
+      const flicker = .3 + Math.sin(clock * (9 + k) + k * 2) * .08 + Math.sin(clock * 23 + k) * .05;
+      glow(sx(o.x + mx), y, unit * .55, '255,140,50', flicker);
+    });
+    const top = sy(o.y) - .8 * unit;
+    glow(sx(o.x + L / 2), top, unit * L * .5, '255,90,30', .12 + Math.sin(clock * 3.1 + o.y) * .04);
+    for (let i = 0; i < 4; i++) {
+      const rise = (clock * .8 + i * .25 + o.y) % 1, x = o.x - o.r + .3 + ((i * .37 + Math.floor(clock * .8 + i * .25) * .61) % 1) * (L + o.r * 2 - .6);
+      glow(sx(x) + Math.sin(rise * 9 + i) * unit * .1, top - rise * unit * 1.2, unit * .07, '255,200,110', 1 - rise);
+    }
+    ctx.restore();
+  }
+
+  // A low marble balustrade cut into pieces about 0.6 long: a base plinth, vase balusters, a hand
+  // rail and square posts with gold finials at the ends.
+  function balustradePieces(o) {
+    const dx = o.x2 - o.x, dy = o.y2 - o.y, len = Math.hypot(dx, dy);
+    const count = Math.max(1, Math.round(len / .6));
+    let nx = -dy / len, ny = dx / len;
+    if (ny < 0) { nx = -nx; ny = -ny; }
+    const pieces = [];
+    for (let k = 0; k < count; k++) {
+      const t0 = k / count, t1 = (k + 1) / count, ax = o.x + dx * t0, ay = o.y + dy * t0;
+      const at = (t, off, z) => [o.x + dx * t + nx * off - ax, (o.y + dy * t + ny * off - ay) * K - z * Z];
+      const ends = .3 / len;
+      const corners = [at(t0 - ends, -o.r - .3, 1.1), at(t1 + ends, -o.r - .3, 1.1), at(t0 - ends, o.r + .3, 0), at(t1 + ends, o.r + .3, 0)];
+      const left = Math.min(...corners.map(p => p[0])) - .2, right = Math.max(...corners.map(p => p[0])) + .2;
+      const top = Math.min(...corners.map(p => p[1])) - .2, bottom = Math.max(...corners.map(p => p[1])) + .2;
+      pieces.push({ x: ax, y: ay, left, top, w: right - left, h: bottom - top, depth: o.y + dy * (t0 + t1) / 2, tall: false,
+        paint: g => paintBalustrade(g, o, t0, t1, at, len, k === 0, k === count - 1) });
+    }
+    return pieces;
+  }
+
+  function paintBalustrade(g, o, t0, t1, at, len, first, last) {
+    const R = o.r, plinth = .14, rail = .56, cap = .68;
+    shapeAt(g, [at(t0, R + .2, 0), at(t1, R + .2, 0), at(t1, -R + .15, 0), at(t0, -R + .15, 0)], 'rgba(30,40,20,.3)', 0);
+    shapeAt(g, [at(t0, R, 0), at(t1, R, 0), at(t1, R, plinth), at(t0, R, plinth)], '#b6af96', .04);
+    shapeAt(g, [at(t0, R, plinth), at(t1, R, plinth), at(t1, -R, plinth), at(t0, -R, plinth)], '#e2dbc4', .04);
+    const count = Math.max(1, Math.round((t1 - t0) * len / .2));
+    for (let k = 0; k < count; k++) {
+      const t = t0 + (k + .5) / count * (t1 - t0);
+      const [bx, by] = at(t, 0, plinth), ty = at(t, 0, rail)[1], span = ty - by;
+      g.beginPath();
+      g.moveTo(bx - .05, by);
+      g.quadraticCurveTo(bx - .12, by + span * .35, bx - .04, by + span * .66);
+      g.lineTo(bx - .06, ty);
+      g.lineTo(bx + .06, ty);
+      g.lineTo(bx + .04, by + span * .66);
+      g.quadraticCurveTo(bx + .12, by + span * .35, bx + .05, by);
+      g.closePath();
+      g.fillStyle = '#ede7d3';
+      g.fill();
+      g.strokeStyle = ink;
+      g.lineWidth = .025;
+      g.stroke();
+      shapeAt(g, [[bx + .01, by], [bx + .05, by], [bx + .1, by + span * .35], [bx + .03, by + span * .66], [bx + .01, by + span * .66]], 'rgba(120,108,80,.3)', 0);
+    }
+    shapeAt(g, [at(t0, R * .8, rail), at(t1, R * .8, rail), at(t1, R * .8, cap), at(t0, R * .8, cap)], '#c6bea4', .04);
+    shapeAt(g, [at(t0, R * .8, cap), at(t1, R * .8, cap), at(t1, -R * .8, cap), at(t0, -R * .8, cap)], '#f5f0e2', .04);
+    const post = .24 / len;
+    for (const [end, t] of [[first, t0], [last, t1]]) {
+      if (!end) continue;
+      const box = z => [at(t - post, R + .02, z), at(t + post, R + .02, z), at(t + post, -R - .02, z), at(t - post, -R - .02, z)];
+      shapeAt(g, [at(t - post, R + .02, 0), at(t + post, R + .02, 0), at(t + post, R + .02, cap + .1), at(t - post, R + .02, cap + .1)], '#cfc8b0', .045);
+      shapeAt(g, box(cap + .1), '#f5f0e2', .04);
+      blob(g, ...at(t, 0, cap + .24), .11, ink);
+      blob(g, ...at(t, 0, cap + .24), .085, '#dcb75e');
+      blob(g, ...at(t, -.03, cap + .28), .03, '#fff2c0');
+    }
+  }
+
+  // ---- Ambient life ----
+
+  // Motes of light (or embers, or fireflies) rising from the floor.
+  function drawMotes(count, colors, speed = 1, height = 3, size = .13) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < count; i++) {
+      const x = ((i * 7.31 + Math.sin(clock * .2 + i) * 1.5 + 24) % 24) - 12;
+      const rise = (clock * (.12 + i % 5 * .03) * speed + i * .37) % 1;
+      glow(sx(x), sy(((i * 3.77) % 13) - 6.5, rise * height), unit * size, colors[i % colors.length], Math.sin(rise * Math.PI) * .7);
+    }
+    ctx.restore();
+  }
+
+  const themes = {
+    temple: {
+      moat: ['#127a6c', '#14305c', '#14082a'],
+      ripple: r => `rgba(${90 + r() * 80},230,210,${.04 + r() * .09})`,
+      backdrop: cavern,
+      wall: { hue: 184, turn: 55, sat: 38, light: 25, drop: 17, buttress: '#2c5c62', buttressLight: 'rgba(170,245,225,.22)', niche: '#061820',
+        glow: ['rgba(255,160,90,.28)', '#ffc07a', 'rgba(110,255,220,.18)', '#8ff7da'], bands: ['#8a6a30', '#4c4a3a'] },
+      platform: '#2d6a63', grout: '#0d2a30', stone: stoneColor,
+      tones: { lit: 'rgba(190,255,235,.22)', dark: 'rgba(0,8,24,.5)', chipDark: 'rgba(0,20,30,.24)', chipLit: 'rgba(180,240,220,.12)', crack: 'rgba(4,20,28,.65)' },
+      inlay(g, r) { fissures(g, r); seal(g, r); },
+      pools: ry => [[0, -ry - .5, 7.5, '255,120,120', .34], [-10.5, .5, 6, '60,255,215', .2], [10.5, .5, 6, '60,255,215', .2], [0, .2, 4.2, '255,225,160', .12],
+        [-8, ry, 7, '60,20,110', .42, 'multiply'], [8, ry, 7, '60,20,110', .42, 'multiply']],
+      shade: ['rgba(150,255,225,.14)', 'rgba(10,50,60,0)', 'rgba(2,14,24,.55)'],
+      rim: { band: 'rgba(8,26,34,.82)', line: 'rgba(201,164,84,.85)', key: '#d2ab58', lip: ['#8f6c2e', '#f0cf7e'], boss: ['#c79c48', '#ffeaa8'], gems: ['#6ff0cd', '#ff6a7c'] },
+      surroundings: (g, r, rx, ry) => surroundings(g, r, rx, ry),
+      fall: { core: r => `${150 + r() * 100},255,235`, edge: '120,255,225', sheet: 'rgba(45,190,175,.2)', glow: '110,255,220', spray: '200,255,240',
+        at: [[-6.3, -7.7, -5.45, .8], [-2.5, -7.1, -5.35, .55], [2.5, -7.1, -5.35, .55], [6.3, -7.7, -5.45, .8]] },
+      mist: '150,235,225', shaft: ['255,235,205', '190,245,230'],
+      shafts: [[-7.4, 2.2, 10.5, -.42, 0], [-3.2, 1.1, 9, -.36, 2.1], [3.9, 2.7, 11, -.4, 4.2], [8.6, 1.3, 9.5, -.34, 1.3]],
+      shades: { top: '#9ef5e0', mid: '#3f9fb0', end: 'rgba(40,80,140,0)', arm: '#6ccfcb', hand: '#aef8e6', face: '#0a1c2c', eye: 'rgba(190,255,235,.35)', pupil: '#f2fffa', mouth: '#bfffee', glow: '90,230,220' },
+      braziers: [[-8.6, -4.9, '90,220,255'], [8.6, -4.9, '90,220,255'], [-8.9, 4.7, '120,255,190'], [8.9, 4.7, '120,255,190']],
+      back() {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.scale(1, K);
+        glow(0, 0, unit * 3.3, '70,255,200', .11 + Math.sin(clock * 1.7) * .045);
+        ctx.restore();
+        drawFalls();
+        drawMist(-5.5, .35, .55, 1.7);
+        drawMist(-6.6, -.2, .3, 2.2);
+        drawCrowd();
+      },
+      front() {
+        drawMist(6.1, .5, .35, 1.9);
+        drawShafts();
+      },
+      motes: () => drawMotes(38, ['255,230,170', '130,255,215', '130,255,215', '130,255,215'])
+    },
+    forge: {
+      moat: ['#ffb347', '#a8300e', '#1e0606'],
+      ripple: r => `rgba(255,${120 + r() * 100},${40 + r() * 50},${.06 + r() * .14})`,
+      backdrop: forgeBackdrop,
+      wall: { hue: 14, turn: -10, sat: 26, light: 18, drop: 12, buttress: '#3a2420', buttressLight: 'rgba(255,160,90,.2)', niche: '#120504',
+        glow: ['rgba(255,140,60,.35)', '#ffb060', 'rgba(255,90,40,.25)', '#ff7a3a'], bands: ['#7a4a2a', '#3a2a22'] },
+      platform: '#3a2622', grout: '#120807', stone: (r, lift = 0) => `hsl(${8 + r() * 22}, ${10 + r() * 12}%, ${13 + r() * 8 + lift * .7}%)`,
+      tones: { lit: 'rgba(255,170,110,.16)', dark: 'rgba(0,0,0,.5)', chipDark: 'rgba(0,0,0,.3)', chipLit: 'rgba(255,160,100,.1)', crack: 'rgba(0,0,0,.6)' },
+      inlay(g, r) {
+        fissures(g, r, ['rgba(255,110,30,.12)', 'rgba(255,130,40,.32)', '#1a0603', '#ffcf6a']);
+        g.save();
+        g.scale(1, K);
+        for (const [radius, w, color] of [[2.35, .16, ink], [2.35, .09, '#9a6a2e'], [2.35, .03, '#ffd08a']]) {
+          g.strokeStyle = color;
+          g.lineWidth = w;
+          ellipsePath(g, 0, 0, radius, radius);
+          g.stroke();
+        }
+        g.restore();
+      },
+      pools: ry => [[0, -ry - .5, 7.5, '255,120,60', .34], [-10.5, .5, 6, '255,90,40', .2], [10.5, .5, 6, '255,90,40', .2], [0, .2, 4.8, '255,160,70', .28],
+        [-8, ry, 7, '40,8,8', .45, 'multiply'], [8, ry, 7, '40,8,8', .45, 'multiply']],
+      shade: ['rgba(255,170,110,.12)', 'rgba(40,10,6,0)', 'rgba(10,2,2,.55)'],
+      rim: { band: 'rgba(20,8,6,.85)', line: 'rgba(190,120,60,.85)', key: '#c07a3a', lip: ['#6e4022', '#e8a860'], boss: ['#9a6a3a', '#ffd9a0'], gems: ['#ff8a3a', '#ffd24a'] },
+      surroundings: (g, r, rx, ry) => surroundings(g, r, rx, ry, { rock: rockLooks.forge, column: columnLooks.forge, statue: statueLooks.forge }),
+      fall: { core: r => `255,${150 + r() * 80},${60 + r() * 40}`, edge: '255,140,50', sheet: 'rgba(220,80,20,.25)', glow: '255,140,50', spray: '255,220,140',
+        at: [[-8.6, -7.9, -5.45, .7], [-6.8, -8.4, -5.5, .5], [6.9, -8.4, -5.5, .5], [8.7, -7.9, -5.45, .7]] },
+      mist: '255,120,60', shaft: ['255,170,110', '255,110,60'], shafts: [],
+      shades: { top: '#ffd0a0', mid: '#b4503c', end: 'rgba(120,30,20,0)', arm: '#e88a64', hand: '#ffd2b0', face: '#2a0a08', eye: 'rgba(255,200,150,.35)', pupil: '#fff2dc', mouth: '#ffd8b8', glow: '255,140,80' },
+      braziers: [[-8.6, -4.9, '255,140,60'], [8.6, -4.9, '255,140,60'], [-8.9, 4.7, '255,180,90'], [8.9, 4.7, '255,180,90']],
+      back() {
+        for (const o of arena.obstacles) if (o.kind === 'pit') drawPit(o);
+        drawFalls();
+        drawMist(-5.5, .3, .3, 1.7);
+        drawMist(-6.8, -.25, .22, 2.4);
+        drawCrowd();
+      },
+      front() { drawMist(6.1, .45, .22, 1.9); },
+      motes: () => drawMotes(54, ['255,170,70', '255,220,140', '255,120,40'], 2.4, 4.2, .1)
+    },
+    garden: {
+      moat: ['#c6f8e8', '#3aa8a0', '#183c4e'],
+      ripple: r => `rgba(255,${235 + r() * 20},${190 + r() * 50},${.06 + r() * .12})`,
+      backdrop: gardenBackdrop,
+      wall: { hue: 48, turn: 30, sat: 14, light: 66, drop: 34, buttress: '#d4ccb0', buttressLight: 'rgba(255,255,240,.45)', niche: '#33483a',
+        glow: ['rgba(255,230,150,.3)', '#ffe9a0', 'rgba(150,255,200,.22)', '#c8ffd8'], bands: ['#c9a24e', '#7a8a6a'] },
+      platform: '#9aa284', grout: '#56643f', stone: (r, lift = 0) => `hsl(${38 + r() * 26}, ${12 + r() * 14}%, ${50 + r() * 12 + lift * .5}%)`,
+      tones: { lit: 'rgba(255,255,240,.35)', dark: 'rgba(40,50,30,.32)', chipDark: 'rgba(60,70,40,.22)', chipLit: 'rgba(255,255,230,.2)', crack: 'rgba(60,60,40,.5)' },
+      inlay: gardenInlay,
+      pools: ry => [[0, -ry - .5, 7.5, '255,220,150', .3], [-10.5, .5, 6, '150,255,210', .16], [10.5, .5, 6, '150,255,210', .16], [0, .2, 4.2, '255,245,200', .14],
+        [-8, ry, 7, '80,70,130', .32, 'multiply'], [8, ry, 7, '80,70,130', .32, 'multiply']],
+      shade: ['rgba(255,250,220,.16)', 'rgba(60,80,60,0)', 'rgba(20,30,40,.42)'],
+      rim: { band: 'rgba(70,82,58,.8)', line: 'rgba(240,210,130,.9)', key: '#ecca70', lip: ['#a88a4a', '#fff0b0'], boss: ['#e0c070', '#fff8d0'], gems: ['#7fe0ff', '#ff8aa8'] },
+      surroundings: (g, r, rx, ry) => surroundings(g, r, rx, ry, { rock: rockLooks.garden, column: columnLooks.garden, statue: statueLooks.garden }),
+      fall: { core: r => `${220 + r() * 35},250,255`, edge: '220,250,255', sheet: 'rgba(200,245,255,.22)', glow: '200,250,255', spray: '255,255,255',
+        at: [[-6.3, -7.6, -5.45, .7], [6.3, -7.6, -5.45, .7]] },
+      mist: '255,246,220', shaft: ['255,240,190', '255,220,160'],
+      shafts: [[-7.4, 2.2, 10.5, -.42, 0], [-3.2, 1.1, 9, -.36, 2.1], [3.9, 2.7, 11, -.4, 4.2], [8.6, 1.3, 9.5, -.34, 1.3]],
+      shades: { top: '#fff6d2', mid: '#c4b07a', end: 'rgba(160,140,90,0)', arm: '#f0dca0', hand: '#fffae0', face: '#3a3a52', eye: 'rgba(255,250,210,.4)', pupil: '#ffffff', mouth: '#fff4d8', glow: '255,236,170' },
+      braziers: [[-8.6, -4.9, '255,215,130'], [8.6, -4.9, '255,215,130'], [-8.9, 4.7, '255,235,170'], [8.9, 4.7, '255,235,170']],
+      back() {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.scale(1, K);
+        glow(0, 0, unit * 3, '255,235,170', .08 + Math.sin(clock * 1.1) * .03);
+        ctx.restore();
+        drawFalls();
+        drawMist(-5.5, .25, .4, 1.7);
+        drawCrowd();
+      },
+      front() {
+        drawShafts();
+      },
+      motes: () => drawMotes(24, ['230,255,150', '255,240,170'], .6, 2.2, .1)
+    }
+  };
+  const theme = () => themes[mapKey] || themes.temple;
 
   // ---- Projection and primitives ----
 
@@ -1640,6 +2339,12 @@
   }
 
   function draw(duel, dt, { debug = false } = {}) {
+    // A bout on another map repaints the scenery for it.
+    if (duel.map && duel.map !== mapKey && maps[duel.map]) {
+      mapKey = duel.map;
+      arena = maps[mapKey];
+      sized = false;
+    }
     if (!sized || canvas.clientWidth !== width || canvas.clientHeight !== height) resize();
     if (!sized) return;
     updateEffects(dt, duel);
@@ -1653,32 +2358,27 @@
       dpr * (width / 2 - camera.x * unit * z + jx), dpr * (height / 2 + unit * .55 * z - camera.y * unit * z + jy));
     ctx.drawImage(floor, bounds.x * unit, bounds.y * unit, bounds.w * unit, bounds.h * unit);
     ctx.drawImage(decals, bounds.x * unit, bounds.y * unit, bounds.w * unit, bounds.h * unit);
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.scale(1, K);
-    glow(0, 0, unit * 3.3, '70,255,200', .11 + Math.sin(clock * 1.7) * .045);
-    ctx.restore();
-    drawFalls();
-    drawMist(-5.5, .35, .55, 1.7);
-    drawMist(-6.6, -.2, .3, 2.2);
-    drawCrowd();
+    const look = theme();
+    look.back();
     duel.fighters.forEach(telegraph);
     duel.fighters.forEach(footing);
 
     const items = duel.fighters.map(f => ({ y: f.y, draw: () => drawFighter(duel, f) }));
-    for (const p of arena.pillars) {
+    for (const piece of obstacleArt) {
       items.push({
-        y: p.y + .2,
+        y: piece.depth,
         draw: () => {
-          // A block fades when someone stands behind it.
-          const hiding = duel.fighters.some(f => f.y < p.y && f.y > p.y - 3 && Math.abs(f.x - p.x) < 1.2);
+          // Tall stone fades when someone stands behind it.
+          const base = piece.depth - .2;
+          const hiding = piece.tall && duel.fighters.some(f => f.y < base && f.y > base - 3 && f.x > piece.x0 - 1.2 && f.x < piece.x1 + 1.2);
           ctx.globalAlpha = hiding ? .5 : 1;
-          ctx.drawImage(pillarSprite, sx(p.x) - 1.5 * unit, sy(p.y) - 2.5 * unit, 3 * unit, 3.4 * unit);
+          ctx.drawImage(piece.canvas, sx(piece.x) + piece.left * unit, sy(piece.y) + piece.top * unit, piece.w * unit, piece.h * unit);
           ctx.globalAlpha = 1;
+          piece.live?.();
         }
       });
     }
-    for (const [x, y, hue] of [[-8.6, -4.9, '90,220,255'], [8.6, -4.9, '90,220,255'], [-8.9, 4.7, '120,255,190'], [8.9, 4.7, '120,255,190']]) {
+    for (const [x, y, hue] of look.braziers) {
       items.push({ y, draw: () => brazier(x, y, hue) });
     }
     for (const g of ghosts) for (const shot of g.shots) {
@@ -1696,8 +2396,7 @@
     for (const p of duel.projectiles) items.push({ y: p.y, draw: () => drawProjectile(p, duel) });
     items.sort((a, b) => a.y - b.y).forEach(item => item.draw());
 
-    drawMist(6.1, .5, .35, 1.9);
-    drawShafts();
+    look.front();
     drawTrails();
     ctx.save();
     for (const p of particles) {
@@ -1722,23 +2421,28 @@
       ctx.stroke();
     }
     ctx.restore();
-    // Drifting motes.
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 38; i++) {
-      const x = ((i * 7.31 + Math.sin(clock * .2 + i) * 1.5 + 24) % 24) - 12;
-      const rise = (clock * (.12 + i % 5 * .03) + i * .37) % 1;
-      glow(sx(x), sy(((i * 3.77) % 13) - 6.5, rise * 3), unit * .13, i % 4 ? '130,255,215' : '255,230,170', Math.sin(rise * Math.PI) * .7);
-    }
-    ctx.restore();
+    look.motes();
 
     duel.fighters.forEach(labelFighter);
     if (debug) {
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 1;
-      for (const body of [...duel.fighters.map(f => [f.x, f.y, root.HadesSim.radius]), ...arena.pillars.map(p => [p.x, p.y, p.r])]) {
+      for (const body of [...duel.fighters.map(f => [f.x, f.y, root.HadesSim.radius]), ...arena.obstacles.filter(o => o.x2 === undefined).map(p => [p.x, p.y, p.r])]) {
         groundPath(circle(...body));
         ctx.stroke();
+      }
+      // Walls: a line with rounded ends; low ones dashed.
+      for (const o of arena.obstacles) {
+        if (o.x2 === undefined && !o.low) continue;
+        ctx.setLineDash(o.low ? [4, 4] : []);
+        if (o.x2 === undefined) groundPath(circle(o.x, o.y, o.r));
+        else {
+          const a = Math.atan2(o.y2 - o.y, o.x2 - o.x);
+          groundPath([...Array.from({ length: 13 }, (_, i) => [o.x2 + Math.cos(a - Math.PI / 2 + i / 12 * Math.PI) * o.r, o.y2 + Math.sin(a - Math.PI / 2 + i / 12 * Math.PI) * o.r]),
+            ...Array.from({ length: 13 }, (_, i) => [o.x + Math.cos(a + Math.PI / 2 + i / 12 * Math.PI) * o.r, o.y + Math.sin(a + Math.PI / 2 + i / 12 * Math.PI) * o.r])]);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
       groundPath(Array.from({ length: 60 }, (_, i) => [Math.cos(i / 60 * 6.283) * arena.a, Math.sin(i / 60 * 6.283) * arena.b]));
       ctx.stroke();

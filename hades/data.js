@@ -101,15 +101,44 @@
     emberpriest: { name: 'Ember Priest', weapon: 'staff', reserve: 'mace', shield: 'none', armor: 'robes', move: 'blink', speed: 3.4, hp: 232, spells: ['ember', 'ward', 'heal'] }
   };
 
-  const arena = {
-    a: 10.2, b: 6.9, // half width and half depth of the elliptical floor
-    pillars: [
-      { x: -4.4, y: -2.6, r: .78 }, { x: 4.4, y: -2.6, r: .78 },
-      { x: -4.4, y: 2.8, r: .78 }, { x: 4.4, y: 2.8, r: .78 }
-    ]
+  // The maps. a and b are the half width and half depth of the elliptical floor. Obstacles are
+  // circles ({ x, y, r }) or walls ({ x, y, x2, y2, r }: a line with rounded ends); a low one (a pit,
+  // a balustrade) stops bodies but not shots. kind picks the painting (render.js). The temple is the
+  // default and the one the balance tools measure.
+  const maps = {
+    temple: {
+      name: 'Drowned temple', a: 10.2, b: 6.9,
+      // Four carved stone plinths on the diagonals.
+      obstacles: [
+        { x: -4.4, y: -2.6, r: .78, kind: 'plinth' }, { x: 4.4, y: -2.6, r: .78, kind: 'plinth' },
+        { x: -4.4, y: 2.8, r: .78, kind: 'plinth' }, { x: 4.4, y: 2.8, r: .78, kind: 'plinth' }
+      ]
+    },
+    forge: {
+      name: 'Molten forge', a: 10.2, b: 6.9,
+      // A pit of molten metal in the middle (shots fly over it) between two forge hearths.
+      obstacles: [
+        { x: 0, y: 0, r: 1.6, low: true, kind: 'pit' },
+        { x: -1.7, y: -4.2, x2: 1.7, y2: -4.2, r: .4, kind: 'hearth' },
+        { x: -1.7, y: 4.4, x2: 1.7, y2: 4.4, r: .4, kind: 'hearth' }
+      ]
+    },
+    garden: {
+      name: 'Elysian garden', a: 10.2, b: 6.9,
+      // Broken marble columns in a quincunx, the middle one whole, and a low balustrade along the
+      // far and near terraces that shots clear but bodies do not.
+      obstacles: [
+        { x: 0, y: 0, r: .56, kind: 'column', whole: true },
+        { x: -3.4, y: -2.9, r: .62, kind: 'column' }, { x: 3.4, y: 2.9, r: .62, kind: 'column' },
+        { x: -3.4, y: 2.9, r: .5, kind: 'column' }, { x: 3.4, y: -2.9, r: .5, kind: 'column' },
+        { x: -2, y: -4.9, x2: 2, y2: -4.9, r: .3, low: true, kind: 'balustrade' },
+        { x: -2, y: 5.1, x2: 2, y2: 5.1, r: .3, low: true, kind: 'balustrade' }
+      ]
+    }
   };
+  const arena = maps.temple;
 
-  const data = { switchCost, weapons, shields, armors, spells, moves, kits, arena };
+  const data = { switchCost, weapons, shields, armors, spells, moves, kits, maps, arena };
   if (typeof module !== 'undefined') module.exports = data;
   else root.HadesData = data;
 })(this);

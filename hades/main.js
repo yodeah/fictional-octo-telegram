@@ -1,6 +1,6 @@
 // The page: matchups, the fixed-step clock, the HUD and the controls. Bouts are fully idle.
 (function () {
-  const { kits, weapons, armors, shields, moves } = window.HadesData;
+  const { kits, weapons, armors, shields, moves, maps } = window.HadesData;
   const Sim = window.HadesSim, Render = window.HadesRender;
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
@@ -25,6 +25,8 @@
     { name: 'Felix', team: 0, ...gearOf('sagittarius') }, { name: 'Draco', team: 1, ...gearOf('murmillo') }
   ];
   let mode = params.get('mode') === '1v1' ? '1v1' : '2v2';
+  // The drowned temple unless ?map= or the Map menu picks another.
+  let map = maps[params.get('map')] ? params.get('map') : 'temple';
   const lineup = () => roster.slice(0, mode === '2v2' ? 4 : 2);
   const teamColors = ['#ff8a6a', '#7fd0ff'];
   const teamLabel = team => mode === '2v2' ? teamNames[team] : lineup().find(l => l.team === team).name;
@@ -107,7 +109,7 @@
   }
 
   function setup(seed = Math.floor(Math.random() * 1e9)) {
-    duel = Sim.createBattle(matchup.map(({ name, team, ...entry }) => ({ entry, team, name })), seed);
+    duel = Sim.createBattle(matchup.map(({ name, team, ...entry }) => ({ entry, team, name })), seed, map);
     state = 'ready';
     accumulator = pause = slow = 0;
     Render.reset();
@@ -133,6 +135,7 @@
     $('generate').disabled = locked;
     $('shuffle').disabled = locked;
     $('mode').disabled = locked;
+    $('map').disabled = locked;
     for (const select of $('loadouts').querySelectorAll('select')) select.disabled = locked;
     $('bout').textContent = String(bout).padStart(2, '0');
   }
@@ -284,6 +287,7 @@
     $('speed').textContent = speeds[speed] + '×';
   });
   // Every visit starts as a 2v2 with shuffled loadouts; ?mode=1v1 starts a duel instead.
+  // ?map=forge or ?map=garden starts on another map,
   // ?a=murmillo&b=murmillo pins the first two champions in their own gear (a mirror match),
   // ?seed=7 repeats the loadouts and the bout, ?debug draws collision shapes.
   shuffleRoster(params.has('seed') ? seeded(Number(params.get('seed'))) : Math.random);
@@ -297,6 +301,14 @@
     if (state === 'finished') bout++;
     buildLoadouts();
     newMatchup();
+    setup();
+  });
+
+  for (const [key, info] of Object.entries(maps)) $('map').add(new Option(info.name, key));
+  $('map').value = map;
+  $('map').addEventListener('change', () => {
+    map = $('map').value;
+    if (state === 'finished') bout++;
     setup();
   });
 
