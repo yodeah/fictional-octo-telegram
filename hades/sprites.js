@@ -820,7 +820,52 @@
     poly([sub(top, d), add(top, d), add(bottom, d), sub(bottom, d)], color, .012);
     disc(bottom, .022, bronze.base, false);
   }
+  const fur = { base: '#6e5640', deep: '#47362a', light: '#a68b6a', tip: '#d2b892' };
   const armorLooks = {
+    pelt: {
+      // Varro keeps his bare chest under the mantle; Cassian trades his scales for a laced jerkin.
+      torso({ surface, chestZ, hipZ, front, clipToTorso, varro, c }) {
+        if (varro) return 'native';
+        clipToTorso();
+        if (front) {
+          for (let k = 0; k < 5; k++) {
+            const z = chestZ + .1 - k * .085;
+            fine([surface(-.05, z), surface(.05, z - .05)], c.leatherLight, .014);
+            fine([surface(.05, z), surface(-.05, z - .05)], c.leatherLight, .014);
+          }
+          fine([surface(-.04, chestZ + .14), surface(-.03, hipZ + .2)], c.leatherDeep, .02);
+          fine([surface(.04, chestZ + .14), surface(.03, hipZ + .2)], c.leatherDeep, .02);
+          for (const s of [-1, 1]) fine([surface(s * .24, chestZ + .1), surface(s * .2, hipZ + .22)], c.leatherDeep, .014);
+        } else fine([surface(0, chestZ + .12), surface(0, hipZ + .2)], c.leatherDeep, .025);
+        g.restore();
+      },
+      shoulder(S, tE, away) {
+        limbShell(S, tE * .42, 1.42, 1.3, fur.base, .014);
+        for (const [t, side] of [[.08, .5], [.18, -.3], [.28, .4], [.36, -.5]]) limbLine(S, tE * t, tE * (t + .07), side, fur.light, .014);
+        limbLine(S, tE * .04, tE * .3, -away * .6, fur.tip, .014);
+      },
+      mantle({ P, vector, lean, chestZ, front }) {
+        // A shaggy ring of fur round the shoulders with a ragged lower edge, and the wolf's
+        // forepaws hanging over the chest.
+        const centre = P(lean * .74, 0, chestZ + .16);
+        const ring = [];
+        for (let k = 0; k < 22; k++) {
+          const a = k / 22 * Math.PI * 2, tuft = k % 2 ? .05 : -.02;
+          ring.push(add(centre, vector(Math.cos(a) * (.3 + tuft), Math.sin(a) * (.42 + tuft), -.1 - (k % 2 ? .1 : 0) - Math.max(0, -Math.cos(a)) * .08)));
+        }
+        poly(ring, fur.base);
+        for (let k = 1; k < 22; k += 2) fine([lerp(centre, ring[k], .55), lerp(centre, ring[k], .95)], fur.light, .016);
+        fine(ring.filter((_, k) => k % 2).map(v => add(v, [0, 0, .03])), fur.deep, .012);
+        poly(Array.from({ length: 10 }, (_, k) => add(centre, vector(Math.cos(k / 10 * Math.PI * 2) * .14, Math.sin(k / 10 * Math.PI * 2) * .17, .03))), fur.deep, false);
+        if (!front) return;
+        for (const s of [-1, 1]) {
+          const top = add(centre, vector(.24, s * .15, -.12)), paw = add(centre, vector(.3, s * .12, -.42));
+          taper(top, paw, .09, .07, fur.base);
+          fine([lerp(top, paw, .2), lerp(top, paw, .8)], fur.light, .012);
+          for (const w of [-.03, 0, .03]) disc(add(paw, vector(.02, w, -.03)), .012, '#f2ead8', false);
+        }
+      }
+    },
     cuirass: {
       body: bronze.base,
       under: look => look.deep,
@@ -1782,7 +1827,8 @@
       };
       // The front or back surface of the torso, curving away toward the sides.
       const surface = (right, up) => spine((front ? 1 : -1) * (.27 - Math.abs(right) * .36), right, up);
-      if (worn?.torso) worn.torso({ surface, spine, P, vector, lean, chestZ, hipZ, front, look, c, clipToTorso, varro, facing });
+      const custom = worn?.torso && worn.torso({ surface, spine, P, vector, lean, chestZ, hipZ, front, look, c, clipToTorso, varro, facing }) !== 'native';
+      if (custom) { /* drawn by the armor */ }
       else if (varro && front) {
         clipToTorso();
         // Bare chest: pectorals, a six-pack, obliques, collarbones and an old scar.
@@ -1891,6 +1937,7 @@
       }, .07);
     }
 
+    if (worn?.mantle) part(P(lean * .74, 0, chestZ + .1), () => worn.mantle({ P, vector, lean, chestZ, front, look, c }), .1);
     part(j.head, () => (varro ? murmilloHead : archerHead)(r, look, c, facing), .16);
     if (!p.thrown) part(lerp(j.handR, add(j.handR, j.aim), .45), () => {
       const held = () => weapon(spec.weapon, j.handR, j.aim, j.side, look, spec.weapon === 'recurve' && p.draw !== undefined ? { draw: p.draw, charge: p.charge }

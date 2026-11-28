@@ -51,7 +51,10 @@
     segmentata: { name: 'Lorica segmentata', style: 'melee', power: 1, defense: 10, mobility: .89, taken: { melee: 1, ranged: .9, magic: 1.12 } },
     // Bronze cuirass: a sculpted breastplate over leather strips; lighter than steel hoops, and a
     // swordsman hits a little harder in it.
-    cuirass: { name: 'Bronze cuirass', style: 'melee', power: 1.03, defense: 6, mobility: .97, taken: { melee: 1.02, ranged: .97, magic: 1.04 } }
+    cuirass: { name: 'Bronze cuirass', style: 'melee', power: 1.03, defense: 6, mobility: .97, taken: { melee: 1.02, ranged: .97, magic: 1.04 } },
+    // Wolf pelt: a fur mantle over bare skin or a jerkin; almost no protection, but the lightest
+    // thing to run in, and a shooter's aim is surer in it.
+    pelt: { name: 'Wolf pelt', style: 'ranged', power: 1.08, defense: 2, mobility: 1.09, taken: { melee: 1.1, ranged: 1.0, magic: .92 } }
   };
 
   const spells = {
