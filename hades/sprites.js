@@ -66,6 +66,7 @@
     const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0, breath: 0, swing: 0 };
     if (weapon === 'spear' || weapon === 'trident') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
+    if (weapon === 'sling') { p.yaw = .5; p.pitch = 0; p.high = .9; }
     if (['maul', 'greatsword', 'mace', 'axe', 'flail', 'falx', 'hammer'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
     if (weapon === 'staff') { p.yaw = .75; p.pitch = 1.38; }
     if (weapon === 'crossbow' || weapon === 'bow' || weapon === 'recurve') { p.yaw = .16; p.pitch = 0; p.out = .32; p.high = 1.14; }
@@ -250,6 +251,21 @@
       j.elbowR = add(lerp(j.shoulderR, j.handR, .5), vector(-.12, .28, cock * .12 - .06));
       p.thrown = throwing && (anim === 'active' || anim === 'recover' && t < .55);
     }
+    if (fine && spec.weapon === 'sling' && ['idle', 'run', 'windup', 'active', 'recover'].includes(anim)) {
+      // The sling hangs from the hand at rest, is raised and whirled flat over the head through
+      // the windup, and loosed with a forward snap of the arm.
+      const slinging = shape === 'bolt';
+      const raise = slinging && anim === 'windup' ? ease(Math.min(1, t / .3)) : slinging && anim === 'active' ? 1 - ease(Math.min(1, t * 1.4)) : 0;
+      const whip = slinging && anim === 'active' ? ease(Math.min(1, t * 1.4)) : slinging && anim === 'recover' ? 1 - ease(t) : 0;
+      const carry = [.14, .38, hipZ + .2], overhead = [.04, .2, chestZ + .66], thrown = [.6, .14, chestZ + .12];
+      const at = carry.map((v, i) => mix(mix(v, overhead[i], raise), thrown[i], whip));
+      j.handR = P(shift + lean * .6 + at[0], at[1], at[2] + p.bob * .5 + (anim === 'run' ? Math.abs(p.swing) * .03 : 0));
+      j.aim = vector(1, 0, 0);
+      j.side = vector(0, 1, 0);
+      j.elbowR = add(lerp(j.shoulderR, j.handR, .5), vector(-.1, .3, raise * .12 - .08));
+      p.sling = { whirl: slinging && anim === 'windup' ? t : -1, raise, whip,
+        loaded: !(slinging && (anim === 'active' || anim === 'recover' && t < .5)) };
+    }
     if (fine) {
       if (drawHint) j.elbowR = drawHint;
       j.elbowL = bend(j.shoulderL, j.handL, j.elbowL, .37 * SIZE, .35 * SIZE);
@@ -335,6 +351,8 @@
 
   // A pool of light, for eyes and magic. Queued and added after the outline so it stays pure light.
   let lights = [];
+  // Motion trails, drawn after the ink outline so they stay pale.
+  let late = [];
   const shine = (v, r, color) => lights.push([px(v), py(v), r * res, color]);
 
   function addLights(context) {
@@ -348,7 +366,7 @@
     }
   }
 
-  const weaponLength = { hammer: 1.15, falx: 1.4, flail: 1.05, trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
+  const weaponLength = { sling: .7, hammer: 1.15, falx: 1.4, flail: 1.05, trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
 
   // along(d, w): d from the hand toward the point, w across.
   function weapon(kind, hand, aim, side, look, charge) {
@@ -925,6 +943,45 @@
       fine([at(.86, -.08), at(.76, -.3)], metal.edge, .01);
       poly([at(.98, -.04), at(1.14, 0), at(.98, .04)], metal.steel, .012);
       disc(at(.89, .05), .03, '#d39a3e', .01);
+    },
+    sling(al, aim, side, look, charge) {
+      // Two braided cords from a finger loop to a leather pouch that cradles a stone. On the
+      // release one cord lets go and the empty pouch snaps out along the throw.
+      const c = charge && typeof charge === 'object' ? charge : { whirl: -1, raise: 0, whip: 0, loaded: true };
+      const hand = al(0), R = .46 * SIZE;
+      const A = aim.map(v => v / (Math.hypot(...aim) || 1)), S = side.map(v => v / (Math.hypot(...side) || 1));
+      const scale = (v, k) => v.map(x => x * k);
+      let pouch;
+      if (c.whirl >= 0 && c.raise > .5) {
+        // Three turns over the windup, flat over the head.
+        const a = c.whirl * Math.PI * 2 * 3;
+        pouch = add(hand, add(add(scale(A, Math.cos(a) * R), scale(S, Math.sin(a) * R)), [0, 0, .04]));
+      } else if (c.whip > 0) pouch = add(hand, add(scale(A, R * .95), [0, 0, -R * .3 * (1 - c.whip)]));
+      else pouch = add(hand, add(scale(A, R * .18 * (1 + c.raise)), [0, 0, -R * (1 - c.raise * .5)]));
+      if (c.whirl >= 0 && c.raise > .5 && !masking) {
+        // A pale motion trail along the circle behind the pouch sells the spin.
+        const a = c.whirl * Math.PI * 2 * 3, trail = [];
+        for (let i = 0; i <= 12; i++) {
+          const b = a - i * .32;
+          trail.push(add(hand, add(add(scale(A, Math.cos(b) * R), scale(S, Math.sin(b) * R)), [0, 0, .04])));
+        }
+        late.push(() => {
+          stroke(trail, .09, 'rgba(255,238,205,.2)');
+          stroke(trail.slice(0, 7), .045, 'rgba(255,246,226,.45)');
+        });
+      }
+      const mid = lerp(hand, pouch, .5), off = scale(S, .03);
+      const cord = (points, color) => { stroke(points, .036, ink); stroke(points, .018, color); };
+      cord([hand, add(mid, off), add(pouch, scale(off, .6))], '#e3cf9f');
+      if (c.loaded) cord([hand, sub(mid, off), sub(pouch, scale(off, .6))], '#c2a874');
+      else cord([hand, add(sub(mid, off), [0, 0, -.06]), add(pouch, add(scale(A, .16), [0, 0, -.1]))], '#c2a874');
+      const along = sub(pouch, mid), size = Math.hypot(...along) || 1;
+      taper(sub(pouch, scale(along, .08 / size)), add(pouch, scale(along, .08 / size)), .13, .11, '#7a4a2c');
+      if (c.loaded) {
+        disc(add(pouch, [0, 0, .04]), .062, '#a8a196');
+        disc(add(pouch, [0, 0, .06]), .022, '#efe9dc', false);
+      }
+      disc(hand, .028, '#d8c49a', .01);
     },
     pilum(al, aim, side, look) {
       // Wooden shaft, a lead weight, a long iron shank and a small pyramid point, a little taller
@@ -1536,12 +1593,16 @@
           const grip = P(lean * .5 - .3 - s * .04, -s * .17, hipZ + .12);
           weapon('pilum', grip, vector(-.22 - s * .12, s * .45, .86).map(v => v * .68), vector(0, .9, -.4), look, 0);
         }
-      } else if (!stowedAtHip.includes(spec.spare) && spec.spare !== 'recurve') {
+      } else if (!stowedAtHip.includes(spec.spare) && !['recurve', 'sling'].includes(spec.spare)) {
         // Anything else is slung across the back, grip over the right shoulder.
         const grip = P(lean * .6 - .36, .26, chestZ + .1);
         weapon(spec.spare, grip, vector(-.12, -.66, -.72).map(v => v * .72), vector(0, .7, -.7), look, 0);
       }
     });
+    if (spec.spare === 'sling') {
+      // Tucked under the belt on the right hip, pouch hanging.
+      part(P(.04, .3, hipZ), () => weapon('sling', P(lean * .3 + .1, .3, hipZ + .1), vector(1, 0, 0), vector(0, 1, 0), look, null), .02);
+    }
     if (stowedAtHip.includes(spec.spare)) {
       // Sheathed at the left hip, hilt forward.
       part(P(.02, -.3, hipZ), () => {
@@ -1735,7 +1796,7 @@
     part(j.head, () => (varro ? murmilloHead : archerHead)(r, look, c, facing), .16);
     if (!p.thrown) part(lerp(j.handR, add(j.handR, j.aim), .45), () => {
       const held = () => weapon(spec.weapon, j.handR, j.aim, j.side, look, spec.weapon === 'recurve' && p.draw !== undefined ? { draw: p.draw, charge: p.charge }
-        : spec.weapon === 'flail' ? { fling: p.fling } : p.charge);
+        : spec.weapon === 'flail' ? { fling: p.fling } : spec.weapon === 'sling' ? p.sling : p.charge);
       if (spec.weapon === 'recurve') kept(held); else held();
       // Fingers close over the grip, drawn after the weapon so the hand holds it.
       if (spec.weapon === 'recurve') gripWrap(j.handL, bowAxes(j.aim, j.side).U, c.skin, c);
@@ -1837,6 +1898,7 @@
       add(j.handR, j.aim.map(v => v * weaponLength[spec.weapon])), add(j.handR, j.aim.map(v => v * -.9)),
       r.P(-.55 - r.p.sway * 1.15, 0, .1), r.P(-.5 - r.p.sway, .5, .1), r.P(-.5 - r.p.sway, -.5, .1),
       r.P(.45, .55, .05), r.P(.45, -.55, .05), r.P(-.4, .55, 1.5), r.P(-.4, -.55, 1.5), add(r.j.head, [0, 0, .75])];
+    if (spec.weapon === 'sling') for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) points.push(add(j.handR, [x * .75, y * .75, .1]));
     if (spec.weapon === 'recurve') {
       const grip = add(j.handR, j.aim.map(v => v * (r.p.draw ?? BRACE))), { U } = bowAxes(j.aim, j.side);
       points.push(add(grip, U.map(v => v * .95)), add(grip, U.map(v => v * -.95)));
@@ -1889,6 +1951,7 @@
     fit(work, g, w, h);
     keptAny = false;
     lights = [];
+    late = [];
     const fineInk = isChampion(spec.kit);
     lw = fineInk ? .02 : .028;
     fw = fineInk ? .046 : .06;
@@ -1935,6 +1998,11 @@
       out.drawImage(solid, Math.cos(a) * thick, Math.sin(a) * thick);
     }
     out.drawImage(work, 0, 0);
+    if (late.length) {
+      g = out;
+      for (const draw of late) draw();
+      g = paint;
+    }
     addLights(out);
     baked++;
     bakeTime += performance.now() - start;

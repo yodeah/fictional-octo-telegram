@@ -26,6 +26,8 @@
     falx: { name: 'Falx', style: 'melee', shape: 'arc', reach: 2.35, spread: 1.45, damage: 26, energy: 22, windup: .43, recover: .45, stance: 44, block: .22, heavy: true, twoHanded: true, breaks: true },
     // War hammer: a one-handed overhead slam that crushes stance and knocks the wind out.
     hammer: { name: 'War hammer', style: 'melee', shape: 'slam', reach: 1.65, radius: 1.15, damage: 16, energy: 18, windup: .47, recover: .46, stance: 40, block: .25, breaks: true, winded: 9 },
+    // Sling: a stone whirled overhead and loosed fast; light, but it rattles the stance.
+    sling: { name: 'Sling', style: 'ranged', shape: 'bolt', reach: 8.8, speed: 21, damage: 12, energy: 7, windup: .42, recover: .3, stance: 30, push: .7, block: .30 },
     staff: { name: 'Staff', style: 'magic', shape: 'bolt', reach: 8, speed: 11, damage: 8, energy: 6, windup: .42, recover: .42, stance: 10, block: .10, spellPower: 1.3 }
   };
 

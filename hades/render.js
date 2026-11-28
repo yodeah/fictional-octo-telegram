@@ -1510,6 +1510,23 @@
       shape([[p.x - dx * .14 + dy * .07, p.y - dy * .14 - dx * .07, z], [p.x + dx * .14, p.y + dy * .14, z], [p.x - dx * .14 - dy * .07, p.y - dy * .14 + dx * .07, z]], '#e8f3f8');
       return;
     }
+    if (!spell && p.weapon === 'sling') {
+      // A sling stone: a fast grey pebble with a faint streak, loosed from over the head.
+      const z = 1.55;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const tail = ctx.createLinearGradient(sx(p.x), sy(p.y, z), sx(p.x - dx * 1.8), sy(p.y - dy * 1.8, z));
+      tail.addColorStop(0, 'rgba(235,228,210,.5)');
+      tail.addColorStop(1, 'rgba(235,228,210,0)');
+      ctx.strokeStyle = tail;
+      ctx.lineWidth = unit * .1;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx(p.x), sy(p.y, z)); ctx.lineTo(sx(p.x - dx * 1.8), sy(p.y - dy * 1.8, z)); ctx.stroke();
+      ctx.restore();
+      orb([p.x, p.y, z], .085, '#a8a196');
+      orb([p.x - dx * .02, p.y - dy * .02, z + .03], .03, '#efe9dc', false);
+      return;
+    }
     if (!spell) {
       limb([[p.x - dx * .65, p.y - dy * .65, 1.1], [p.x, p.y, 1.1]], .065, '#e8d3a0', false);
       limb([[p.x - dx * .1, p.y - dy * .1, 1.1], [p.x + dx * .12, p.y + dy * .12, 1.1]], .1, steel, false);
