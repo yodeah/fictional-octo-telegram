@@ -1,86 +1,67 @@
-# Arena Ledger
+# Underworld Duel
 
-A browser prototype for an idle gladiator manager. The first milestone is an automated 1v1 duel in a fixed side view. The fighters use low-poly 3D geometry rendered on Canvas 2D with a perspective camera.
+An idle 2.5D arena duel seen from a high three-quarter camera, inspired by the feel of Hades. This branch holds only this game: the older side-view battler lives on other branches. All art is painted by code and none of it comes from Hades.
 
-## Design decision: fights are fully idle
+## Run
 
-**Decided 2026-11-26.** Once a fight starts, the player cannot interact with it. All choices happen between fights, and the fighters decide everything until one falls.
+There is no build step. From the project folder, open the file directly:
 
-- **Locked during a fight, including while paused:** gear and spellbook pickers, Reset, Generate matchup, the venue selector and the scene markers.
-- **Still available, because they only change how you watch:** Pause/Resume, playback speed, Quality, Hitboxes and Auto-rematch.
-- **For future features:** do not add in-fight commands, abilities, cheers or other inputs. Put player choices in preparation and progression between fights.
+```bash
+open index.html
+```
 
-This replaces the earlier idea of a "corner coach" with timed calls.
+Or serve it (stop with Ctrl+C) and visit <http://localhost:8157/>:
 
-## Run locally
+```bash
+python3 -m http.server 8157 --bind 127.0.0.1
+```
 
-Open `index.html` in a browser, or run `python3 -m http.server 8000` from this directory and visit `http://localhost:8000`. There are no dependencies or build steps.
+## How it plays
 
-Each fighter has a main weapon, optional backup weapon, shield, armor, and spellbook. These pickers, the fighter stats and the spell list are hidden so the fight stays in view; select **Show gear, stats & spells** under the fighters to open them, at any time. Pin any selection for future bouts or leave the slot on **Auto** to keep what the last matchup chose. Fighters keep their levels, stats, and gear until you select **Generate matchup**. Hover over a selector or focus it with the keyboard to read details. Gear is locked while a bout is in progress.
+Fights are fully idle. Choose a champion for each side (a mirror match is allowed) or press **Swap sides**, then watch.
 
-Armor has separate attack and defense bonuses for stab, slash, crush, magic, and ranged. The greatsword and war maul trade slower, more expensive swings for higher accuracy and damage. They use both hands, so the shield moves to the back and stops providing defense or blocks until a one-handed weapon is drawn.
+- **Champions:** by default the bout is always the same two hardcoded fighters, each with a backup weapon and a sprite of their own. **Varro the Murmillo** fights with a gladius and a painted scutum and carries two pila (javelins) on his back to throw at a fleeing archer. He wears a grilled, crested helmet, a segmented manica on the sword arm and a greave on the leading leg. **Cassian the Sagittarius** shoots a composite bow, wears a hood, scale armor and a long cloak, and draws a curved sica from his hip when he is cornered.
+- **Champion bodies:** the champions are built like figure drawings, from masses: pelvis, narrow waist, a broad ribcage flaring into the lats, a shoulder girdle out to round deltoids, biceps, forearms that narrow to the wrist, quadriceps and calves, squared fists and real feet, on longer legs than the other classes. Arms and legs keep their bone lengths, so elbows and knees bend instead of stretching. Arms are drawn as one smooth contour along a muscle profile (deltoid, biceps peak, narrow elbow, forearm swelling then narrowing to the wrist) with form shading and soft muscle creases, elbows kept in close to the ribs. The armor follows that contour: Varro's manica lames curve round the arm under a domed bronze shoulder guard, and Cassian wears team-colored sleeves under two layered leather shoulder plates. Hands are fists with knuckles, finger creases and a folded thumb, and the fingers wrap over the weapon grip. Cassian's composite recurve is drawn from a side profile: a wrapped grip with bronze collars, working limbs that sweep back toward him to bone string bridges, and stiff bone ears that flick forward again. Each limb is a solid strip with a dark sinew back (gold inlay), a pale horn belly and laminated sides, kept out of the bake's shadow pass so its colors hold against the floor. The bow is rolled around the arrow toward the camera (canted when he shoots toward or away from the camera), so it never shows edge-on. At rest he holds it low with an arrow nocked; a shot raises it, turns him side-on and draws the string to his cheek as the limbs bend deeper and the fixed-length arrow slides back until only the broadhead clears the grip. On release the string snaps straight, the arrow is gone and his hand flies back past the ear; he nocks a fresh arrow halfway through the recovery. Stowed, the bow is strapped flat across his back under the quiver, strung and empty. Varro throws a pilum overhand: carried level at the shoulder, cocked high behind the head with the shoulders turned back, whipped forward over the shoulder, and gone from his hand until he draws the next. His scutum is held angled around his front so it never shows edge-on, and Cassian carries the bow low on the run under a cloak short enough to show his legs. Arrows and pila fly as real shafts with heads, fletching and a hot streak; an arrow leaves the bow at cheek height and drops to chest height over its flight.
+- **Champion tactics:** the two champions think harder than the other classes. They sidestep a shot already in flight, and against a shot still being aimed they walk one way while the aim tracks them and cut back once it locks, so the lead sends it wide (a **DODGE** pops up). Varro weaves in short zigzags toward an archer, runs at where Cassian is heading from the middle of the floor to pin him against the wall, and dashes in the moment Cassian is recovering from a shot, out of rolls or staggered. They also dodge melee windups more often.
+- **Kicks and shield bashes:** anyone can throw a front kick up close: quick, unblockable and light on damage, but it shoves hard enough to slam a rival into stone, knocks out 16 energy and breaks a windup. Shield users also bash on their own, not only after a block, and a bash breaks a windup too (**INTERRUPTED**). The champions choose their moments: Varro bashes to stop a swing and kicks to send Cassian into the wall or off a raised shield, and Cassian kicks Varro away to make room to shoot.
+- **Other classes:** the eleven older classes (Duelist, Hoplite, Raider, Breaker, Executioner, Marksman, Skirmisher and four mages) are still in `data.js` and the balance tool, but they can't be picked: their sprites are not up to the champions' standard.
+- **Two weapons each:** every class carries a main and a backup and swaps for 7 energy. Melee fighters take a couple of shots when they cannot close; shooters and mages draw steel when caught with no escape; a spear gives way to a sword up close and a maul to a sword when tired. The spare is worn on the back.
+- **Quick movement:** melee **dashes** to close in or sidestep, shooters **roll** away, mages **blink**. Each has limited charges (the pips under the health bar), costs energy and gives a moment of invulnerability. An escape also grants a short burst of speed. A melee dash that ends beside the rival flows into a **dash-strike**: half the windup, 20% more damage.
+- **Shared with the side-view battler:** HP, mana, energy, stance and stagger, shield blocks, perfect blocks and riposte bashes, shields broken by axes and mauls, the combat triangle (gentler here), spellbooks, crowded shots and blood.
+- **New with a floor to move on:** attacks have a shape (sweep, thrust, slam, bolt) written on the ground during the windup, shields only cover the front, hits from behind are stronger, carved stone plinths block shots, and being knocked into stone staggers.
+- After 45 seconds damage rises steadily, so a cautious bout still ends.
 
-The armory contains 27 weapons across blades, polearms, axes, impact weapons, flails, ranged weapons, and staves. Twelve armor sets include four plate harnesses, four leather kits, and four robes. Weapons have different silhouettes, attack profiles, and resource costs. Armor sets trade protection, movement speed, and bonuses to their combat style.
+## How the picture is made
 
-Fighters automatically switch between their two weapons based on distance, skills, energy, mana, and the opponent’s armor. Unused weapons stay visible on the back or hip. Crossbows fire ranged bolts. Staves increase spell power by 30%. The combat triangle gives melee an advantage against leather, ranged an advantage against robes, and magic an advantage against plate. Armor also gives a small boost to its own combat style. [Old School RuneScape combat triangle](https://oldschool.runescape.wiki/w/Combat_triangle)
+This follows the pipeline of the original Hades, where characters were [built in 3D and pre-rendered into 2D frames from many angles](https://www.hyperlific.com/articles/jen-zees-2d-defiance-and-the-hand-that-paints-hades-ii/) over [hand-painted 2D environments](https://mcvuk.com/business-news/behind-the-art-of-hades-we-value-artistic-integrity-and-excellence-in-artistic-craft-at-supergiant-however-were-first-and-foremost-a-game-design-lead-team/), with a pen-and-ink look.
 
-Melee fighters press crossbow users at close range. A crowded shot loses damage and accuracy, so the shooter favors a melee backup or retreats while casting when a spell is available.
+- **Fighters are 2D sprites.** A small rig poses each frame once; it is painted in flat color with a heavy shadow side, a hot rim light and an ink outline, then cached. There are 16 facing directions and animations for idle, run, dash, windup, strike, recover, hurt, stagger and death. A broken stance drops the fighter into a staggered stance: buckled onto the back knee, weapon hanging with the blade dragging, guard sagging and head lolling while the body reels.
+- **Each class has its own headgear**: crests, pelts, horns, hoods, crowns and halos over the team color.
+- **Baked on first use**, about 1 ms a frame, with at most 1,400 frames kept; the champions get extra in-between frames, breathe while idle, swing their arms on the run, coil deeper before a blow and settle back to guard with a slight overshoot.
+- **Scenery and effects are prepainted** too: floor (with old bloodstains, broken blades, dropped shields, dented helmets and spent arrows near the edge), stone plinths, vignette, glows, sweep crescents and impact bursts are stamped, not rebuilt.
+- **Backdrop:** a drowned temple in a cavern with flowing falls, mist and light shafts. A crowd of shades hops at big blows and cheers a kill; it is drawing only and never affects the bout.
+- **Camera:** fixed high angle that zooms in while keeping both fighters in view.
 
-Both fighters start with 60 mana and 100 energy. They recover 3.6 mana and 5 energy per simulated second. Physical attacks, blocks, and dodges use energy. Swapping weapons costs 7 energy. Carrying a spare reduces movement speed by 4% and energy recovery by 0.35 per simulated second. Low energy reduces attack speed and damage. Heavier shields cover more area while slowing movement.
+The sprites are generated by code, not drawn by an artist. Painted sprite sheets could replace `sprites.js` behind the same `get()` call.
 
-| Spellbook | Role | Spells |
-| --- | --- | --- |
-| General | Balanced damage and protection | Ember Bolt, Iron Ward, Second Wind |
-| Vampiric | Damage that heals and trades health for mana | Crimson Drain, Scarlet Surge, Blood Pact |
-| Glacial | Fight at range with slows, a freeze, and shielding | Frost Lance, Winter Barrage, Glacial Shell |
-| Storm | Burst damage and energy control | Arc Flash, Thunderclap, Tailwind |
+## Address options
 
-Equip a staff and select **None** for the backup to run a dedicated mage. Staff Spark gives that build a weak free spell when mana runs out. A staff and another weapon form a hybrid. A melee weapon, crossbow, and spellbook let the fighter use all three styles in one bout. The Vampiric and Glacial books draw inspiration from the healing and freezing effects of [Old School RuneScape’s Ancient Magicks](https://oldschool.runescape.wiki/w/Ancient_Magicks).
+`?a=murmillo&b=murmillo` pins the champions (`murmillo` or `sagittarius`), `?seed=7` repeats a bout, `?debug` draws collision shapes, `?fps` shows frame rate, draw time and the sprite cache.
 
-Melee swings check the moving weapon against the shield and body regions. Head, body, arm, and leg hits deal different damage and produce different reactions. The defeated fighter falls with a jointed ragdoll. Some killing blows end in a finisher, chosen by weapon and hit zone (`finishers.js`): a frost shatter, a bolt pin, a rare beheading, a rapier run-through with a kick, a grounded maul collapse, or a rare finishing spear throw. Finishers start after the winner is decided and only change drawing. Toggle **Hitboxes** to see collision shapes.
+## Code
 
-Fighters move and act on independent clocks, so windups can overlap and either fighter can land a follow-up. Heavy two-handed melee weapons hit harder, use more energy, and recover more slowly. Very high Strength shortens their recovery. Hits and blocks can wear down the stance meter. A stance break lowers the fighter into a vulnerable stagger. Shields can bash after a block or interrupt a nearby heavy windup. A perfect block earns a riposte bash with knockback, and being knocked into the arena edge staggers. Bucklers bash faster and tower shields hit harder. Once per bout, a staggered fighter may throw sand to blind a nearby attacker for 2 seconds. To test these, open `index.html?force=perfect,wall,sand` (any subset) to make them trigger whenever they can. [Elden Ring combat guide](https://www.bandainamcoent.com/es_mx/news/elden-ring-introduction-part-4-combat-guide)
+| File (in `hades/`) | Contents |
+| --- | --- |
+| `data.js` | weapons, armor, spells, movement, classes, arena size |
+| `sim.js` | the duel with no DOM: decisions, movement, hits, projectiles |
+| `sprites.js` | rig, painting and the sprite cache |
+| `render.js` | camera, scenery, sprite placement, effects |
+| `main.js` | matchups, clock, HUD, controls |
 
-The Sand Pit, Fernwood Clearing, and Moonlit Ruins rotate every one to three completed bouts. Between bouts, select the venue name to preview the next one, or select a marker in the scene to cheer with spectators, startle wildlife, or stir the ruins’ birds and fireflies.
+`tools/sprites.html?kit=murmillo` shows every facing and animation of one fighter at full size, for checking art (serve the folder first). Add `&facings=3,5&scale=1.5` for a close look at chosen directions, `&rows=windup,active` for chosen animations and `&shape=kick` to see a kick.
 
-Pause or change speed to control how you watch a bout. Auto-rematch runs back-to-back bouts until switched off. Win totals last for the current page session.
+Balance check without a browser:
 
-The **Quality** menu saves your choice for the next visit. Low is the default. Medium and High refine the fighters, equipment, bolts, finisher props and the three venues. High draws about twice as much geometry as Low in the reference bout.
-
-**Generate matchup** rolls two new fighters with a level gap of at most nine, different combat builds, and equipment suited to each build. Neither fighter keeps a weapon from the previous bout, both levels change, and each fighter receives a different spellbook. Generated matches roll all gear slots. **Rematch**, **Auto-rematch**, and **Reset** keep the same two fighters.
-
-The in-game **Mechanics guide** (`mechanics.html`) explains the combat rules and lists improvement ideas. Its numbers are written by hand, so update it when combat values change.
-
-## Weapon specials
-
-Rare special weapons (`specials.js`) reuse an existing weapon's model with new colors and small details, and change the fight through a few hooks that `arena.js` calls (attack start, landed hit, every step, blocking, weapon choice and drawing). A generated fighter carries one 5% of the time; the **Main** and **Backup** pickers list them, marked ★, under *Special weapons*, so you can equip one before a fight. A fighter carries at most one special. There are fifteen: **Stormbrand** (sword, lightning after three landed hits), **Snarecaster** (crossbow, a 3-second root), **Last Oath** (greatsword, +60% damage and lifesteal below 10% health, no blocking), **Dawn Mender** (mace, an interruptible heal below 35% health), **Dragon Bow** (crossbow, one burning double shot), **Winter’s Bite** (axe, every third hit freezes), **Leech Fang** (rapier, heals on hit, costs HP on a miss), **Earthshaker** (maul, one stance-breaking slam), **Jailer’s Chain** (flail, one pull) **Phoenix Spear** (survives one killing blow at 1 HP and sets the attacker burning), **Tidecaller** (trident, every third hit a wave that can slam the target into the wall), **Gambler’s Club** (club, a die roll per swing: 6 triples, 1 fumbles), **Briar Blade** (falchion, thorns), **Pendulum** (twin flail, momentum that speeds up swings) and **Headsman’s Verdict** (executioner blade, one unblockable execution below 25% health). The mechanics guide has the numbers. `?force=oath,mender,pull,verdict` makes the health- and distance-gated ones trigger early for testing. The scoreboard shows each fighter's special and its state.
-
-## Combat effects
-
-Hits, heavy blocks, and stance breaks shake the arena, with the strongest shake on the finishing blow. The shake is off when the system asks for reduced motion. Melee swings leave a short trail behind the weapon head, warmer for heavy weapons. Blows flash at the contact point, blocks and hits on plate throw sparks, and footfalls, heavy blows, stance breaks, and falling bodies raise dust tinted to the venue. A blocked crossbow bolt stays stuck in the shield for the rest of the bout. Weapon wounds spray blood that stains the ground until the next bout, and a fighter felled by a weapon leaves a spreading pool. Damage numbers grow with the share of health lost, show the hit zone and armor weakness underneath, turn gold for head hits and green for healing, and stay readable at any playback speed. All effects live in `effects.js` and are cosmetic: they never change fight state or use the simulation's random rolls.
-
-## Animation
-
-Fighters coil before they swing and carry the weapon through after it lands, then settle back to guard. Heavy two-handed weapons coil deepest, spears draw back for a thrust, crossbows steady the aim and kick on release, and staves gather power before pushing a spell out. Blows knock the defender back by more for heavier hits and a larger share of health lost, and big hits force a stumble step. Head hits snap the head back, body blows double the fighter over, arm hits fling the arm, and leg hits buckle the knee. A blocked weapon rebounds off the shield while the defender braces, and a miss overreaches. This motion is drawing only: `fighterPose` stays the combat pose that hit detection, guarding and movement use, and `displayPose` adds the animation on top for rendering. While a blow can still connect, both fighters are drawn exactly in their combat pose, so **Hitboxes** match what you see when it matters.
-
-## Renderers and benchmark
-
-The benchmark overlay is hidden by default so it never covers the fight. Select **FPS** next to the speed control to show or hide it, or open `index.html?bench` to start with it open. It reports current, average and minimum FPS (over half-second windows), the worst frame interval, main-thread draw time, and frame drops: frames that take more than 1.5 times the expected interval for the screen's refresh rate, which is estimated from the fastest animation frames (`?hz=60` overrides it). The first second after loading, Reset or a toggle is ignored, and so is time while paused or in a hidden tab. The text updates four times a second.
-
-The overlay toggles the fighter painter between **Canvas** (the default) and **WebGL**, and **Polys 1×/3×** builds each fighter three times over to test three times as many polygons with the same picture. The choices are saved in the browser; `?renderer=webgl` and `?polygons=3` set them from the address bar.
-
-Opening with `?bench` adds face and triangle-equivalent counts by fighter part, plus cached and animated scenery counts and the most recent backdrop rebuild time. The same breakdown is available from `ArenaBench.snapshot()` while that overlay is open. Use **Polys 1×** to compare Quality levels.
-
-The second row of buttons finds what limits the frame rate on a device. **Res full / Res 1×** draws the arena at up to 2 pixels per CSS pixel or at 1 (`?res=1`), which tests fill rate. **Fighters**, **Scenery** and **Effects** each skip drawing that part: the fighters' polygons and shadows, the animated crowd and wildlife, or dust, trails, blood, sparks, magic, bolts and damage numbers. These toggles change only the picture, are never saved, and add **TEST TOGGLE ON** to the overlay while active. The **Scene · Fighters · FX** line shows the main-thread milliseconds each part took per frame. Only the depth-sorted fighter polygons move to WebGL (`gl-renderer.js`). They are painted in sorted order into an offscreen WebGL canvas that is drawn into the arena canvas where Canvas 2D would have filled them, so backdrops, shadows and effects keep their layering. Concave and self-crossing polygons use a stencil pass with the same nonzero fill rule as Canvas 2D. Rendering is capped at 120 FPS; skipped frames leave the simulation clock alone, so the next frame advances by the full elapsed time.
-
-Measured at phone size on a Mac (60 Hz), both renderers held 60 FPS with no drops at 1× and 3×. WebGL cut main-thread draw time from 3.2 to 2.3 ms at 1× and from 9.2 to 5.0 ms at 3×, and painting alone from 1.8 to 0.4 ms. The first test on a phone reported about 24 FPS on Canvas and 22 FPS on WebGL. The follow-up phone profiling steps and full measurements are in [docs/rendering-performance.md](docs/rendering-performance.md). The plan for doubling geometric detail with a Quality setting is in [docs/detail-rework-plan.md](docs/detail-rework-plan.md).
-
-## Armor geometry
-
-The prototype projects procedural 3D shapes onto Canvas 2D. With the fighter in an idle pose, the standard plate torso and helmet submit 1,044 triangle equivalents on Low and 1,980 on High. Leather goes from 853 to 1,569 and robes go from 695 to 1,281. The counts triangulate the polygons passed to the renderer. Rendered size and frame time also matter when comparing detail at the in-game camera distance.
-
-## Development plan
-
-1. **Duel prototype** — Establish readable attacks, hits, blocks, and a clear outcome. Use repeated matches to tune reach, damage, and timing.
-2. **Stable management** — Recruit a small roster and assign weapons and training. Give bout results consequences through earnings, fatigue, and recovery.
-3. **Idle progression** — Save the stable locally and resolve scheduled bouts when the player returns. Let the player replay bouts from the same simulation results used to update the stable.
+```bash
+node tools/hades-balance.js 60
+```

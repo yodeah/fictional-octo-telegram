@@ -1,5 +1,5 @@
 // Gear, spells and fighter kits for the 2.5D arena. Weapon damage, energy costs, armor matchups and
-// spells follow the 2D battler (arena.js); reach and timing are retuned for a two-dimensional floor.
+// spells came from the old side-view battler; reach and timing are tuned for a two-dimensional floor.
 // Loads in the browser and in Node (tools/hades-balance.js).
 (function (root) {
   // shape: arc (sweep), thrust (narrow lunge), slam (circle where the weapon lands), bolt (projectile).
