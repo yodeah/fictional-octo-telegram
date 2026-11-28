@@ -66,7 +66,7 @@
     const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0, breath: 0, swing: 0 };
     if (weapon === 'spear' || weapon === 'trident') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
-    if (['maul', 'greatsword', 'mace', 'axe', 'flail', 'falx'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
+    if (['maul', 'greatsword', 'mace', 'axe', 'flail', 'falx', 'hammer'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
     if (weapon === 'staff') { p.yaw = .75; p.pitch = 1.38; }
     if (weapon === 'crossbow' || weapon === 'bow' || weapon === 'recurve') { p.yaw = .16; p.pitch = 0; p.out = .32; p.high = 1.14; }
     const wave = Math.sin(t * Math.PI * 2);
@@ -348,7 +348,7 @@
     }
   }
 
-  const weaponLength = { falx: 1.4, flail: 1.05, trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
+  const weaponLength = { hammer: 1.15, falx: 1.4, flail: 1.05, trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
 
   // along(d, w): d from the hand toward the point, w across.
   function weapon(kind, hand, aim, side, look, charge) {
@@ -906,6 +906,25 @@
       poly([...back.slice(1, 10).map((v, i) => lerp(v, edge[9 - i], .55)), ...edge.slice(1)], metal.iron, false);
       fine([...edge.slice().reverse().slice(1), tip], metal.edge, .018);
       fine(back.slice(1, 9).map((v, i) => lerp(v, edge[9 - i], .2)), metal.dark, .014);
+    },
+    hammer(al, aim, side, look) {
+      // An ash haft with a leather grip and iron langets, and a forged head: a square striking face
+      // on one side, a down-curved spike on the other and a short point on top.
+      taper(al(-.22), al(.86), .062, .056, '#7a432c');
+      fine([al(-.2, .012), al(.84, .012)], '#a8693f', .012);
+      taper(al(-.18), al(.12), .074, .074, '#5b3322');
+      for (const d of [-.12, -.04, .04]) fine([al(d, -.035), al(d + .02, .035)], '#2a160e', .012);
+      disc(al(-.25), .05, metal.iron);
+      for (const w of [-.03, .03]) fine([al(.56, w), al(.82, w)], metal.dark, .016);
+      const W = flatAcross(aim, side);
+      const at = (d, w) => add(al(d), W.map(v => v * w));
+      poly([at(.8, -.06), at(.8, .17), at(.77, .17), at(.77, .25), at(1.01, .25), at(1.01, .17), at(.98, .17), at(.98, -.06)], metal.iron);
+      poly([at(.77, .19), at(.77, .25), at(1.01, .25), at(1.01, .19)], metal.steel, .012);
+      fine([at(.79, .24), at(.99, .24)], metal.edge, .012);
+      poly([at(.82, -.06), at(.8, -.2), at(.72, -.34), at(.86, -.22), at(.96, -.06)], metal.steel);
+      fine([at(.86, -.08), at(.76, -.3)], metal.edge, .01);
+      poly([at(.98, -.04), at(1.14, 0), at(.98, .04)], metal.steel, .012);
+      disc(at(.89, .05), .03, '#d39a3e', .01);
     },
     pilum(al, aim, side, look) {
       // Wooden shaft, a lead weight, a long iron shank and a small pyramid point, a little taller
