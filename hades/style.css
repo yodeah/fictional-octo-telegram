@@ -52,6 +52,11 @@ button:disabled, select:disabled { opacity: .45; cursor: default; }
 button.primary { background: linear-gradient(#e6b757, #a7762c); color: #1d1204; font-weight: 800; min-width: 120px; }
 button.primary:hover:enabled { background: linear-gradient(#ffd176, #bd8a37); }
 a { color: #8fd8c8; margin-left: auto; }
+.loadouts { display: grid; gap: 6px; margin-top: 10px; }
+.slot { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 6px 10px; background: #0a2027; border-left: 3px solid var(--team); border-radius: 4px; }
+.slot b { min-width: 64px; font-family: "Copperplate", "Cinzel", Georgia, serif; letter-spacing: .05em; color: var(--team); }
+.slot label { display: flex; gap: 6px; align-items: center; color: #9fd0c4; font-size: 12px; }
+.slot select { padding: 4px 8px; }
 #log { list-style: none; padding: 0; margin: 12px 0 0; max-height: 84px; overflow: auto; color: #8fb4ac; font-size: 12px; }
 @media (max-width: 760px) {
   main { min-width: 0; width: 100%; padding: 6px; }

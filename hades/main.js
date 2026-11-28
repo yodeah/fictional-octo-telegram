@@ -12,13 +12,49 @@
   let duel, state = 'ready', speed = 0, bout = 1, accumulator = 0, pause = 0, slow = 0, rematch = 0;
   let matchup;
   // Only the two detailed champions can be picked. The older classes stay in data.js but their
-  // sprites are not up to the same standard, so they are left out of the menus.
+  // sprites are not up to the same standard, so they are left out of the menus. Each fighter's
+  // weapons can be changed from the champion's own.
   const keys = Object.keys(kits).filter(key => kits[key].champion);
-  const pickers = [0, 1].map(i => $('kit' + i));
+  const gearOf = key => ({ kit: key, weapon: kits[key].weapon, reserve: kits[key].reserve });
+  const loadouts = names.map((name, i) => gearOf(i ? 'sagittarius' : 'murmillo'));
+  const teamColors = ['#ff8a6a', '#7fd0ff'];
 
   function newMatchup() {
-    matchup = pickers.map(picker => picker.value);
+    matchup = loadouts.map(entry => ({ ...entry }));
     wins[0] = wins[1] = 0;
+  }
+
+  function choice(label, options, value, change) {
+    const wrap = document.createElement('label');
+    const select = document.createElement('select');
+    for (const [key, text] of options) select.add(new Option(text, key));
+    select.value = value;
+    select.addEventListener('change', () => change(select.value));
+    wrap.append(label + ' ', select);
+    return wrap;
+  }
+
+  // One row per fighter: champion, main weapon, backup.
+  function buildLoadouts() {
+    const weaponOptions = Object.entries(weapons).map(([key, w]) => [key, w.name]);
+    $('loadouts').replaceChildren(...loadouts.map((entry, i) => {
+      const row = document.createElement('div');
+      row.className = 'slot';
+      row.style.setProperty('--team', teamColors[i]);
+      const name = document.createElement('b');
+      name.textContent = names[i];
+      const changed = () => {
+        if (state === 'finished') bout++;
+        newMatchup();
+        setup();
+      };
+      row.append(name,
+        choice('Champion', keys.map(key => [key, kits[key].name]), entry.kit, value => { loadouts[i] = gearOf(value); buildLoadouts(); changed(); }),
+        choice('Main', weaponOptions, entry.weapon, value => { entry.weapon = value; changed(); }),
+        choice('Backup', weaponOptions, entry.reserve, value => { entry.reserve = value; changed(); }));
+      return row;
+    }));
+    updateControls();
   }
 
   function setup(seed = Math.floor(Math.random() * 1e9)) {
@@ -42,7 +78,7 @@
     $('play').textContent = { ready: 'Begin duel', running: 'Pause', paused: 'Resume', finished: 'Rematch' }[state];
     const locked = state === 'running' || state === 'paused';
     $('generate').disabled = locked;
-    pickers.forEach(picker => { picker.disabled = locked; });
+    for (const select of $('loadouts').querySelectorAll('select')) select.disabled = locked;
     $('bout').textContent = String(bout).padStart(2, '0');
   }
 
@@ -163,10 +199,11 @@
     else if (state === 'finished') { bout++; setup(); begin(); }
     else { state = state === 'running' ? 'paused' : 'running'; updateControls(); }
   });
-  // Swaps which champion stands on which side.
+  // Swaps which champion and gear stand on which side.
   $('generate').addEventListener('click', () => {
     if (state === 'finished') bout++;
-    [pickers[0].value, pickers[1].value] = [pickers[1].value, pickers[0].value];
+    loadouts.reverse();
+    buildLoadouts();
     newMatchup();
     setup();
   });
@@ -174,23 +211,15 @@
     speed = (speed + 1) % speeds.length;
     $('speed').textContent = speeds[speed] + '×';
   });
-  pickers.forEach(picker => {
-    for (const key of keys) picker.add(new Option(`${kits[key].name} — ${weapons[kits[key].weapon].name} + ${weapons[kits[key].reserve].name}`, key));
-    picker.addEventListener('change', () => {
-      if (state === 'finished') bout++;
-      newMatchup();
-      setup();
-    });
-  });
-
   // ?a=murmillo&b=murmillo pins the champions (a mirror match), ?seed=7 repeats a bout, ?debug draws collision shapes.
   // Without them the two champions meet: Varro the murmillo against Cassian the archer.
-  pickers.forEach((picker, i) => {
+  loadouts.forEach((entry, i) => {
     const key = params.get(i ? 'b' : 'a');
-    picker.value = keys.includes(key) ? key : i ? 'sagittarius' : 'murmillo';
+    if (keys.includes(key)) loadouts[i] = gearOf(key);
   });
 
   Render.init($('arena'));
+  buildLoadouts();
   newMatchup();
   setup(params.has('seed') ? Number(params.get('seed')) : undefined);
 

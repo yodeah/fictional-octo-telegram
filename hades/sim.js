@@ -23,8 +23,13 @@
 
   const styleOf = f => weapons[f.weapon].style;
 
-  function createFighter(index, kitKey, name) {
-    const kit = kits[kitKey];
+  // entry is a kit key, or { kit, weapon, reserve, armor } to change that kit's gear. A fighter who
+  // picks up a staff without a spellbook of their own gets the Ember Priest's.
+  function createFighter(index, entry, name) {
+    const { kit: kitKey, ...gear } = typeof entry === 'string' ? { kit: entry } : entry;
+    const kit = { ...kits[kitKey] };
+    for (const [slot, key] of Object.entries(gear)) if (key) kit[slot] = key;
+    if (!kit.spells && [kit.weapon, kit.reserve].some(key => weapons[key].style === 'magic')) kit.spells = kits.emberpriest.spells;
     const move = moves[kit.move];
     const x = index ? 6 : -6;
     return {
@@ -143,7 +148,7 @@
 
   function pickSpell(duel, f, rival) {
     let best = 'spark', bestScore = spells.spark.damage;
-    for (const key of f.kit.spells) {
+    for (const key of f.kit.spells || []) {
       const spell = spells[key];
       if (f.mana < spell.cost || duel.time < (f.cooldowns[key] || 0)) continue;
       const support = supportScore(duel, f, spell);
