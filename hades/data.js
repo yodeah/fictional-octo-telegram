@@ -22,6 +22,8 @@
     trident: { name: 'Trident', style: 'melee', shape: 'thrust', reach: 2.85, spread: .6, damage: 14, energy: 14, windup: .31, recover: .38, stance: 26, block: .30, hinder: .9 },
     // Flail: a spiked ball on a chain that whips around a raised shield, so it is rarely blocked.
     flail: { name: 'Flail', style: 'melee', shape: 'arc', reach: 2.15, spread: 1.3, damage: 17, energy: 17, windup: .35, recover: .4, stance: 34, block: .06 },
+    // Falx: a two-handed Dacian blade hooked forward like a beak; heavy, and it splits shields.
+    falx: { name: 'Falx', style: 'melee', shape: 'arc', reach: 2.35, spread: 1.45, damage: 26, energy: 22, windup: .43, recover: .45, stance: 44, block: .22, heavy: true, twoHanded: true, breaks: true },
     staff: { name: 'Staff', style: 'magic', shape: 'bolt', reach: 8, speed: 11, damage: 8, energy: 6, windup: .42, recover: .42, stance: 10, block: .10, spellPower: 1.3 }
   };
 

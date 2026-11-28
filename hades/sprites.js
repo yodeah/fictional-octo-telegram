@@ -66,7 +66,7 @@
     const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0, breath: 0, swing: 0 };
     if (weapon === 'spear' || weapon === 'trident') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
-    if (['maul', 'greatsword', 'mace', 'axe', 'flail'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
+    if (['maul', 'greatsword', 'mace', 'axe', 'flail', 'falx'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
     if (weapon === 'staff') { p.yaw = .75; p.pitch = 1.38; }
     if (weapon === 'crossbow' || weapon === 'bow' || weapon === 'recurve') { p.yaw = .16; p.pitch = 0; p.out = .32; p.high = 1.14; }
     const wave = Math.sin(t * Math.PI * 2);
@@ -194,7 +194,7 @@
     j.handR = P(shift + Math.cos(p.yaw) * reach - p.swing * .14, Math.sin(p.yaw) * reach + .08, handZ + Math.abs(p.swing) * .03);
     j.aim = vector(Math.cos(p.yaw) * Math.cos(p.pitch), Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch));
     j.side = vector(-Math.sin(p.yaw), Math.cos(p.yaw), 0);
-    const twoHanded = ['maul', 'greatsword', 'spear', 'trident', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
+    const twoHanded = ['maul', 'greatsword', 'spear', 'trident', 'falx', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
     j.handL = spec.shield ? P(shift + .4 - p.droop * .14 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3 - p.droop * .08, 1.04 + chestUp - p.crouch + p.bob - p.droop * .3)
       : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (spec.weapon === 'recurve' ? BRACE : ['crossbow', 'bow'].includes(spec.weapon) ? .42 : .26)))
         : P(shift + .12 - st * .3 + p.swing * .1, fine ? -.42 : -.48, .9 + tall * .6 + p.bob + (anim === 'run' ? .1 : 0));
@@ -348,7 +348,7 @@
     }
   }
 
-  const weaponLength = { flail: 1.05, trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
+  const weaponLength = { falx: 1.4, flail: 1.05, trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
 
   // along(d, w): d from the hand toward the point, w across.
   function weapon(kind, hand, aim, side, look, charge) {
@@ -793,6 +793,16 @@
     return { A, s, U, L: cross(A, U) };
   }
 
+  // The direction across a blade that lies flat to the camera, on the same side as side: a broad
+  // blade then shows its full shape instead of turning edge-on.
+  function flatAcross(aim, side) {
+    const s = Math.hypot(...aim) || 1, k = Math.hypot(...side) || 1;
+    const F = cross(aim.map(v => v / s), CAM), n = Math.hypot(...F);
+    if (n < .25) return side;
+    const sign = F[0] * side[0] + F[1] * side[1] + F[2] * side[2] < 0 ? -1 : 1;
+    return F.map(v => v / n * k * sign);
+  }
+
   const championGear = {
     gladius(al, aim, side, look) {
       // A short, broad stabbing blade with a ball pommel and an oval guard.
@@ -871,6 +881,31 @@
       disc(ball, .12, metal.iron);
       disc(add(ball, [0, 0, .035]), .045, metal.steel, false);
       disc(add(ball, [0, 0, .05]), .018, metal.edge, false);
+    },
+    falx(al, aim, side, look) {
+      // A long two-handed grip bound in team-colored leather, a bronze collar, and a short heavy
+      // blade that bends forward into a hook, the edge on the inside of the curve. The blade is
+      // laid flat to the camera so its shape reads from every side.
+      taper(al(-.42), al(.4), .07, .066, '#5b3322');
+      for (const d of [-.3, .02]) taper(al(d), al(d + .14), .078, .078, look.main);
+      for (const d of [-.26, -.2, .06, .12]) fine([al(d, -.035), al(d + .02, .035)], look.deep, .01);
+      disc(al(-.45), .055, '#d39a3e');
+      taper(al(.36), al(.44), .1, .09, '#d39a3e');
+      fine([al(.38, -.02), al(.42, -.02)], '#ffdc8c', .012);
+      const W = flatAcross(aim, side);
+      const at = (d, w) => add(al(d), W.map(v => v * w));
+      const bend = d => .62 * (d - .44) * (d - .44);
+      const back = [], edge = [];
+      for (let i = 0; i <= 10; i++) {
+        const d = .44 + i * .08, w = .1 * (1 - i / 13);
+        back.push(at(d, bend(d) - w));
+        edge.unshift(at(d, bend(d) + w * .7));
+      }
+      const tip = at(1.3, bend(1.3) + .1);
+      poly([...back, tip, ...edge], metal.steel);
+      poly([...back.slice(1, 10).map((v, i) => lerp(v, edge[9 - i], .55)), ...edge.slice(1)], metal.iron, false);
+      fine([...edge.slice().reverse().slice(1), tip], metal.edge, .018);
+      fine(back.slice(1, 9).map((v, i) => lerp(v, edge[9 - i], .2)), metal.dark, .014);
     },
     pilum(al, aim, side, look) {
       // Wooden shaft, a lead weight, a long iron shank and a small pyramid point, a little taller
