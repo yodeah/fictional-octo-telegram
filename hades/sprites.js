@@ -66,7 +66,7 @@
     const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0, breath: 0, swing: 0 };
     if (weapon === 'spear' || weapon === 'trident') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
-    if (['maul', 'greatsword', 'mace', 'axe'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
+    if (['maul', 'greatsword', 'mace', 'axe', 'flail'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
     if (weapon === 'staff') { p.yaw = .75; p.pitch = 1.38; }
     if (weapon === 'crossbow' || weapon === 'bow' || weapon === 'recurve') { p.yaw = .16; p.pitch = 0; p.out = .32; p.high = 1.14; }
     const wave = Math.sin(t * Math.PI * 2);
@@ -127,6 +127,11 @@
           p.lean = key(.06, -.14, .3);
         } else { p.yaw = key(p.yaw, 0, 0); p.out = key(p.out, .42, .2); p.lean = key(.06, .1, -.18); }
       }
+    }
+    // A flail's chain hangs at rest, starts to swing in the windup and flies straight out in the blow.
+    if (weapon === 'flail') {
+      p.fling = anim === 'windup' ? .25 + .45 * ease(t) : anim === 'active' ? 1 : anim === 'recover' ? 1 - .85 * ease(t)
+        : anim === 'run' ? .15 + Math.abs(wave) * .1 : 0;
     }
     return p;
   }
@@ -343,7 +348,7 @@
     }
   }
 
-  const weaponLength = { trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
+  const weaponLength = { flail: 1.05, trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
 
   // along(d, w): d from the hand toward the point, w across.
   function weapon(kind, hand, aim, side, look, charge) {
@@ -838,6 +843,34 @@
           poly([al(tip - .15, w + s * .046), al(tip - .27, w + s * .09), al(tip - .2, w + s * .02)], metal.steel, .012);
         }
       }
+    },
+    flail(al, aim, side, look, charge) {
+      // A short haft with an iron ferrule, a chain of links and a spiked ball. The chain hangs
+      // under its own weight unless the swing flings it out along the haft.
+      const fling = charge && typeof charge === 'object' ? charge.fling : 0;
+      taper(al(-.2), al(.3), .07, .064, '#5b3322');
+      for (const d of [-.14, -.06, .02]) fine([al(d, -.032), al(d + .02, .032)], '#2a160e', .012);
+      taper(al(.24), al(.34), .085, .075, metal.iron);
+      disc(al(-.23), .05, '#d39a3e');
+      const top = al(.35), length = .62 * SIZE, s = Math.hypot(...aim) || 1;
+      const out = aim.map(v => v / s * (.25 + fling)), dir = add(out, [0, 0, -(1 - fling) * 1.1]);
+      const size = Math.hypot(...dir) || 1;
+      const ball = add(top, dir.map(v => v / size * length));
+      // A little sag in the middle of the chain while it hangs slack.
+      const mid = add(lerp(top, ball, .5), [0, 0, -(1 - fling) * .04]);
+      for (let i = 1; i <= 7; i++) {
+        const u = i / 8, at = lerp(lerp(top, mid, u), lerp(mid, ball, u), u);
+        disc(at, i % 2 ? .026 : .02, i % 2 ? metal.iron : metal.dark, .01);
+      }
+      const across = side.map(v => v / (Math.hypot(...side) || 1)), up = [0, 0, 1];
+      const ring = (a, r) => add(ball, add(across.map(v => v * Math.cos(a) * r), up.map(v => v * Math.sin(a) * r)));
+      for (let k = 0; k < 8; k++) {
+        const a = k / 8 * Math.PI * 2 + .2;
+        poly([ring(a - .3, .1), ring(a, .2), ring(a + .3, .1)], metal.steel, .012);
+      }
+      disc(ball, .12, metal.iron);
+      disc(add(ball, [0, 0, .035]), .045, metal.steel, false);
+      disc(add(ball, [0, 0, .05]), .018, metal.edge, false);
     },
     pilum(al, aim, side, look) {
       // Wooden shaft, a lead weight, a long iron shank and a small pyramid point, a little taller
@@ -1647,7 +1680,8 @@
 
     part(j.head, () => (varro ? murmilloHead : archerHead)(r, look, c, facing), .16);
     if (!p.thrown) part(lerp(j.handR, add(j.handR, j.aim), .45), () => {
-      const held = () => weapon(spec.weapon, j.handR, j.aim, j.side, look, spec.weapon === 'recurve' && p.draw !== undefined ? { draw: p.draw, charge: p.charge } : p.charge);
+      const held = () => weapon(spec.weapon, j.handR, j.aim, j.side, look, spec.weapon === 'recurve' && p.draw !== undefined ? { draw: p.draw, charge: p.charge }
+        : spec.weapon === 'flail' ? { fling: p.fling } : p.charge);
       if (spec.weapon === 'recurve') kept(held); else held();
       // Fingers close over the grip, drawn after the weapon so the hand holds it.
       if (spec.weapon === 'recurve') gripWrap(j.handL, bowAxes(j.aim, j.side).U, c.skin, c);
