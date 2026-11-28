@@ -44,7 +44,11 @@
   const armors = {
     plate: { name: 'Plate', style: 'melee', power: 1.06, defense: 12, mobility: .95, taken: { melee: .98, ranged: .88, magic: 1.1 } },
     leather: { name: 'Leather', style: 'ranged', power: 1.09, defense: 7, mobility: 1.04, taken: { melee: 1.07, ranged: .98, magic: .9 } },
-    robes: { name: 'Robes', style: 'magic', power: 1.12, defense: 3, mobility: 1.02, taken: { melee: 1.05, ranged: 1.08, magic: .98 } }
+    robes: { name: 'Robes', style: 'magic', power: 1.12, defense: 3, mobility: 1.02, taken: { melee: 1.05, ranged: 1.08, magic: .98 } },
+    // Worn over a champion's own outfit (see sprites.js armorLooks).
+    // Lorica segmentata: steel hoops and shoulder lames; strong against blades and arrows, but heavy
+    // enough that an archer can keep away.
+    segmentata: { name: 'Lorica segmentata', style: 'melee', power: 1, defense: 10, mobility: .89, taken: { melee: 1, ranged: .9, magic: 1.12 } }
   };
 
   const spells = {

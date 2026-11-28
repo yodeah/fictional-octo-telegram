@@ -15,7 +15,9 @@
   // sprites are not up to the same standard, so they are left out of the menus. Each fighter's
   // weapons can be changed from the champion's own.
   const keys = Object.keys(kits).filter(key => kits[key].champion);
-  const gearOf = key => ({ kit: key, weapon: kits[key].weapon, reserve: kits[key].reserve });
+  const gearOf = key => ({ kit: key, weapon: kits[key].weapon, reserve: kits[key].reserve, armor: kits[key].armor });
+  // Leather stands for the champion's own outfit; the others are worn over it.
+  const armorChoices = ['leather', 'segmentata', 'cuirass', 'pelt'].filter(key => armors[key]);
   const loadouts = names.map((name, i) => gearOf(i ? 'sagittarius' : 'murmillo'));
   const teamColors = ['#ff8a6a', '#7fd0ff'];
 
@@ -34,9 +36,10 @@
     return wrap;
   }
 
-  // One row per fighter: champion, main weapon, backup.
+  // One row per fighter: champion, main weapon, backup, armor.
   function buildLoadouts() {
     const weaponOptions = Object.entries(weapons).map(([key, w]) => [key, w.name]);
+    const armorOptions = armorChoices.map(key => [key, key === 'leather' ? 'Own outfit' : armors[key].name]);
     $('loadouts').replaceChildren(...loadouts.map((entry, i) => {
       const row = document.createElement('div');
       row.className = 'slot';
@@ -51,7 +54,8 @@
       row.append(name,
         choice('Champion', keys.map(key => [key, kits[key].name]), entry.kit, value => { loadouts[i] = gearOf(value); buildLoadouts(); changed(); }),
         choice('Main', weaponOptions, entry.weapon, value => { entry.weapon = value; changed(); }),
-        choice('Backup', weaponOptions, entry.reserve, value => { entry.reserve = value; changed(); }));
+        choice('Backup', weaponOptions, entry.reserve, value => { entry.reserve = value; changed(); }),
+        choice('Armor', armorOptions, entry.armor, value => { entry.armor = value; changed(); }));
       return row;
     }));
     updateControls();

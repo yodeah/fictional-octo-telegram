@@ -811,6 +811,46 @@
     return { A, s, U, L: cross(A, U) };
   }
 
+  // Armor a champion can wear over their own outfit. Each look recolors the torso and adds its
+  // own torso, shoulder, hip and mantle details; a champion in their own outfit has none.
+  const steelLight = '#b9c7d0';
+  const armorLooks = {
+    segmentata: {
+      body: steelLight,
+      under: look => look.deep,
+      torso({ surface, chestZ, hipZ, front, clipToTorso }) {
+        clipToTorso();
+        // Girth hoops from the waist up, each lapping over the one below, with a lit top edge.
+        const across = [-.4, -.26, -.13, 0, .13, .26, .4];
+        const row = z => across.map(r => surface(r, z));
+        const bands = 5, low = hipZ + .1, high = chestZ - .02, step = (high - low) / bands;
+        for (let k = 0; k < bands; k++) {
+          const z0 = low + k * step, z1 = z0 + step + .015;
+          poly([...row(z1), ...row(z0).reverse()], k % 2 ? metal.iron : steelLight, .012);
+          fine(row(z1 - .014), metal.edge, .012);
+        }
+        // Two upper plates over the chest, hinged with brass, and the fastenings down the middle.
+        for (const s of [-1, 1]) {
+          const plate = [surface(s * .03, chestZ + .21), surface(s * .3, chestZ + .17), surface(s * .32, chestZ - .02), surface(s * .03, chestZ - .02)];
+          poly(plate, s > 0 ? steelLight : metal.iron, .012);
+          fine([surface(s * .05, chestZ + .19), surface(s * .28, chestZ + .15)], metal.edge, .012);
+          for (const z of [chestZ + .08, low + step * 1.5, low + step * 3.5]) disc(surface(s * .06, z), .018, '#d39a3e', .008);
+        }
+        fine([surface(0, chestZ + .2), surface(0, low)], front ? '#8a5a22' : metal.dark, .016);
+        g.restore();
+      },
+      shoulder(S, tE, away) {
+        // Three overlapping lames over the deltoid, the top one smallest.
+        limbShell(S, tE * .5, 1.38, 1.28, metal.iron, .014);
+        limbShell(S, tE * .37, 1.32, 1.22, steelLight, .014);
+        limbShell(S, tE * .24, 1.24, 1.14, metal.iron, .014);
+        limbShell(S, tE * .12, 1.14, 1.06, steelLight, false);
+        limbLine(S, tE * .03, tE * .44, -away * .6, metal.edge, .016);
+        limbDot(S, tE * .08, .018, '#ffdc8c');
+      }
+    }
+  };
+
   // The direction across a blade that lies flat to the camera, on the same side as side: a broad
   // blade then shows its full shape instead of turning edge-on.
   function flatAcross(aim, side) {
@@ -1487,6 +1527,7 @@
     const varro = spec.kit === 'murmillo';
     const { j, p, P, vector, lean, chestZ, hipZ } = r;
     const front = Math.sin(facing) > -.3;
+    const worn = armorLooks[spec.armor];
     const parts = [];
     const part = (at, draw, bias = 0) => parts.push({ depth: at[1] * K + at[2] * .55 + bias, draw });
     // Points on the front of the chest, curving away toward the sides.
@@ -1659,23 +1700,24 @@
 
     // Torso.
     part(lerp(j.waist, j.chest, .6), () => {
-      const body = varro ? c.skin : c.leather;
+      const body = worn?.body || (varro ? c.skin : c.leather);
+      const under = worn?.under?.(look);
       // A point that follows the spine's lean between hips and chest.
       const spine = (forward, right, up) => P(lean * (.3 + .46 * clamp01((up - hipZ) / (chestZ - hipZ))) + forward, right, up);
       // Built from masses like a figure drawing: pelvis, a narrow waist, a broad ribcage flaring
       // into the lats, a shoulder girdle reaching out to the deltoids, trapezius and a thick neck.
       const torso = [
-        [spine(0, -.1, hipZ + .03), spine(0, .1, hipZ + .03), .3, .3, varro ? c.skin : c.leatherDeep],
+        [spine(0, -.1, hipZ + .03), spine(0, .1, hipZ + .03), .3, .3, under || (varro ? c.skin : c.leatherDeep)],
         [spine(0, -.07, hipZ + .16), spine(0, .07, hipZ + .16), .32, .32, body],
         [spine(.01, 0, hipZ + .14), spine(.02, 0, chestZ - .14), .34, .46, body],
         [add(lerp(j.shoulderL, j.shoulderR, .3), [0, 0, -.2]), add(lerp(j.shoulderL, j.shoulderR, .7), [0, 0, -.2]), .42, .42, body],
         [add(lerp(j.shoulderL, j.shoulderR, .12), [0, 0, -.06]), add(lerp(j.shoulderL, j.shoulderR, .88), [0, 0, -.06]), .24, .24, body],
-        [spine(-.02, -.17, chestZ + .14), spine(-.03, 0, chestZ + .22), .17, .2, varro ? c.skin : body],
-        [spine(-.02, .17, chestZ + .14), spine(-.03, 0, chestZ + .22), .17, .2, varro ? c.skin : body],
+        [spine(-.02, -.17, chestZ + .14), spine(-.03, 0, chestZ + .22), .17, .2, varro && !worn?.body ? c.skin : body],
+        [spine(-.02, .17, chestZ + .14), spine(-.03, 0, chestZ + .22), .17, .2, varro && !worn?.body ? c.skin : body],
         [spine(0, 0, chestZ + .12), j.neck, .2, .17, c.skin],
         // Depth front to back, so the side view has a chest and a seat, not a pole.
         [spine(-.07, 0, chestZ - .08), spine(.07, 0, chestZ - .05), .34, .36, body],
-        [spine(-.07, 0, hipZ + .06), spine(.02, 0, hipZ + .08), .26, .24, varro ? c.skin : c.leatherDeep]
+        [spine(-.07, 0, hipZ + .06), spine(.02, 0, hipZ + .08), .26, .24, under || (varro ? c.skin : c.leatherDeep)]
       ];
       fused(torso);
       // Surface details sit a little proud of the masses; clipped to them, the ones near the edge
@@ -1686,7 +1728,10 @@
         for (const [a, b, wa, wb] of torso) taperPath(a, b, wa, wb, false);
         g.clip();
       };
-      if (varro && front) {
+      // The front or back surface of the torso, curving away toward the sides.
+      const surface = (right, up) => spine((front ? 1 : -1) * (.27 - Math.abs(right) * .36), right, up);
+      if (worn?.torso) worn.torso({ surface, spine, P, vector, lean, chestZ, hipZ, front, look, c, clipToTorso, varro, facing });
+      else if (varro && front) {
         clipToTorso();
         // Bare chest: pectorals, a six-pack, obliques, collarbones and an old scar.
         for (const s of [-1, 1]) {
@@ -1789,6 +1834,7 @@
             for (const f of [.4, .62, .84]) limbDot(S, tE + (1 - tE) * f, .016, c.bronze);
           } else limbBand(S, tE + (1 - tE) * .78, 1, 1.08, c.leather, .012, .3);
         }
+        if (worn?.shoulder) worn.shoulder(S, tE, away, left, c, look);
         fist(wrist, hand, left, varro ? c.skin : left ? c.skin : c.leather, c);
       }, .07);
     }
