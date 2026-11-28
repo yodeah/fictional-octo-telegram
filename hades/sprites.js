@@ -814,7 +814,58 @@
   // Armor a champion can wear over their own outfit. Each look recolors the torso and adds its
   // own torso, shoulder, hip and mantle details; a champion in their own outfit has none.
   const steelLight = '#b9c7d0';
+  const bronze = { base: '#d39a3e', deep: '#7d5020', light: '#ffdc8c', shade: 'rgba(110,60,18,.55)' };
+  // A hanging leather strip (pteryx) from top to bottom, d across, ending in a bronze stud.
+  function strip(top, bottom, d, color) {
+    poly([sub(top, d), add(top, d), add(bottom, d), sub(bottom, d)], color, .012);
+    disc(bottom, .022, bronze.base, false);
+  }
   const armorLooks = {
+    cuirass: {
+      body: bronze.base,
+      under: look => look.deep,
+      torso({ surface, chestZ, hipZ, front, clipToTorso }) {
+        clipToTorso();
+        if (front) {
+          // A muscle cuirass: pectorals, a ribbed stomach and a navel hammered into the bronze.
+          for (const s of [-1, 1]) {
+            poly([surface(s * .03, chestZ + .13), surface(s * .25, chestZ + .14), surface(s * .27, chestZ), surface(s * .04, chestZ - .05)], 'rgba(255,226,150,.35)', false);
+            fine([surface(s * .27, chestZ - .01), surface(s * .14, chestZ - .09), surface(s * .02, chestZ - .06)], bronze.shade, .032);
+            for (let row = 0; row < 3; row++) {
+              const z = chestZ - .16 - row * .085;
+              fine([surface(s * .025, z), surface(s * .11, z - .014)], bronze.shade, .02);
+              poly([surface(s * .03, z + .07), surface(s * .1, z + .065), surface(s * .1, z + .015), surface(s * .03, z + .015)], 'rgba(255,230,160,.3)', false);
+            }
+            fine([surface(s * .23, chestZ - .1), surface(s * .2, hipZ + .26)], bronze.shade, .022);
+          }
+          fine([surface(0, chestZ + .02), surface(0, hipZ + .2)], bronze.shade, .02);
+          disc(surface(0, hipZ + .21), .016, bronze.deep, false);
+        } else {
+          fine([surface(0, chestZ + .14), surface(0, hipZ + .2)], bronze.shade, .026);
+          for (const s of [-1, 1]) fine([surface(s * .06, chestZ + .06), surface(s * .2, chestZ - .02), surface(s * .16, chestZ - .16)], bronze.shade, .022);
+        }
+        // Rolled rims at the neck and the bottom edge.
+        fine([-.34, -.17, 0, .17, .34].map(r => surface(r, hipZ + .14 + Math.abs(r) * .1)), bronze.light, .03);
+        fine([-.2, -.1, 0, .1, .2].map(r => surface(r, chestZ + .2 - Math.abs(r) * .12)), bronze.light, .022);
+        g.restore();
+      },
+      shoulder(S, tE, away, left, c, look) {
+        // Pteruges over the upper arm under a small bronze cap.
+        limbBand(S, tE * .1, tE * .55, 1.16, look.main, .012);
+        for (const side of [-.5, 0, .5]) limbLine(S, tE * .12, tE * .53, side, look.deep, .012);
+        limbLine(S, tE * .55, tE * .55, 0, metal.gold, 0, 1.16, .02);
+        limbShell(S, tE * .22, 1.26, 1.14, bronze.base, .014);
+        limbLine(S, tE * .03, tE * .18, -away * .55, bronze.light, .016);
+      },
+      hips({ P, vector, lean, hipZ, p, look }) {
+        // A skirt of team-colored strips hanging from under the cuirass to mid-thigh.
+        for (let i = -4; i <= 4; i++) {
+          const right = i * .07, forward = .2 - Math.abs(i) * .026;
+          const swing = -p.stride * right * .5;
+          strip(P(lean * .3 + forward, right, hipZ + .1), P(forward + .05 + swing, right * 1.15, hipZ - .3), vector(0, .03, 0), i % 2 ? look.main : look.deep);
+        }
+      }
+    },
     segmentata: {
       body: steelLight,
       under: look => look.deep,
@@ -1696,6 +1747,7 @@
           disc(pouch(.03, 0, .02), .014, c.bronze, false);
         }
       }
+      if (worn?.hips) worn.hips({ P, vector, lean, hipZ, p, look, c, front, varro });
     }, .05);
 
     // Torso.

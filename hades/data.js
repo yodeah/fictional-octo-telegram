@@ -48,7 +48,10 @@
     // Worn over a champion's own outfit (see sprites.js armorLooks).
     // Lorica segmentata: steel hoops and shoulder lames; strong against blades and arrows, but heavy
     // enough that an archer can keep away.
-    segmentata: { name: 'Lorica segmentata', style: 'melee', power: 1, defense: 10, mobility: .89, taken: { melee: 1, ranged: .9, magic: 1.12 } }
+    segmentata: { name: 'Lorica segmentata', style: 'melee', power: 1, defense: 10, mobility: .89, taken: { melee: 1, ranged: .9, magic: 1.12 } },
+    // Bronze cuirass: a sculpted breastplate over leather strips; lighter than steel hoops, and a
+    // swordsman hits a little harder in it.
+    cuirass: { name: 'Bronze cuirass', style: 'melee', power: 1.03, defense: 6, mobility: .97, taken: { melee: 1.02, ranged: .97, magic: 1.04 } }
   };
 
   const spells = {
