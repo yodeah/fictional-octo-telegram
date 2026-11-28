@@ -74,9 +74,33 @@
     }
     return f.target;
   }
-  // For now, the nearest standing enemy.
+  // Team sense in choosing a rival: a melee fighter weighs distance heavily, a shooter barely. Both
+  // finish off the wounded, punish a stagger, peel an enemy blade off a teammate (above all off a
+  // shooter), answer a blade that is on them, and keep their rival unless another is clearly better.
   function pickTarget(duel, f, alive) {
-    return alive.reduce((best, o) => dist(f, o) < dist(f, best) ? o : best);
+    const ranged = styleOf(f) !== 'melee';
+    const friends = alliesOf(duel, f);
+    let best = alive[0], bestScore = Infinity;
+    for (const o of alive) {
+      const d = dist(f, o), blade = styleOf(o) === 'melee';
+      let score = d * (ranged ? .35 : 1) + o.hp / o.maxHP * 3;
+      if (helpless(duel, o)) score -= 1.5;
+      for (const a of friends) if (blade && dist(o, a) < 2.6) score -= styleOf(a) !== 'melee' ? 2.5 : 1.2;
+      if (blade && d < 2.8) score -= ranged ? 3 : 1.5;
+      if (ranged && !lineOfSight(f, o, .3)) score += 2.5;
+      if (o === f.target) score -= 1;
+      if (score < bestScore) { bestScore = score; best = o; }
+    }
+    return best;
+  }
+
+  // A teammate standing on the line of fire to the rival.
+  function blockingAlly(duel, f, rival) {
+    const dx = rival.x - f.x, dy = rival.y - f.y, len2 = dx * dx + dy * dy || 1;
+    return alliesOf(duel, f).find(a => {
+      const t = ((a.x - f.x) * dx + (a.y - f.y) * dy) / len2;
+      return t > .05 && t < .95 && Math.hypot(f.x + dx * t - a.x, f.y + dy * t - a.y) < radius + .2;
+    });
   }
   const ownerTeam = (duel, p) => duel.fighters[p.owner].team;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -603,6 +627,7 @@
     let [tx, ty] = unit(rival.x - f.x, rival.y - f.y);
     const weapon = weapons[f.weapon];
     const smart = f.kit.champion;
+    const friends = alliesOf(duel, f);
     let x = 0, y = 0;
     if (duel.time > f.strafeUntil) {
       // A champion closing on a shooter weaves in shorter, sharper zigzags.
@@ -615,7 +640,14 @@
       if (dodge) return dodge;
     }
     const sight = lineOfSight(f, rival, radius * .8);
-    if (!sight) return route(f, rival);
+    if (!sight) {
+      // Two fighters going round a pillar the same way can chase each other forever: after a while
+      // out of sight, turn back the other way.
+      f.blindSince ??= duel.time + duel.random() * 1.5;
+      if (duel.time - f.blindSince > 2.5) { f.detour = -f.detour || 1; f.blindSince = duel.time + duel.random() * 1.5; }
+      return route(f, rival);
+    }
+    f.blindSince = null;
     f.detour = 0;
     if (weapon.style === 'melee') {
       const want = weapon.shape === 'slam' ? weapon.reach : weapon.reach * .78;
@@ -625,6 +657,12 @@
         const [cx, cy] = unit(-rival.x, -rival.y);
         const pin = Math.min(1.2, d * .2) * Math.min(1, Math.hypot(rival.x / arena.a, rival.y / arena.b) * 1.6);
         [tx, ty] = unit(rival.x + rival.vx * lead + cx * pin - f.x, rival.y + rival.vy * lead + cy * pin - f.y);
+      }
+      // With a teammate already on this rival, come at them from the far side: blows from behind hit harder.
+      const partner = friends.find(a => styleOf(a) === 'melee' && a.target === rival && dist(a, rival) < d);
+      if (partner && d > want * .8) {
+        const [ox, oy] = unit(rival.x - partner.x, rival.y - partner.y);
+        [tx, ty] = unit(rival.x + ox * want - f.x, rival.y + oy * want - f.y);
       }
       if (d > want) { x = tx; y = ty; }
       else if (d < want * .6) { x = -tx * .5; y = -ty * .5; }
@@ -638,6 +676,22 @@
         x = Math.cos(away); y = Math.sin(away);
       } else if (d > far) { x = tx; y = ty; }
       else { x = -ty * f.strafe * .6; y = tx * f.strafe * .6; }
+      const guard = friends.find(a => styleOf(a) === 'melee');
+      const foes = enemiesOf(duel, f).filter(o => !o.dead);
+      if (guard && d >= near) {
+        // Keep a teammate's blade between the shooter and the enemy.
+        const cx = foes.reduce((sum, o) => sum + o.x, 0) / foes.length, cy = foes.reduce((sum, o) => sum + o.y, 0) / foes.length;
+        const [bx, by] = unit(guard.x - cx, guard.y - cy);
+        const ax = guard.x + bx * 3 - f.x, ay = guard.y + by * 3 - f.y, far2 = Math.hypot(ax, ay);
+        if (far2 > 1.2) { x += ax / far2 * .55; y += ay / far2 * .55; }
+      }
+      // Step aside for a clear line when a teammate stands in it.
+      if (blockingAlly(duel, f, rival)) { x += -ty * f.strafe * .9; y += tx * f.strafe * .9; }
+    }
+    // Teammates give each other room.
+    for (const a of friends) {
+      const gap = dist(f, a);
+      if (gap > 0 && gap < 1.9) { x += (f.x - a.x) / gap * (1.9 - gap) * .9; y += (f.y - a.y) / gap * (1.9 - gap) * .9; }
     }
     const edge = Math.hypot(f.x / arena.a, f.y / arena.b);
     if (edge > .82) { x -= f.x / arena.a * (edge - .82) * 5; y -= f.y / arena.b * (edge - .82) * 5; }
@@ -672,7 +726,7 @@
       if (!free) return;
       const support = f.kit.spells?.some(key => !spells[key].damage && f.mana >= spells[key].cost
         && duel.time >= (f.cooldowns[key] || 0) && supportScore(duel, f, spells[key]) > 0);
-      if (support && d > 3 || d <= weapon.reach && lineOfSight(f, rival) && !(d < 2.4 && duel.random() < .6)) {
+      if (support && d > 3 || d <= weapon.reach && lineOfSight(f, rival) && !blockingAlly(duel, f, rival) && !(d < 2.4 && duel.random() < .6)) {
         startAttack(duel, f, rival);
       }
       return;
