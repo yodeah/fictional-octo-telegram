@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="55%">
+      <stop offset="0" stop-color="#1f5a5f"/>
+      <stop offset="1" stop-color="#06141c"/>
+    </radialGradient>
+    <linearGradient id="coin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd98a"/>
+      <stop offset="1" stop-color="#a7762c"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <path d="M0 404 Q128 380 256 396 T512 392 V512 H0Z" fill="#0b2a33"/>
+  <path d="M0 432 Q140 414 256 428 T512 424" stroke="#2f7f86" stroke-width="6" fill="none" opacity=".7"/>
+  <circle cx="256" cy="236" r="150" fill="url(#coin)" stroke="#5a3d12" stroke-width="10"/>
+  <circle cx="256" cy="236" r="118" fill="none" stroke="#7a5418" stroke-width="6"/>
+  <path d="M256 128 C226 168 214 196 214 222 C214 252 234 270 256 270 C278 270 298 252 298 222 C298 196 286 168 256 128Z" fill="#06141c"/>
+  <path d="M256 168 C242 192 236 208 236 224 C236 240 245 250 256 250 C267 250 276 240 276 224 C276 208 270 192 256 168Z" fill="#ff9a4a"/>
+  <path d="M188 300 H324 L306 334 H206Z" fill="#06141c"/>
+  <path d="M240 270 H272 V300 H240Z" fill="#06141c"/>
+</svg>

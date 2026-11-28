@@ -32,3 +32,10 @@ Every commit that changes the game must be a meaningful improvement in a working
 ## Arena art direction
 
 The arena leans gory. Use stylized blood at the point of impact, stains on the sand and occasional bloody weapon-specific finishes. Keep injuries readable at the normal arena camera distance. Reserve severing for rare or signature executions. Keep the violence brief and leave anatomical close-ups and prolonged suffering out of the presentation. A heavy weapon should visibly shift the opponent’s weight in the direction of the blow.
+
+## Ash & Obol (`idle/`)
+
+The idle RPG PWA is the one part with a build step (React + Vite + TypeScript). The Underworld Duel at the root stays build-free; the PWA copies it in as its Fight Sim.
+
+- Checks: `npm test` and `npm run typecheck` in `idle/`, then `npm run build` and play `npm run preview` (http://localhost:8164): create a shade, hunt, and run a Fight Sim bout to the end.
+- Pages builds it from this branch and publishes `idle/dist/` at `/idle/`.

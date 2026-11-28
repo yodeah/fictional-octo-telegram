@@ -29,7 +29,6 @@ Ideas beyond the version 1 plan in `docs/idle-rpg-plan.md`. Same scoring, best f
 
 | Idea | Impact | Est. tokens | Score |
 | --- | --- | --- | --- |
-| Auto-allocate presets for points earned offline (melee, tank, archer, mage) | 2 | 4k | 5.0 |
 | Ferryman's Lantern: an upgrade that raises the offline cap from 24 h to 48 h | 2 | 5k | 4.0 |
 | Daily login gift with a 7-day streak (obols, then a charm on day 7) | 3 | 8k | 3.8 |
 | Shareable bout codes: a seed plus both builds, so anyone can watch a fight | 3 | 8k | 3.8 |
