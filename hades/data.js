@@ -17,6 +17,9 @@
     pilum: { name: 'Pilum', style: 'ranged', shape: 'bolt', reach: 8, speed: 16, damage: 21, energy: 13, windup: .5, recover: .5, stance: 26, push: 1, hinder: .6, block: .30 },
     recurve: { name: 'Composite bow', style: 'ranged', shape: 'bolt', reach: 9, speed: 18, damage: 18, energy: 9, windup: .38, recover: .34, stance: 14, hinder: .4, block: .30 },
     sica: { name: 'Sica', style: 'melee', shape: 'arc', reach: 1.8, spread: 1.25, damage: 12, energy: 11, windup: .23, recover: .29, stance: 24, block: .22 },
+    // The wider armory, open to any champion.
+    // Trident: three barbed prongs, a little wider than a spear's point; a hit snags and slows.
+    trident: { name: 'Trident', style: 'melee', shape: 'thrust', reach: 2.85, spread: .6, damage: 14, energy: 14, windup: .31, recover: .38, stance: 26, block: .30, hinder: .9 },
     staff: { name: 'Staff', style: 'magic', shape: 'bolt', reach: 8, speed: 11, damage: 8, energy: 6, windup: .42, recover: .42, stance: 10, block: .10, spellPower: 1.3 }
   };
 

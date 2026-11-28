@@ -430,7 +430,8 @@
       damage: bash ? 7 * (action.riposte ? 1.5 : 1) : nova ? 6 : weapon.damage * (.7 + .3 * action.fatigue) * (action.power || 1),
       style: nova ? 'magic' : 'melee', stance: bash ? 44 : nova ? 18 : weapon.stance,
       block: bash ? .05 : weapon.block, heavy: !bash && !nova && weapon.heavy, breaks: !bash && !nova && weapon.breaks,
-      push: nova ? 1.9 : action.riposte ? 1.7 : bash ? 1.1 : 0, unblockable: nova, dirX, dirY
+      push: nova ? 1.9 : action.riposte ? 1.7 : bash ? 1.1 : 0, unblockable: nova, dirX, dirY,
+      hinder: bash || nova ? 0 : weapon.hinder, winded: bash || nova ? 0 : weapon.winded
     });
   }
 

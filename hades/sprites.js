@@ -64,7 +64,7 @@
   // pitch lifts the weapon, out is the hand's distance in front.
   function posture(weapon, anim, shape, t, fine = false) {
     const p = { yaw: .62, pitch: .42, out: .28, high: 1.0, lunge: 0, charge: 0, lean: .06, crouch: 0, stride: 0, bob: 0, sway: .06, fall: 0, kneel: 0, loll: 0, droop: 0, chamber: 0, kick: 0, breath: 0, swing: 0 };
-    if (weapon === 'spear') { p.yaw = .3; p.pitch = .16; }
+    if (weapon === 'spear' || weapon === 'trident') { p.yaw = .3; p.pitch = .16; }
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
     if (['maul', 'greatsword', 'mace', 'axe'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
     if (weapon === 'staff') { p.yaw = .75; p.pitch = 1.38; }
@@ -189,7 +189,7 @@
     j.handR = P(shift + Math.cos(p.yaw) * reach - p.swing * .14, Math.sin(p.yaw) * reach + .08, handZ + Math.abs(p.swing) * .03);
     j.aim = vector(Math.cos(p.yaw) * Math.cos(p.pitch), Math.sin(p.yaw) * Math.cos(p.pitch), Math.sin(p.pitch));
     j.side = vector(-Math.sin(p.yaw), Math.cos(p.yaw), 0);
-    const twoHanded = ['maul', 'greatsword', 'spear', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
+    const twoHanded = ['maul', 'greatsword', 'spear', 'trident', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
     j.handL = spec.shield ? P(shift + .4 - p.droop * .14 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3 - p.droop * .08, 1.04 + chestUp - p.crouch + p.bob - p.droop * .3)
       : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (spec.weapon === 'recurve' ? BRACE : ['crossbow', 'bow'].includes(spec.weapon) ? .42 : .26)))
         : P(shift + .12 - st * .3 + p.swing * .1, fine ? -.42 : -.48, .9 + tall * .6 + p.bob + (anim === 'run' ? .1 : 0));
@@ -343,7 +343,7 @@
     }
   }
 
-  const weaponLength = { gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
+  const weaponLength = { trident: 2.0, gladius: .95, pilum: 1.25, recurve: .9, sica: .95, sword: 1.2, greatsword: 1.75, spear: 1.85, axe: 1.15, mace: 1.05, maul: 1.4, staff: 1.15, crossbow: .85, bow: .85 };
 
   // along(d, w): d from the hand toward the point, w across.
   function weapon(kind, hand, aim, side, look, charge) {
@@ -817,6 +817,27 @@
       poly([...back, al(.98, bend(.98) + .02), ...edge], metal.steel);
       fine(edge.slice().reverse().slice(1), metal.edge, .014);
       fine(back.slice(0, 7).map(v => add(v, side.map(x => x * -.025))), metal.dark, .012);
+    },
+    trident(al, aim, side, look) {
+      // A retiarius' fishing spear: an ash shaft, a team-colored grip, a bronze collar and three
+      // barbed iron prongs on a crossbar.
+      taper(al(-.8), al(1.42), .058, .052, '#7a432c');
+      fine([al(-.78, .012), al(1.4, .012)], '#a8693f', .012);
+      taper(al(-.12), al(.1), .072, .072, look.main);
+      fine([al(-.1), al(.08)], look.light, .018);
+      taper(al(1.34), al(1.46), .1, .082, '#d39a3e');
+      fine([al(1.36, -.02), al(1.44, -.02)], '#ffdc8c', .012);
+      taper(al(1.47, -.17), al(1.47, .17), .055, .055, metal.iron);
+      for (const w of [-.165, 0, .165]) {
+        const tip = w ? 1.86 : 1.97, out = Math.sign(w);
+        taper(al(1.47, w), al(tip - .12, w), .042, .034, metal.iron);
+        fine([al(1.5, w - .008), al(tip - .14, w - .008)], metal.edge, .009);
+        poly([al(tip - .15, w - .048), al(tip, w), al(tip - .15, w + .048), al(tip - .12, w)], metal.steel);
+        // Side prongs carry a barb on the outside, the middle one on both sides.
+        for (const s of out ? [out] : [-1, 1]) {
+          poly([al(tip - .15, w + s * .046), al(tip - .27, w + s * .09), al(tip - .2, w + s * .02)], metal.steel, .012);
+        }
+      }
     },
     pilum(al, aim, side, look) {
       // Wooden shaft, a lead weight, a long iron shank and a small pyramid point, a little taller
