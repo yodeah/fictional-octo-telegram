@@ -18,16 +18,38 @@
   const gearOf = key => ({ kit: key, weapon: kits[key].weapon, reserve: kits[key].reserve, armor: kits[key].armor });
   // Leather stands for the champion's own outfit; the others are worn over it.
   const armorChoices = ['leather', 'segmentata', 'cuirass', 'pelt'].filter(key => armors[key]);
-  // Every fighter who can take the floor. A 1v1 bout uses the first two; 2v2 adds a second pair,
-  // so each team has a murmillo and an archer.
+  // Every fighter who can take the floor. A 1v1 bout uses the first two; 2v2 adds a second pair.
+  // Each visit shuffles their loadouts (see shuffleRoster); these are the champions' own gear.
   const roster = [
     { name: 'Varro', team: 0, ...gearOf('murmillo') }, { name: 'Cassian', team: 1, ...gearOf('sagittarius') },
     { name: 'Felix', team: 0, ...gearOf('sagittarius') }, { name: 'Draco', team: 1, ...gearOf('murmillo') }
   ];
-  let mode = params.get('mode') === '2v2' ? '2v2' : '1v1';
+  let mode = params.get('mode') === '1v1' ? '1v1' : '2v2';
   const lineup = () => roster.slice(0, mode === '2v2' ? 4 : 2);
   const teamColors = ['#ff8a6a', '#7fd0ff'];
   const teamLabel = team => mode === '2v2' ? teamNames[team] : lineup().find(l => l.team === team).name;
+
+  // Any champion, two different weapons from the armory and any armor, for every fighter.
+  function shuffleRoster(random) {
+    const pick = list => list[Math.floor(random() * list.length)];
+    const weaponKeys = Object.keys(weapons);
+    for (const entry of roster) {
+      entry.kit = pick(keys);
+      entry.weapon = pick(weaponKeys);
+      entry.reserve = pick(weaponKeys.filter(key => key !== entry.weapon));
+      entry.armor = pick(armorChoices);
+    }
+  }
+
+  // A small seeded generator, so ?seed=7 repeats the loadouts as well as the bout.
+  function seeded(seed) {
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
 
   function newMatchup() {
     matchup = lineup().map(entry => ({ ...entry }));
@@ -109,6 +131,7 @@
     $('play').textContent = { ready: 'Begin duel', running: 'Pause', paused: 'Resume', finished: 'Rematch' }[state];
     const locked = state === 'running' || state === 'paused';
     $('generate').disabled = locked;
+    $('shuffle').disabled = locked;
     $('mode').disabled = locked;
     for (const select of $('loadouts').querySelectorAll('select')) select.disabled = locked;
     $('bout').textContent = String(bout).padStart(2, '0');
@@ -249,13 +272,21 @@
     newMatchup();
     setup();
   });
+  $('shuffle').addEventListener('click', () => {
+    if (state === 'finished') bout++;
+    shuffleRoster(Math.random);
+    buildLoadouts();
+    newMatchup();
+    setup();
+  });
   $('speed').addEventListener('click', () => {
     speed = (speed + 1) % speeds.length;
     $('speed').textContent = speeds[speed] + '×';
   });
-  // ?a=murmillo&b=murmillo pins the champions (a mirror match), ?seed=7 repeats a bout, ?debug draws collision shapes.
-  // Without them the two champions meet: Varro the murmillo against Cassian the archer.
-  // ?mode=2v2 starts a team bout.
+  // Every visit starts as a 2v2 with shuffled loadouts; ?mode=1v1 starts a duel instead.
+  // ?a=murmillo&b=murmillo pins the first two champions in their own gear (a mirror match),
+  // ?seed=7 repeats the loadouts and the bout, ?debug draws collision shapes.
+  shuffleRoster(params.has('seed') ? seeded(Number(params.get('seed'))) : Math.random);
   roster.slice(0, 2).forEach((entry, i) => {
     const key = params.get(i ? 'b' : 'a');
     if (keys.includes(key)) Object.assign(entry, gearOf(key));
