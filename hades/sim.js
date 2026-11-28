@@ -25,15 +25,17 @@
 
   // entry is a kit key, or { kit, weapon, reserve, armor } to change that kit's gear. A fighter who
   // picks up a staff without a spellbook of their own gets the Ember Priest's.
-  function createFighter(index, entry, name) {
+  function createFighter(index, entry, name, team = index, slot = 0, size = 1) {
     const { kit: kitKey, ...gear } = typeof entry === 'string' ? { kit: entry } : entry;
     const kit = { ...kits[kitKey] };
     for (const [slot, key] of Object.entries(gear)) if (key) kit[slot] = key;
     if (!kit.spells && [kit.weapon, kit.reserve].some(key => weapons[key].style === 'magic')) kit.spells = kits.emberpriest.spells;
     const move = moves[kit.move];
-    const x = index ? 6 : -6;
+    // Teams start on opposite sides; teammates stand a little apart.
+    const x = team ? 6 : -6, y = size > 1 ? (slot - (size - 1) / 2) * 3.2 : 0;
     return {
-      index, name, kitKey, kit, weapon: kit.weapon, swapReady: 1.2, shots: 0, x, y: 0, vx: 0, vy: 0, facing: index ? Math.PI : 0,
+      index, team, name, kitKey, kit, weapon: kit.weapon, swapReady: 1.2, shots: 0, x, y, vx: 0, vy: 0, facing: team ? Math.PI : 0,
+      target: null, retargetAt: 0,
       hp: kit.hp, maxHP: kit.hp, mana: 70, energy: 100, stance: 0, ward: 0, wardUntil: 0,
       shieldHits: shields[kit.shield].durability, move: kit.move, charges: move.charges, rechargeAt: 0,
       action: null, dash: null, readyAt: .5 + index * .12, stunnedUntil: 0, frozenUntil: 0, chilledUntil: 0,
@@ -44,14 +46,39 @@
   }
 
   function createDuel(kitA, kitB, seed = Date.now(), names = ['Varro', 'Cassian']) {
+    return createBattle([{ entry: kitA, team: 0, name: names[0] }, { entry: kitB, team: 1, name: names[1] }], seed);
+  }
+
+  // Any number of fighters on two teams: lineup is [{ entry, team, name }]. winner is a team.
+  function createBattle(lineup, seed = Date.now()) {
+    const size = team => lineup.filter(l => l.team === team).length;
+    const slots = [0, 0];
     return {
       time: 0, seed, random: seeded(seed), winner: null, events: [], projectiles: [], nextId: 1,
-      fighters: [createFighter(0, kitA, names[0]), createFighter(1, kitB, names[1])]
+      fighters: lineup.map((l, i) => createFighter(i, l.entry, l.name, l.team, slots[l.team]++, size(l.team)))
     };
   }
 
   const emit = (duel, type, data) => duel.events.push({ type, time: duel.time, ...data });
-  const other = (duel, f) => duel.fighters[1 - f.index];
+  const enemiesOf = (duel, f) => duel.fighters.filter(o => o.team !== f.team);
+  const alliesOf = (duel, f) => duel.fighters.filter(o => o.team === f.team && o !== f && !o.dead);
+  // The rival this fighter is dealing with: chosen by pickTarget, kept between choices.
+  function other(duel, f) {
+    const foes = enemiesOf(duel, f);
+    if (foes.length === 1) return foes[0];
+    if (!f.target || f.target.dead || duel.time >= f.retargetAt) {
+      const alive = foes.filter(o => !o.dead);
+      if (alive.length) f.target = pickTarget(duel, f, alive);
+      else f.target ||= foes[0];
+      f.retargetAt = duel.time + .5 + duel.random() * .3;
+    }
+    return f.target;
+  }
+  // For now, the nearest standing enemy.
+  function pickTarget(duel, f, alive) {
+    return alive.reduce((best, o) => dist(f, o) < dist(f, best) ? o : best);
+  }
+  const ownerTeam = (duel, p) => duel.fighters[p.owner].team;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const shieldUp = f => f.shieldHits > 0 && !weapons[f.weapon].twoHanded;
   const defense = f => 30 + armors[f.kit.armor].defense + (shieldUp(f) ? shields[f.kit.shield].defense : 0);
@@ -278,7 +305,7 @@
         id: duel.nextId++, owner: f.index, x: f.x + Math.cos(angle) * .7, y: f.y + Math.sin(angle) * .7,
         vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: weapon.reach / speed + .25,
         spellKey: action.spellKey, weapon: action.weapon, fatigue: action.fatigue,
-        homing: spell ? .9 : 0, crowded: !spell && dist(f, rival) < 2.6
+        homing: spell ? .9 : 0, crowded: !spell && dist(f, rival) < 2.6, target: rival.index
       });
       if (!spell) f.shots++;
       emit(duel, 'shoot', { who: f.index, spell: action.spellKey });
@@ -386,7 +413,7 @@
       defender.dead = true;
       defender.action = null;
       defender.dash = null;
-      duel.winner = attacker.index;
+      if (duel.winner === null && !duel.fighters.some(o => o.team === defender.team && !o.dead)) duel.winner = attacker.team;
       emit(duel, 'death', { who: defender.index, by: attacker.index, dirX: hit.dirX, dirY: hit.dirY, heavy: hit.heavy, style: hit.style });
       return 'kill';
     }
@@ -411,11 +438,20 @@
     return 'block';
   }
 
+  // A blow lands on every enemy it covers, once each.
   function meleeContact(duel, f, action) {
-    const rival = other(duel, f);
-    if (action.hit || rival.dead || rival.safeUntil > duel.time || !covers(f, action, rival)) return;
-    if (!lineOfSight(f, rival, 0)) return;
-    action.hit = true;
+    for (const rival of enemiesOf(duel, f)) {
+      action.struck ||= new Set();
+      if (action.struck.has(rival.index) || rival.dead || rival.safeUntil > duel.time || !covers(f, action, rival)) continue;
+      if (!lineOfSight(f, rival, 0)) continue;
+      action.struck.add(rival.index);
+      action.hit = true;
+      landBlow(duel, f, action, rival);
+      if (action.kind === 'kick' || action.kind === 'bash') return;
+    }
+  }
+
+  function landBlow(duel, f, action, rival) {
     const weapon = weapons[action.weapon];
     const bash = action.kind === 'bash', nova = action.kind === 'nova';
     const [dirX, dirY] = unit(rival.x - f.x, rival.y - f.y);
@@ -437,7 +473,7 @@
 
   function stepProjectiles(duel, dt) {
     for (const p of duel.projectiles) {
-      const owner = duel.fighters[p.owner], target = duel.fighters[1 - p.owner];
+      const owner = duel.fighters[p.owner], target = duel.fighters[p.target ?? 1 - p.owner];
       const spell = spells[p.spellKey];
       if (p.homing && !target.dead) {
         const speed = Math.hypot(p.vx, p.vy), heading = Math.atan2(p.vy, p.vx);
@@ -460,11 +496,14 @@
         if (pillar || Math.hypot(p.x / arena.a, p.y / arena.b) > 1.06) {
           p.life = 0;
           emit(duel, 'fizzle', { x: p.x, y: p.y, color: spell?.color });
-        } else if (!target.dead && target.safeUntil <= duel.time && Math.hypot(p.x - target.x, p.y - target.y) < radius + .1) {
+        } else {
+          const struck = duel.fighters.find(o => o.team !== owner.team && !o.dead && o.safeUntil <= duel.time
+            && Math.hypot(p.x - o.x, p.y - o.y) < radius + .1);
+          if (!struck) continue;
           p.life = 0;
           const weapon = weapons[p.weapon];
           const [dirX, dirY] = unit(p.vx, p.vy);
-          strike(duel, owner, target, {
+          strike(duel, owner, struck, {
             damage: spell ? spell.damage * weapon.spellPower * 1.04 : weapon.damage * (.7 + .3 * p.fatigue) * (p.crowded ? .6 : 1),
             style: spell ? 'magic' : weapon.style, spellKey: p.spellKey, stance: spell ? 13 : weapon.stance,
             block: spell ? .06 : weapon.block * .5, push: spell ? 0 : weapon.push, hinder: spell ? 0 : weapon.hinder,
@@ -479,13 +518,15 @@
   // ---- Decisions ----
 
   // Something about to hit this fighter, identified so each threat is judged only once.
-  function threatTo(duel, f, rival) {
-    const a = rival.action;
-    if (a && !a.hit && a.t < a.windup && a.windup - a.t < .24 && a.shape !== 'bolt' && a.shape !== 'self' && covers(rival, a, f, radius + .15)) {
-      return { id: a.id, angle: Math.atan2(f.y - rival.y, f.x - rival.x), weight: weapons[a.weapon].heavy ? 1.5 : 1 };
+  function threatTo(duel, f) {
+    for (const foe of enemiesOf(duel, f)) {
+      const a = foe.action;
+      if (!foe.dead && a && !a.hit && a.t < a.windup && a.windup - a.t < .24 && a.shape !== 'bolt' && a.shape !== 'self' && covers(foe, a, f, radius + .15)) {
+        return { id: a.id, angle: Math.atan2(f.y - foe.y, f.x - foe.x), weight: weapons[a.weapon].heavy ? 1.5 : 1 };
+      }
     }
     for (const p of duel.projectiles) {
-      if (p.owner === f.index) continue;
+      if (ownerTeam(duel, p) === f.team) continue;
       const dx = f.x - p.x, dy = f.y - p.y, speed = Math.hypot(p.vx, p.vy);
       const along = (dx * p.vx + dy * p.vy) / speed;
       if (along > 0 && along / speed < .32 && Math.abs(dx * p.vy - dy * p.vx) / speed < .8) {
@@ -496,7 +537,7 @@
   }
 
   function tryEvade(duel, f, rival) {
-    const threat = threatTo(duel, f, rival);
+    const threat = threatTo(duel, f);
     if (!threat || f.threatSeen === threat.id) return false;
     f.threatSeen = threat.id;
     const move = moves[f.move];
@@ -532,7 +573,7 @@
   // other way once it locks, so the lead it took sends the shot wide. Returns a heading or null.
   function juke(duel, f, rival) {
     for (const p of duel.projectiles) {
-      if (p.owner === f.index) continue;
+      if (ownerTeam(duel, p) === f.team) continue;
       const dx = f.x - p.x, dy = f.y - p.y, speed = Math.hypot(p.vx, p.vy);
       const ahead = (dx * p.vx + dy * p.vy) / speed;
       const off = (dx * p.vy - dy * p.vx) / speed;
@@ -771,27 +812,30 @@
   }
 
   function separate(duel) {
-    const [a, b] = duel.fighters;
-    if (a.dead || b.dead || a.dash || b.dash) return;
-    const gap = dist(a, b), min = radius * 2;
-    if (gap < min) {
-      const [x, y] = unit(a.x - b.x || 1, a.y - b.y);
-      const push = (min - gap) / 2;
-      a.x += x * push; a.y += y * push; b.x -= x * push; b.y -= y * push;
-      constrain(a); constrain(b);
+    const all = duel.fighters;
+    for (let i = 0; i < all.length; i++) for (let k = i + 1; k < all.length; k++) {
+      const a = all[i], b = all[k];
+      if (a.dead || b.dead || a.dash || b.dash) continue;
+      const gap = dist(a, b), min = radius * 2;
+      if (gap < min) {
+        const [x, y] = unit(a.x - b.x || 1, a.y - b.y);
+        const push = (min - gap) / 2;
+        a.x += x * push; a.y += y * push; b.x -= x * push; b.y -= y * push;
+        constrain(a); constrain(b);
+      }
     }
   }
 
   function step(duel, dt) {
     duel.time += dt;
-    // Alternate who acts first so neither side wins ties.
-    const order = Math.floor(duel.time * 60) % 2 ? [0, 1] : [1, 0];
-    for (const i of order) stepFighter(duel, duel.fighters[i], dt);
+    // Rotate who acts first so no one wins ties.
+    const n = duel.fighters.length, first = (Math.floor(duel.time * 60) + 1) % n;
+    for (let k = 0; k < n; k++) stepFighter(duel, duel.fighters[(first + k) % n], dt);
     separate(duel);
     stepProjectiles(duel, dt);
   }
 
-  const api = { createDuel, step, radius, stanceLimit };
+  const api = { createDuel, createBattle, step, radius, stanceLimit };
   if (typeof module !== 'undefined') module.exports = api;
   else root.HadesSim = api;
 })(this);

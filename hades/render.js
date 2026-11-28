@@ -1111,7 +1111,7 @@
     const info = shields[kit.shield];
     const held = kit.shield !== 'none' && f.shieldHits > 0 && !weapons[f.weapon].twoHanded;
     return {
-      team: f.index, kit: f.kitKey, armor: kit.armor, weapon: f.weapon, spare: f.weapon === kit.weapon ? kit.reserve : kit.weapon,
+      team: f.team, kit: f.kitKey, armor: kit.armor, weapon: f.weapon, spare: f.weapon === kit.weapon ? kit.reserve : kit.weapon,
       shield: held ? kit.shield : null, cracks: held ? info.durability - f.shieldHits : 0,
       frozen: f.frozenUntil > duel.time && !f.dead
     };
@@ -1144,7 +1144,7 @@
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       glow(sx(f.x + Math.cos(f.facing) * .6), sy(f.y + Math.sin(f.facing) * .6, 1.3), unit * (.3 + t * .8),
-        spell ? hexRgb(spell.color) : looks[f.index].glow, .3 + t * .55);
+        spell ? hexRgb(spell.color) : looks[f.team].glow, .3 + t * .55);
       ctx.restore();
     }
     if (f.frozenUntil > duel.time && !f.dead) {
@@ -1202,7 +1202,7 @@
     const a = f.action;
     if (!a || a.t >= a.windup || a.shape === 'self') return;
     const t = a.t / a.windup;
-    const rgb = looks[f.index].glow;
+    const rgb = looks[f.team].glow;
     const paint = (points, alpha, line = true) => {
       groundPath(points);
       ctx.fillStyle = `rgba(${rgb},${alpha})`;
@@ -1236,7 +1236,7 @@
   }
 
   function footing(f) {
-    const rgb = looks[f.index].glow;
+    const rgb = looks[f.team].glow;
     ctx.fillStyle = 'rgba(0,12,18,.46)';
     ctx.beginPath();
     ctx.ellipse(sx(f.x), sy(f.y), unit * .62, unit * .62 * K, 0, 0, Math.PI * 2);
@@ -1309,7 +1309,7 @@
         spray(who.x, who.y, 1.2, 22, [e.color || '#fff', '#ffffff'], { speed: 4, gravity: 3, glowing: true, size: .07 });
       }
       rings.push({ x: who.x, y: who.y, z: 1.15, r: .2, to: e.heavy || e.critical ? 1.4 : .85, age: 0, life: .2, color: rgb });
-      impacts.push({ x: who.x, y: who.y, z: 1.2, size: e.heavy || e.critical ? 2.1 : 1.3, turn: rand(0, 6.3), age: 0, life: .17, rgb: looks[e.by].glow });
+      impacts.push({ x: who.x, y: who.y, z: 1.2, size: e.heavy || e.critical ? 2.1 : 1.3, turn: rand(0, 6.3), age: 0, life: .17, rgb: looks[duel.fighters[e.by].team].glow });
       jolt(e.heavy ? .22 : e.critical ? .16 : .07);
     } else if (e.type === 'block') {
       spray(e.x, e.y, 1.15, e.perfect ? 30 : 14, ['#ffe9a8', '#ffb63f', '#fff'], { dirX: -e.dirX, dirY: -e.dirY, speed: 4, glowing: true, size: .05, life: .3 });
@@ -1318,7 +1318,7 @@
       rings.push({ x: e.x, y: e.y, z: 1.15, r: .15, to: e.perfect ? 1.5 : .8, age: 0, life: .22, color: '#ffe2a0' });
       jolt(e.perfect ? .14 : .05);
     } else if (e.type === 'swing') {
-      trails.push({ x: who.x, y: who.y, who: e.who, shape: e.shape, angle: e.angle, reach: e.reach, spread: e.spread, radius: e.radius, heavy: e.heavy, age: 0, life: e.heavy ? .34 : .24 });
+      trails.push({ x: who.x, y: who.y, who: e.who, team: who.team, shape: e.shape, angle: e.angle, reach: e.reach, spread: e.spread, radius: e.radius, heavy: e.heavy, age: 0, life: e.heavy ? .34 : .24 });
       if (e.shape === 'slam') {
         const x = who.x + Math.cos(e.angle) * e.reach, y = who.y + Math.sin(e.angle) * e.reach;
         spray(x, y, .1, 34, ['#6fb3a3', '#9fd6c4', '#3d7a72'], { speed: 4.5, up: 3, size: .09 });
@@ -1338,8 +1338,8 @@
     } else if (e.type === 'swap') {
       floater(who, weapons[e.weapon].name.toUpperCase(), '#d9f4e8', .62);
     } else if (e.type === 'dashstrike') {
-      floater(who, 'DASH-STRIKE', looks[e.who].trim, .75);
-      rings.push({ x: who.x, y: who.y, z: .05, r: .3, to: 1.5, age: 0, life: .28, color: looks[e.who].trim });
+      floater(who, 'DASH-STRIKE', looks[who.team].trim, .75);
+      rings.push({ x: who.x, y: who.y, z: .05, r: .3, to: 1.5, age: 0, life: .28, color: looks[who.team].trim });
     } else if (e.type === 'dash' || e.type === 'roll') {
       ghosts.push({ who: e.who, left: moves[e.type].time + .05, next: 0, shots: [] });
       spray(e.from.x, e.from.y, .15, 12, ['#a8e8d8', '#e9fff8'], { dirX: -Math.cos(e.angle), dirY: -Math.sin(e.angle), speed: 2, up: .8, gravity: 1, size: .1, life: .35 });
@@ -1437,7 +1437,7 @@
         continue;
       }
       if (t.shape === 'slam' || t.shape === 'nova' || t.shape === 'kick') continue;
-      const rgb = looks[t.who].glow;
+      const rgb = looks[t.team].glow;
       if (t.shape === 'thrust') {
         const c = Math.cos(t.angle), s = Math.sin(t.angle);
         const side = .22 * fade;
@@ -1447,7 +1447,7 @@
       }
       // A sweeping crescent, stamped flat on the plane of the swing.
       const grow = ease(clamp(t.age / (t.life * .45), 0, 1));
-      const art = crescent(t.who, t.spread, !!t.heavy);
+      const art = crescent(t.team, t.spread, !!t.heavy);
       const size = (t.reach + .55) * unit;
       ctx.save();
       ctx.globalAlpha = fade;
@@ -1490,8 +1490,8 @@
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const tail = ctx.createLinearGradient(sx(p.x), sy(p.y, z), sx(p.x - dx * 2.6), sy(p.y - dy * 2.6, z));
-      tail.addColorStop(0, `rgba(${looks[p.owner].glow},.55)`);
-      tail.addColorStop(1, `rgba(${looks[p.owner].glow},0)`);
+      tail.addColorStop(0, `rgba(${looks[duel.fighters[p.owner].team].glow},.55)`);
+      tail.addColorStop(1, `rgba(${looks[duel.fighters[p.owner].team].glow},0)`);
       ctx.strokeStyle = tail;
       ctx.lineWidth = unit * (javelin ? .16 : .12);
       ctx.lineCap = 'round';
@@ -1532,7 +1532,7 @@
       limb([[p.x - dx * .1, p.y - dy * .1, 1.1], [p.x + dx * .12, p.y + dy * .12, 1.1]], .1, steel, false);
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      glow(sx(p.x - dx * .4), sy(p.y - dy * .4, 1.1), unit * .45, looks[p.owner].glow, .45);
+      glow(sx(p.x - dx * .4), sy(p.y - dy * .4, 1.1), unit * .45, looks[duel.fighters[p.owner].team].glow, .45);
       ctx.restore();
       return;
     }
@@ -1610,7 +1610,7 @@
     ctx.fillRect(x - w / 2 - 2, y - 2, w + 4, h + 4);
     ctx.fillStyle = '#3a1620';
     ctx.fillRect(x - w / 2, y, w, h);
-    ctx.fillStyle = f.index ? '#52b4ff' : '#ff5c50';
+    ctx.fillStyle = f.team ? '#52b4ff' : '#ff5c50';
     ctx.fillRect(x - w / 2, y, w * f.hp / f.maxHP, h);
     // Escape charges, as pips.
     for (let i = 0; i < moves[f.move].charges; i++) {
@@ -1621,11 +1621,11 @@
 
   // Zooms in as far as both fighters stay fully in view, head to feet, clear of the HUD.
   function aimCamera(duel, dt) {
-    const [a, b] = duel.fighters;
+    const xs = duel.fighters.map(f => f.x), ys = duel.fighters.map(f => f.y);
     // A fallen body stretches well past its feet, so leave more room once someone is down.
     const sprawl = duel.winner === null ? 0 : 1.5;
-    const left = Math.min(a.x, b.x) - 2.4 - sprawl, right = Math.max(a.x, b.x) + 2.4 + sprawl;
-    const top = Math.min(a.y, b.y) * K - 4.2, bottom = Math.max(a.y, b.y) * K + 1.4 + sprawl;
+    const left = Math.min(...xs) - 2.4 - sprawl, right = Math.max(...xs) + 2.4 + sprawl;
+    const top = Math.min(...ys) * K - 4.2, bottom = Math.max(...ys) * K + 1.4 + sprawl;
     // Held 10% further out than a tight fit, so the fight has room around it.
     const fit = Math.min(width / unit / (right - left), height / unit / (bottom - top)) / 1.1;
     const zoom = clamp(fit, 1 / 1.1, duel.winner === null ? 1.29 : 1.18);
