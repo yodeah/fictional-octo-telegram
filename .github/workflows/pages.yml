@@ -1,8 +1,9 @@
 # GitHub Pages is one site, so each deploy publishes every game together:
-#   /             swords-and-sandals                    (Salt & Sand)
-#   /arena-2d/    claude/detailed-2d-assets-poc-63e424  (Arena Ledger, 2D art)
-#   /underworld/  claude/hades-arena-poc-177873         (Underworld Duel, at hades.html)
-# A push to either of the first two deploys. The third is picked up by the next deploy.
+#   /                 swords-and-sandals                          (Salt & Sand)
+#   /arena-2d/        claude/detailed-2d-assets-poc-63e424        (Arena Ledger, 2D art)
+#   /underworld/      claude/hades-arena-poc-177873               (Underworld Duel, at hades.html)
+#   /underworld-2v2/  claude/multiple-weapons-feasibility-2be7ae  (Underworld Duel with the armory and 2v2)
+# A push to either of the first two deploys. The others are picked up by the next deploy.
 # Keep this file identical on the first two branches.
 name: Deploy games to Pages
 
@@ -39,12 +40,17 @@ jobs:
         with:
           ref: claude/hades-arena-poc-177873
           path: underworld
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/multiple-weapons-feasibility-2be7ae
+          path: underworld-2v2
       - name: Assemble the site
         run: |
           mkdir site
           rsync -a --exclude .git --exclude .github salt-and-sand/ site/
           rsync -a --exclude .git --exclude .github arena-2d/ site/arena-2d/
           rsync -a --exclude .git --exclude .github underworld/ site/underworld/
+          rsync -a --exclude .git --exclude .github underworld-2v2/ site/underworld-2v2/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
