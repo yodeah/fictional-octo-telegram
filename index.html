@@ -20,24 +20,8 @@
     </header>
     <section class="stage">
       <canvas id="arena" aria-label="Two gladiators dueling in an arena seen from above at an angle"></canvas>
-      <div class="hud left">
-        <h2><span id="name0"></span> <small id="class0"></small> <em id="status0"></em></h2>
-        <div class="bar" role="img" aria-label="Health"><i id="hp0"></i><span id="hpText0"></span></div>
-        <div class="gauge mana" title="Mana"><i id="mana0"></i></div>
-        <div class="gauge energy" title="Energy"><i id="energy0"></i></div>
-        <div class="gauge stance" title="Stance"><i id="stance0"></i></div>
-        <div class="pips" id="pips0" aria-label="Escape charges"></div>
-        <p id="gear0"></p>
-      </div>
-      <div class="hud right">
-        <h2><span id="name1"></span> <small id="class1"></small> <em id="status1"></em></h2>
-        <div class="bar" role="img" aria-label="Health"><i id="hp1"></i><span id="hpText1"></span></div>
-        <div class="gauge mana" title="Mana"><i id="mana1"></i></div>
-        <div class="gauge energy" title="Energy"><i id="energy1"></i></div>
-        <div class="gauge stance" title="Stance"><i id="stance1"></i></div>
-        <div class="pips" id="pips1" aria-label="Escape charges"></div>
-        <p id="gear1"></p>
-      </div>
+      <div class="hud left" id="hud0"></div>
+      <div class="hud right" id="hud1"></div>
       <div class="banner" id="banner" hidden></div>
       <pre class="fps" id="fps" hidden></pre>
       <div class="result" id="result" hidden><span>VICTORY</span><strong id="winner"></strong></div>
@@ -45,6 +29,7 @@
     <section class="controls">
       <button id="play" class="primary">Begin duel</button>
       <button id="generate">Swap sides</button>
+      <label>Mode <select id="mode"><option value="1v1">1 v 1</option><option value="2v2">2 v 2</option></select></label>
       <button id="speed" aria-label="Playback speed">1×</button>
       <label><input id="repeat" type="checkbox"> Auto-rematch</label>
     </section>

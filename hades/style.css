@@ -13,6 +13,9 @@ canvas { display: block; width: 100%; height: 100%; }
 .hud { position: absolute; top: 8px; width: min(290px, 31%); text-shadow: 0 1px 2px #000, 0 0 6px #000; pointer-events: none; }
 .hud.left { left: 10px; }
 .hud.right { right: 10px; text-align: right; }
+.card + .card { margin-top: 10px; }
+.hud.team .bar { height: 15px; }
+.hud.team .card p { display: none; }
 .hud h2 { margin: 0 0 2px; font: 700 15px "Copperplate", "Cinzel", Georgia, serif; letter-spacing: .06em; }
 .hud h2 small { color: #ffd98a; font-size: 12px; }
 .hud h2 em { color: #ffb36b; font: italic 12px "Avenir Next", sans-serif; }

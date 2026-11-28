@@ -6,8 +6,8 @@
   const params = new URLSearchParams(location.search);
   const step = 1 / 60;
   const speeds = [1, 2, .5];
-  const names = ['Varro', 'Cassian'];
   const wins = [0, 0];
+  const teamNames = ['Red', 'Blue'];
 
   let duel, state = 'ready', speed = 0, bout = 1, accumulator = 0, pause = 0, slow = 0, rematch = 0;
   let matchup;
@@ -18,11 +18,19 @@
   const gearOf = key => ({ kit: key, weapon: kits[key].weapon, reserve: kits[key].reserve, armor: kits[key].armor });
   // Leather stands for the champion's own outfit; the others are worn over it.
   const armorChoices = ['leather', 'segmentata', 'cuirass', 'pelt'].filter(key => armors[key]);
-  const loadouts = names.map((name, i) => gearOf(i ? 'sagittarius' : 'murmillo'));
+  // Every fighter who can take the floor. A 1v1 bout uses the first two; 2v2 adds a second pair,
+  // so each team has a murmillo and an archer.
+  const roster = [
+    { name: 'Varro', team: 0, ...gearOf('murmillo') }, { name: 'Cassian', team: 1, ...gearOf('sagittarius') },
+    { name: 'Felix', team: 0, ...gearOf('sagittarius') }, { name: 'Draco', team: 1, ...gearOf('murmillo') }
+  ];
+  let mode = params.get('mode') === '2v2' ? '2v2' : '1v1';
+  const lineup = () => roster.slice(0, mode === '2v2' ? 4 : 2);
   const teamColors = ['#ff8a6a', '#7fd0ff'];
+  const teamLabel = team => mode === '2v2' ? teamNames[team] : lineup().find(l => l.team === team).name;
 
   function newMatchup() {
-    matchup = loadouts.map(entry => ({ ...entry }));
+    matchup = lineup().map(entry => ({ ...entry }));
     wins[0] = wins[1] = 0;
   }
 
@@ -40,19 +48,20 @@
   function buildLoadouts() {
     const weaponOptions = Object.entries(weapons).map(([key, w]) => [key, w.name]);
     const armorOptions = armorChoices.map(key => [key, key === 'leather' ? 'Own outfit' : armors[key].name]);
-    $('loadouts').replaceChildren(...loadouts.map((entry, i) => {
+    const rows = lineup().slice().sort((a, b) => a.team - b.team);
+    $('loadouts').replaceChildren(...rows.map(entry => {
       const row = document.createElement('div');
       row.className = 'slot';
-      row.style.setProperty('--team', teamColors[i]);
+      row.style.setProperty('--team', teamColors[entry.team]);
       const name = document.createElement('b');
-      name.textContent = names[i];
+      name.textContent = entry.name;
       const changed = () => {
         if (state === 'finished') bout++;
         newMatchup();
         setup();
       };
       row.append(name,
-        choice('Champion', keys.map(key => [key, kits[key].name]), entry.kit, value => { loadouts[i] = gearOf(value); buildLoadouts(); changed(); }),
+        choice('Champion', keys.map(key => [key, kits[key].name]), entry.kit, value => { Object.assign(entry, gearOf(value)); buildLoadouts(); changed(); }),
         choice('Main', weaponOptions, entry.weapon, value => { entry.weapon = value; changed(); }),
         choice('Backup', weaponOptions, entry.reserve, value => { entry.reserve = value; changed(); }),
         choice('Armor', armorOptions, entry.armor, value => { entry.armor = value; changed(); }));
@@ -61,19 +70,37 @@
     updateControls();
   }
 
+  // A HUD card per fighter, stacked on their team's side.
+  function card(i) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `<h2><span id="name${i}"></span> <small id="class${i}"></small> <em id="status${i}"></em></h2>
+      <div class="bar" role="img" aria-label="Health"><i id="hp${i}"></i><span id="hpText${i}"></span></div>
+      <div class="gauge mana" title="Mana"><i id="mana${i}"></i></div>
+      <div class="gauge energy" title="Energy"><i id="energy${i}"></i></div>
+      <div class="gauge stance" title="Stance"><i id="stance${i}"></i></div>
+      <div class="pips" id="pips${i}" aria-label="Escape charges"></div>
+      <p id="gear${i}"></p>`;
+    return el;
+  }
+
   function setup(seed = Math.floor(Math.random() * 1e9)) {
-    duel = Sim.createDuel(matchup[0], matchup[1], seed, names);
+    duel = Sim.createBattle(matchup.map(({ name, team, ...entry }) => ({ entry, team, name })), seed);
     state = 'ready';
     accumulator = pause = slow = 0;
     Render.reset();
     $('result').hidden = true;
     $('banner').hidden = true;
     $('log').replaceChildren();
-    for (const f of duel.fighters) {
-      const kit = f.kit;
-      $('name' + f.index).textContent = f.name;
-      $('class' + f.index).textContent = kit.name;
+    for (const team of [0, 1]) {
+      $('hud' + team).classList.toggle('team', mode === '2v2');
+      $('hud' + team).replaceChildren(...duel.fighters.filter(f => f.team === team).map(f => card(f.index)));
     }
+    for (const f of duel.fighters) {
+      $('name' + f.index).textContent = f.name;
+      $('class' + f.index).textContent = f.kit.name;
+    }
+    $('record').textContent = [0, 1].map(team => teamLabel(team) + ' ' + wins[team]).join(' · ');
     updateControls();
     updateHud();
   }
@@ -82,6 +109,7 @@
     $('play').textContent = { ready: 'Begin duel', running: 'Pause', paused: 'Resume', finished: 'Rematch' }[state];
     const locked = state === 'running' || state === 'paused';
     $('generate').disabled = locked;
+    $('mode').disabled = locked;
     for (const select of $('loadouts').querySelectorAll('select')) select.disabled = locked;
     $('bout').textContent = String(bout).padStart(2, '0');
   }
@@ -139,7 +167,7 @@
     else if (e.type === 'support') log(`${who} casts ${e.name}.`);
     else if (e.type === 'wallslam') log(`${who} is slammed into the stone.`);
     else if (e.type === 'shieldbreak') log(`${who}’s shield breaks.`);
-    else if (e.type === 'death') log(`${by} wins the bout.`);
+    else if (e.type === 'death') log(duel.winner === null ? `${who} falls to ${by}.` : `${teamLabel(duel.winner)} ${mode === '2v2' ? 'team wins' : 'wins'} the bout.`);
   }
 
   function handleEvents() {
@@ -149,14 +177,17 @@
       // A beat of stillness sells a heavy contact; the killing blow plays in slow motion.
       if (e.type === 'hit') pause = Math.max(pause, e.heavy ? .08 : e.critical ? .055 : .02);
       else if (e.type === 'block' && e.perfect) pause = Math.max(pause, .07);
-      else if (e.type === 'death') {
+      else if (e.type === 'death' && duel.winner === null) pause = Math.max(pause, .1);
+      else if (e.type === 'death' && state !== 'finished') {
         pause = .14;
         slow = 1.1;
         rematch = 3.4;
         state = 'finished';
         wins[duel.winner]++;
-        $('winner').textContent = duel.fighters[duel.winner].name + ' · ' + duel.fighters[duel.winner].kit.name;
-        $('record').textContent = names.map((name, i) => name + ' ' + wins[i]).join(' · ');
+        const victors = duel.fighters.filter(f => f.team === duel.winner);
+        $('winner').textContent = mode === '2v2' ? teamNames[duel.winner] + ' team · ' + victors.map(f => f.name).join(' & ')
+          : victors[0].name + ' · ' + victors[0].kit.name;
+        $('record').textContent = [0, 1].map(team => teamLabel(team) + ' ' + wins[team]).join(' · ');
         setTimeout(() => { if (state === 'finished') $('result').hidden = false; }, 700);
         updateControls();
       }
@@ -190,7 +221,8 @@
   function begin() {
     state = 'running';
     $('banner').hidden = false;
-    $('banner').textContent = duel.fighters.map(f => f.kit.name).join('  vs  ');
+    $('banner').textContent = [0, 1].map(team => duel.fighters.filter(f => f.team === team)
+      .map(f => mode === '2v2' ? f.name : f.kit.name).join(' & ')).join('  vs  ');
     // Restart the entrance animation.
     $('banner').style.animation = 'none';
     void $('banner').offsetWidth;
@@ -206,7 +238,13 @@
   // Swaps which champion and gear stand on which side.
   $('generate').addEventListener('click', () => {
     if (state === 'finished') bout++;
-    loadouts.reverse();
+    // Swap the gear of each opposing pair; the names stay on their side.
+    for (let k = 0; k + 1 < lineup().length; k += 2) {
+      const a = roster[k], b = roster[k + 1], gear = ({ kit, weapon, reserve, armor }) => ({ kit, weapon, reserve, armor });
+      const ga = gear(a);
+      Object.assign(a, gear(b));
+      Object.assign(b, ga);
+    }
     buildLoadouts();
     newMatchup();
     setup();
@@ -217,9 +255,18 @@
   });
   // ?a=murmillo&b=murmillo pins the champions (a mirror match), ?seed=7 repeats a bout, ?debug draws collision shapes.
   // Without them the two champions meet: Varro the murmillo against Cassian the archer.
-  loadouts.forEach((entry, i) => {
+  // ?mode=2v2 starts a team bout.
+  roster.slice(0, 2).forEach((entry, i) => {
     const key = params.get(i ? 'b' : 'a');
-    if (keys.includes(key)) loadouts[i] = gearOf(key);
+    if (keys.includes(key)) Object.assign(entry, gearOf(key));
+  });
+  $('mode').value = mode;
+  $('mode').addEventListener('change', () => {
+    mode = $('mode').value;
+    if (state === 'finished') bout++;
+    buildLoadouts();
+    newMatchup();
+    setup();
   });
 
   Render.init($('arena'));
