@@ -16,5 +16,5 @@ Improvement ideas for the 2.5D arena. Score is impact (1–5) per 10k estimated 
 | A second chamber (a molten one) that rotates between matchups | 3 | 18k | 1.7 |
 | Coordinated 2v2 openers: one teammate draws the rival's swing while the other dashes in behind (rear hits are still only ~7% of 2v2 hits) | 3 | 20k | 1.5 |
 | Idle-RPG roster: name fighters, save their gear and records in the browser and pick from the stable for each bout | 5 | 40k | 1.3 |
+| Redraw the seven older weapons (sword, spear, mace, greatsword, crossbow, bow, staff) at the champions' detail | 3 | 32k | 0.9 |
 | Replace the code-painted fighters with artist-drawn sprite sheets | 5 | 60k+ | 0.8 |
-| Redraw the nine older weapons (sword, spear, axe, mace, maul, greatsword, crossbow, bow, staff) at the champions' detail | 3 | 40k | 0.8 |

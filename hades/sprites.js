@@ -68,6 +68,8 @@
     if (weapon === 'pilum') { p.yaw = .38; p.pitch = .22; p.high = 1.08; }
     if (weapon === 'sling') { p.yaw = .5; p.pitch = 0; p.high = .9; }
     if (['maul', 'greatsword', 'mace', 'axe', 'flail', 'falx', 'hammer'].includes(weapon)) { p.yaw = .5; p.pitch = .7; p.high = 1.05; }
+    // A war maul is too heavy to hold up: its head rests low in front, the haft across the body.
+    if (weapon === 'maul') { p.yaw = .28; p.pitch = -.12; p.high = .98; }
     if (weapon === 'staff') { p.yaw = .75; p.pitch = 1.38; }
     if (weapon === 'crossbow' || weapon === 'bow' || weapon === 'recurve') { p.yaw = .16; p.pitch = 0; p.out = .32; p.high = 1.14; }
     const wave = Math.sin(t * Math.PI * 2);
@@ -197,7 +199,7 @@
     j.side = vector(-Math.sin(p.yaw), Math.cos(p.yaw), 0);
     const twoHanded = ['maul', 'greatsword', 'spear', 'trident', 'falx', 'crossbow', 'bow', 'recurve'].includes(spec.weapon);
     j.handL = spec.shield ? P(shift + .4 - p.droop * .14 + (shape === 'bash' ? p.lunge : 0) + lean * .4, -.3 - p.droop * .08, 1.04 + chestUp - p.crouch + p.bob - p.droop * .3)
-      : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (spec.weapon === 'recurve' ? BRACE : ['crossbow', 'bow'].includes(spec.weapon) ? .42 : .26)))
+      : twoHanded && anim !== 'dead' ? add(j.handR, j.aim.map(v => v * (spec.weapon === 'recurve' ? BRACE : ['crossbow', 'bow'].includes(spec.weapon) ? .42 : spec.weapon === 'maul' ? .34 : .26)))
         : P(shift + .12 - st * .3 + p.swing * .1, fine ? -.42 : -.48, .9 + tall * .6 + p.bob + (anim === 'run' ? .1 : 0));
     // Champions keep their elbows in and down, close to the ribs, instead of flaring them out.
     j.elbowL = add(lerp(j.shoulderL, j.handL, .5), fine ? vector(-.12, -.09, -.22) : vector(-.14, -.2, -.1));
@@ -388,12 +390,6 @@
       stroke([al(1.3, -.12), al(1.76, 0)], .025, metal.edge);
       taper(al(1.08), al(1.22), .13, .1, metal.gold);
       poly([al(1.08, .02), al(.7, .3), al(.82, .08), al(.62, .12), al(1.0, -.02)], look.main);
-    } else if (kind === 'axe') {
-      taper(al(-.2), al(1.0), .085, .075, metal.wood);
-      poly([al(.66, .02), al(.46, .34), al(.6, .55), al(.92, .6), al(1.14, .4), al(.94, .22), al(.98, .02)], metal.steel);
-      stroke([al(.55, .46), al(.9, .54), al(1.08, .4)], .04, metal.edge);
-      poly([al(.68, -.02), al(.8, -.26), al(.94, -.02)], metal.dark);
-      taper(al(.6), al(1.03), .12, .12, metal.gold, false);
     } else if (kind === 'mace') {
       taper(al(-.18), al(.76), .085, .08, metal.wood);
       for (let i = 0; i < 6; i++) {
@@ -403,13 +399,6 @@
       }
       disc(al(.88), .2, metal.iron);
       disc(al(.9, -.04), .08, metal.steel, false);
-    } else if (kind === 'maul') {
-      taper(al(-.3), al(1.1), .1, .1, metal.wood);
-      stroke([al(.2), al(.5)], .13, look.deep);
-      poly([al(.96, -.38), al(1.34, -.34), al(1.42, 0), al(1.34, .34), al(.96, .38), al(.9, 0)], metal.iron);
-      poly([al(1.18, -.35), al(1.34, -.34), al(1.42, 0), al(1.34, .34), al(1.18, .35)], metal.dark, false);
-      taper(al(1.12, -.4), al(1.12, .4), .09, .09, metal.gold);
-      disc(al(1.12), .09, look.light);
     } else if (kind === 'staff') {
       taper(al(-.85), al(.85), .08, .07, '#3b2350');
       poly([al(.74, -.05), al(.86, -.28), al(1.14, -.2), al(.98, -.13), al(.9, -.02)], metal.gold);
@@ -1079,6 +1068,60 @@
       fine([at(.86, -.08), at(.76, -.3)], metal.edge, .01);
       poly([at(.98, -.04), at(1.14, 0), at(.98, .04)], metal.steel, .012);
       disc(at(.89, .05), .03, '#d39a3e', .01);
+    },
+    axe(al, aim, side, look) {
+      // A bearded battle axe: an ash haft with a leather grip, an iron butt cap and a team-colored
+      // cord under the head. The head is forged thin: a socket, a short square poll at the back
+      // and a blade whose edge sweeps down into a hooked beard. Laid flat to the camera.
+      taper(al(-.24), al(1.0), .06, .054, '#7a432c');
+      fine([al(-.22, .012), al(.98, .012)], '#a8693f', .012);
+      taper(al(-.2), al(.12), .072, .072, '#5b3322');
+      for (const d of [-.14, -.06, .02, .1]) fine([al(d, -.034), al(d + .02, .034)], '#2a160e', .012);
+      disc(al(-.26), .045, metal.iron);
+      taper(al(.62), al(.7), .07, .07, look.main);
+      fine([al(.63), al(.69)], look.light, .016);
+      const W = flatAcross(aim, side);
+      const at = (d, w) => add(al(d), W.map(v => v * w));
+      taper(al(.8), al(1.0), .1, .09, metal.dark);
+      // The blade: neck, toe, the curved edge and the beard hooking back to the haft.
+      const edge = [at(1.1, .3), at(1.05, .34), at(.97, .36), at(.86, .35), at(.75, .31), at(.66, .24)];
+      poly([at(.97, .04), at(1.0, .1), ...edge, at(.7, .17), at(.79, .12), at(.83, .04)], metal.steel);
+      poly([at(.95, .05), at(.97, .12), at(1.0, .26), at(.84, .27), at(.76, .2), at(.81, .1), at(.84, .05)], metal.iron, false);
+      fine(edge, metal.edge, .02);
+      fine([at(1.02, .22), at(.94, .28), at(.82, .27), at(.73, .22)], metal.dark, .012);
+      // The poll behind the socket.
+      poly([at(.83, -.04), at(.85, -.12), at(.95, -.12), at(.97, -.04)], metal.iron, .014);
+      fine([at(.86, -.11), at(.94, -.11)], metal.steel, .012);
+      disc(at(.9, 0), .026, '#d39a3e', .01);
+    },
+    maul(al, aim, side, look) {
+      // A two-handed war maul: a long hickory haft with a leather grip for both hands and a team-
+      // colored band between them, iron langets riveted up to a heavy forged head with flared
+      // striking faces at both ends and a bronze band round the socket. Laid flat to the camera.
+      taper(al(-.34), al(1.08), .068, .062, '#6b3a24');
+      fine([al(-.32, .013), al(1.06, .013)], '#9a5f38', .013);
+      taper(al(-.16), al(.44), .078, .078, '#5b3322');
+      for (const d of [-.1, -.02, .06, .24, .32, .4]) fine([al(d, -.036), al(d + .022, .036)], '#2a160e', .012);
+      taper(al(.11), al(.19), .084, .084, look.main);
+      fine([al(.12), al(.18)], look.light, .016);
+      disc(al(-.36), .052, metal.iron);
+      disc(al(-.37, -.01), .02, metal.steel, false);
+      for (const w of [-.034, .034]) fine([al(.74, w), al(1.04, w)], metal.dark, .018);
+      for (const d of [.8, .92]) disc(al(d), .018, metal.steel, .008);
+      const W = flatAcross(aim, side);
+      const at = (d, w) => add(al(d), W.map(v => v * w));
+      // The block, then a flared face at each end, the far rim catching the light.
+      poly([at(1.03, -.23), at(1.25, -.23), at(1.25, .23), at(1.03, .23)], metal.iron);
+      poly([at(1.21, -.22), at(1.25, -.22), at(1.25, .22), at(1.21, .22)], metal.dark, false);
+      for (const s of [-1, 1]) {
+        poly([at(1.04, s * .22), at(.99, s * .25), at(.99, s * .3), at(1.29, s * .3), at(1.29, s * .25), at(1.24, s * .22)], metal.steel);
+        fine([at(1.0, s * .295), at(1.28, s * .295)], metal.edge, .014);
+        fine([at(1.06, s * .24), at(1.22, s * .24)], metal.dark, .01);
+      }
+      poly([at(1.02, -.06), at(1.26, -.06), at(1.26, .06), at(1.02, .06)], '#b98a3a', .014);
+      fine([at(1.04, -.03), at(1.24, -.03)], '#ffdc8c', .012);
+      disc(at(1.14, 0), .036, look.trim, .01);
+      for (const s of [-1, 1]) disc(at(1.14, s * .14), .016, metal.steel, .008);
     },
     sling(al, aim, side, look, charge) {
       // Two braided cords from a finger loop to a leather pouch that cradles a stone. On the
