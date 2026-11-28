@@ -54,6 +54,7 @@
 
   function paintFloor(g) {
     const t = theme();
+    cracks = [];
     const r = noise(71);
     const water = g.createRadialGradient(0, 0, 3, 0, 0, 17);
     t.moat.forEach((color, i) => water.addColorStop([0, .55, 1][i], color));
@@ -573,6 +574,7 @@
         const a = heading + (r() - .5) * 1.5;
         points.push([x += Math.cos(a) * .52, y += Math.sin(a) * .52]);
       }
+      cracks.push(points[1], points[4], points[7]);
       for (const [w, color] of [.46, .2, .1, .035].map((w, i) => [w, colors[i]])) {
         for (let i = 1; i < points.length; i++) {
           g.strokeStyle = color;
@@ -1585,6 +1587,105 @@
 
   // ---- Ambient life ----
 
+  // Bats circling under the temple roof.
+  function drawBats() {
+    ctx.save();
+    ctx.fillStyle = '#1a0a24';
+    ctx.strokeStyle = 'rgba(255,170,210,.55)';
+    ctx.lineWidth = Math.max(1, unit * .02);
+    for (let i = 0; i < 7; i++) {
+      const home = [-9 + i * 3, -5.3 + (i % 3) * .4];
+      const x = home[0] + Math.sin(clock * (.31 + i * .03) + i * 1.7) * 2.2, y = home[1] + Math.sin(clock * (.6 + i * .05) + i) * .45;
+      const flap = Math.sin(clock * (13 + i) + i * 2), s = unit * (.26 + (i % 2) * .06), px = sx(x), py = y * unit;
+      ctx.beginPath();
+      ctx.moveTo(px - s * 1.4, py - flap * s * .9);
+      ctx.quadraticCurveTo(px - s * .6, py - s * .2, px - s * .15, py);
+      ctx.lineTo(px, py - s * .3);
+      ctx.lineTo(px + s * .15, py);
+      ctx.quadraticCurveTo(px + s * .6, py - s * .2, px + s * 1.4, py - flap * s * .9);
+      ctx.quadraticCurveTo(px + s * .6, py + s * .35, px, py + s * .3);
+      ctx.quadraticCurveTo(px - s * .6, py + s * .35, px - s * 1.4, py - flap * s * .9);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Birds crossing the evening sky over Elysium.
+  function drawBirds() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(40,40,80,.75)';
+    ctx.lineWidth = Math.max(1.2, unit * .035);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 6; i++) {
+      const x = ((clock * (.35 + i * .04) + i * 4.7) % 30) - 15, y = -5.7 + (i % 3) * .4 + Math.sin(clock * .5 + i) * .2;
+      const flap = Math.sin(clock * (7 + i) + i), s = unit * (.18 + (i % 2) * .05), px = sx(x), py = y * unit;
+      ctx.beginPath();
+      ctx.moveTo(px - s, py - flap * s * .6);
+      ctx.quadraticCurveTo(px - s * .4, py - s * .3, px, py);
+      ctx.quadraticCurveTo(px + s * .4, py - s * .3, px + s, py - flap * s * .6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Petals and butterflies are stamped from small sheets painted once: a petal at eight turns of
+  // its tumble, a butterfly of each color at four openings of its wings.
+  const butterflyColors = ['#ffd25a', '#9fe0ff', '#ff9ac0', '#fff4d0'];
+  let petalArt, butterflyArt;
+  function paintFlutter() {
+    petalArt = makeCanvas(16 * 8, 32);
+    let g = petalArt.getContext('2d');
+    for (let k = 0; k < 8; k++) for (const [row, color] of [[0, '#ffd6e4'], [1, '#fff8ec']]) {
+      g.fillStyle = color;
+      g.beginPath();
+      g.ellipse(k * 16 + 8, row * 16 + 8, 7, 3.5 * (.35 + .65 * Math.abs(Math.cos(k * Math.PI / 4))), k * Math.PI / 8, 0, Math.PI * 2);
+      g.fill();
+    }
+    butterflyArt = makeCanvas(24 * 4, 16 * 4);
+    g = butterflyArt.getContext('2d');
+    butterflyColors.forEach((color, row) => {
+      for (let k = 0; k < 4; k++) {
+        const open = .15 + k * .28, x = k * 24 + 12, y = row * 16 + 8;
+        g.fillStyle = color;
+        for (const side of [-1, 1]) {
+          g.beginPath();
+          g.ellipse(x + side * 4.4 * open, y - 1, 5.5 * open + .6, 5, side * .4, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.fillStyle = '#2a2030';
+        g.fillRect(x - .7, y - 3.5, 1.4, 6.5);
+      }
+    });
+  }
+
+  // Butterflies fluttering round the edge of the garden floor.
+  function drawButterflies() {
+    if (!butterflyArt) paintFlutter();
+    const w = unit * .5, h = unit * .33;
+    for (let i = 0; i < 9; i++) {
+      const a = clock * (.05 + i * .006) * (i % 2 ? 1 : -1) + i * .7, wobble = Math.sin(clock * 1.3 + i * 2) * .6;
+      const x = Math.cos(a) * (arena.a + .2 + wobble), y = Math.sin(a) * (arena.b + .2 + wobble * .6);
+      const z = 1.1 + Math.sin(clock * 2.2 + i) * .35, open = Math.min(3, Math.floor(Math.abs(Math.cos(clock * 16 + i * 3)) * 4));
+      ctx.drawImage(butterflyArt, open * 24, (i % 4) * 16, 24, 16, sx(x) - w / 2, sy(y, z) - h / 2, w, h);
+    }
+  }
+
+  // Petals drifting down across the garden, tumbling as they fall.
+  function drawPetals() {
+    if (!petalArt) paintFlutter();
+    const size = unit * .16;
+    ctx.save();
+    for (let i = 0; i < 26; i++) {
+      const fall = (clock * (.08 + i % 4 * .015) + i * .137) % 1;
+      const x = ((i * 5.3 + clock * (.5 + i % 3 * .15)) % 26) - 13 + Math.sin(clock + i) * .4, y = (i * 3.77) % 13 - 6.5;
+      ctx.globalAlpha = Math.min(1, (1 - fall) * 4, fall * 8) * .85;
+      const turn = Math.floor((clock * 2 + i) * 8 / Math.PI) & 7;
+      ctx.drawImage(petalArt, turn * 16, (i % 3 ? 0 : 1) * 16, 16, 16, sx(x) - size / 2, sy(y, 5 - fall * 5) - size / 2, size, size);
+    }
+    ctx.restore();
+  }
+
   // Motes of light (or embers, or fireflies) rising from the floor.
   function drawMotes(count, colors, speed = 1, height = 3, size = .13) {
     ctx.save();
@@ -1594,6 +1695,72 @@
       const rise = (clock * (.12 + i % 5 * .03) * speed + i * .37) % 1;
       glow(sx(x), sy(((i * 3.77) % 13) - 6.5, rise * height), unit * size, colors[i % colors.length], Math.sin(rise * Math.PI) * .7);
     }
+    ctx.restore();
+  }
+
+  // A cloth banner on a pole with a crossbar, swaying from the bottom; drawn in screen units.
+  function banner(x, foot, tall, wide, long, [cloth, trim, mark], phase) {
+    const px = sx(x), base = foot * unit, top = (foot - tall) * unit, w = wide * unit, l = long * unit;
+    const sway = t => (Math.sin(clock * 1.6 + phase + t * 2.2) * .5 + Math.sin(clock * 2.7 + phase * 2) * .25) * t * unit * .22;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = ink;
+    ctx.lineWidth = unit * .1;
+    ctx.beginPath();
+    ctx.moveTo(px, base);
+    ctx.lineTo(px, top - unit * .1);
+    ctx.moveTo(px - w * .62, top);
+    ctx.lineTo(px + w * .62, top);
+    ctx.stroke();
+    ctx.strokeStyle = '#b08a44';
+    ctx.lineWidth = unit * .05;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(px - w / 2, top);
+    ctx.lineTo(px + w / 2, top);
+    for (let k = 1; k <= 4; k++) ctx.lineTo(px + w / 2 + sway(k / 4), top + l * k / 4);
+    ctx.lineTo(px + sway(.85), top + l * .8);
+    ctx.lineTo(px - w / 2 + sway(1), top + l);
+    for (let k = 3; k >= 1; k--) ctx.lineTo(px - w / 2 + sway(k / 4), top + l * k / 4);
+    ctx.closePath();
+    ctx.fillStyle = cloth;
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, unit * .04);
+    ctx.strokeStyle = ink;
+    ctx.stroke();
+    ctx.fillStyle = trim;
+    ctx.fillRect(px - w / 2 + sway(.1), top + l * .08, w, unit * .06);
+    ctx.beginPath();
+    ctx.arc(px + sway(.45), top + l * .42, w * .2, 0, Math.PI * 2);
+    ctx.fillStyle = mark;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Glints drifting on the water (or the molten lake) round the foot of the platform.
+  function drawShimmer(rgb) {
+    const rx = arena.a + .75, ry = (arena.b + .75) * K;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 16; i++) {
+      const a = i * 2.4 + clock * .03 * (i % 2 ? 1 : -1), far = 1.14 + (i * .37 % 1) * .34;
+      if (Math.sin(a) < -.25) continue;
+      const life = (clock * .35 + i * .61) % 1, x = Math.cos(a) * rx * far, y = Math.sin(a) * ry * far + 1.5;
+      ctx.globalAlpha = Math.sin(life * Math.PI) * .55;
+      ctx.drawImage(glowStamp(rgb), (x - .35) * unit, (y - .04) * unit, .7 * unit, .08 * unit);
+    }
+    ctx.restore();
+  }
+
+  // Cracks in the temple floor where the light below breathes in and out.
+  let cracks = [];
+  function drawCrackPulse(rgb) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    cracks.forEach(([x, y], i) => {
+      const pulse = Math.max(0, Math.sin(clock * .9 - i * .55)) ** 2;
+      if (pulse > .02) glow(sx(x), sy(y), unit * .5, rgb, pulse * .35);
+    });
     ctx.restore();
   }
 
@@ -1624,6 +1791,9 @@
         ctx.scale(1, K);
         glow(0, 0, unit * 3.3, '70,255,200', .11 + Math.sin(clock * 1.7) * .045);
         ctx.restore();
+        drawShimmer('150,255,230');
+        drawCrackPulse('90,255,210');
+        drawBats();
         drawFalls();
         drawMist(-5.5, .35, .55, 1.7);
         drawMist(-6.6, -.2, .3, 2.2);
@@ -1667,6 +1837,11 @@
       braziers: [[-8.6, -4.9, '255,140,60'], [8.6, -4.9, '255,140,60'], [-8.9, 4.7, '255,180,90'], [8.9, 4.7, '255,180,90']],
       back() {
         for (const o of arena.obstacles) if (o.kind === 'pit') drawPit(o);
+        drawShimmer('255,200,110');
+        drawCrackPulse('255,120,40');
+        for (const [x, foot, tall, phase] of [[-10.1, -3.0, 2.1, 0], [-2.5, -4.8, 1.6, 1.7], [2.5, -4.8, 1.6, 3.1], [10.1, -3.0, 2.1, 4.4]]) {
+          banner(x, foot, tall, .58, tall * .6, ['#6a1410', '#d89a3a', '#1a0a08'], phase);
+        }
         drawFalls();
         drawMist(-5.5, .3, .3, 1.7);
         drawMist(-6.8, -.25, .22, 2.4);
@@ -1701,12 +1876,19 @@
         ctx.scale(1, K);
         glow(0, 0, unit * 3, '255,235,170', .08 + Math.sin(clock * 1.1) * .03);
         ctx.restore();
+        drawShimmer('255,250,215');
+        drawBirds();
+        for (const [x, foot, tall, phase] of [[-10.1, -3.0, 2.1, 0], [-2.5, -4.8, 1.6, 2.2], [2.5, -4.8, 1.6, 3.6], [10.1, -3.0, 2.1, 5.1]]) {
+          banner(x, foot, tall, .5, tall * .58, ['#f4efe0', '#d8b45c', '#7fae5a'], phase);
+        }
         drawFalls();
         drawMist(-5.5, .25, .4, 1.7);
         drawCrowd();
       },
       front() {
         drawShafts();
+        drawPetals();
+        drawButterflies();
       },
       motes: () => drawMotes(24, ['230,255,150', '255,240,170'], .6, 2.2, .1)
     }
@@ -1762,6 +1944,7 @@
 
   // Gradients are costly to create every frame, so each color is painted once and stamped.
   const glows = new Map();
+  const glowStamp = rgb => { if (!glows.has(rgb)) glow(0, 0, 0, rgb, 0); return glows.get(rgb); };
   function glow(x, y, radius, rgb, alpha) {
     let stamp = glows.get(rgb);
     if (!stamp) {
