@@ -8,7 +8,7 @@
   <script src="../hades/sprites.js"></script>
 </head>
 <body>
-  <p>Baked fighter frames at full resolution. <code>?kit=murmillo&amp;team=0&amp;weapon=gladius</code></p>
+  <p>Baked fighter frames at full resolution. <code>?kit=murmillo&amp;team=0&amp;weapon=gladius&amp;spare=pilum</code></p>
   <canvas id="sheet"></canvas>
   <script>
     // Dev view: every facing and animation of one fighter, drawn large on a floor-colored ground.
@@ -17,7 +17,7 @@
     const kit = q.get('kit') || 'murmillo', k = D.kits[kit];
     const weapon = q.get('weapon') || k.weapon;
     const spec = { team: Number(q.get('team') || (kit === 'sagittarius' ? 1 : 0)), kit, armor: k.armor, weapon,
-      spare: weapon === k.weapon ? k.reserve : k.weapon, shield: k.shield !== 'none' && !D.weapons[weapon].twoHanded ? k.shield : null, cracks: 0 };
+      spare: q.get('spare') || (weapon === k.weapon ? k.reserve : k.weapon), shield: k.shield !== 'none' && !D.weapons[weapon].twoHanded ? k.shield : null, cracks: 0 };
     const unit = Number(q.get('unit') || 100);
     S.setResolution(unit);
     const shape = q.get('shape') || D.weapons[weapon].shape;

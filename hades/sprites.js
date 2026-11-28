@@ -729,6 +729,8 @@
     }
   };
   const isChampion = kit => !!champ[kit];
+  // Short blades ride sheathed at the hip; other spares go on the back.
+  const stowedAtHip = ['gladius', 'sica'];
 
   const fine = (points, color, width = .014) => stroke(points, width, color);
   const inked = (points, width, color) => { stroke(points, width + .03, ink); stroke(points, width, color); };
@@ -1426,9 +1428,13 @@
           const grip = P(lean * .5 - .3 - s * .04, -s * .17, hipZ + .12);
           weapon('pilum', grip, vector(-.22 - s * .12, s * .45, .86).map(v => v * .68), vector(0, .9, -.4), look, 0);
         }
+      } else if (!stowedAtHip.includes(spec.spare) && spec.spare !== 'recurve') {
+        // Anything else is slung across the back, grip over the right shoulder.
+        const grip = P(lean * .6 - .36, .26, chestZ + .1);
+        weapon(spec.spare, grip, vector(-.12, -.66, -.72).map(v => v * .72), vector(0, .7, -.7), look, 0);
       }
     });
-    if (spec.spare === 'gladius' || spec.spare === 'sica') {
+    if (stowedAtHip.includes(spec.spare)) {
       // Sheathed at the left hip, hilt forward.
       part(P(.02, -.3, hipZ), () => {
         const mouth = P(lean * .3 + .08, -.3, hipZ + .06);
